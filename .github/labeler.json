@@ -19,7 +19,8 @@
       "accounts": [
         "Jackeyliu37",
         "AndyXuPrime",
-        "heavenllrt"
+        "heavenllrt",
+        "ChenBaoZhuangdayun"
       ],
       "labels": [
         "PrimeTeam"
@@ -45,7 +46,7 @@
   "pathLabels": [
     {
       "paths": [
-        "frontend/**"
+        "apps/frontend/**"
       ],
       "labels": [
         "frontend"
@@ -53,8 +54,7 @@
     },
     {
       "paths": [
-        "services/**",
-        "shared/**"
+        "services/**"
       ],
       "labels": [
         "backend"
@@ -62,13 +62,92 @@
     },
     {
       "paths": [
+        "services/gateway/**"
+      ],
+      "labels": [
+        "service:gateway"
+      ]
+    },
+    {
+      "paths": [
+        "services/auth/**"
+      ],
+      "labels": [
+        "service:auth"
+      ]
+    },
+    {
+      "paths": [
+        "services/file/**"
+      ],
+      "labels": [
+        "service:file"
+      ]
+    },
+    {
+      "paths": [
+        "services/qa/**"
+      ],
+      "labels": [
+        "service:qa"
+      ]
+    },
+    {
+      "paths": [
+        "services/knowledge/**"
+      ],
+      "labels": [
+        "service:knowledge"
+      ]
+    },
+    {
+      "paths": [
+        "services/document/**"
+      ],
+      "labels": [
+        "service:document"
+      ]
+    },
+    {
+      "paths": [
+        "deploy/**"
+      ],
+      "labels": [
+        "deployment"
+      ]
+    },
+    {
+      "paths": [
+        ".github/workflows/**",
+        ".github/labeler.json"
+      ],
+      "labels": [
+        "ci"
+      ]
+    },
+    {
+      "paths": [
         "docs/**",
         "*.md",
-        ".github/**",
-        ".trellis/spec/**"
+        ".github/pull_request_template.md",
+        ".trellis/spec/**",
+        ".trellis/tasks/**"
       ],
       "labels": [
         "documentation"
+      ]
+    },
+    {
+      "paths": [
+        "AGENTS.md",
+        ".agents/**",
+        ".claude/**",
+        ".codex/**",
+        ".cursor/**",
+        ".trellis/**"
+      ],
+      "labels": [
+        "trellis"
       ]
     }
   ]

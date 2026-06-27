@@ -6,45 +6,28 @@ workflow 只能拦截 PR 行为；分支保护和 label 仍需要维护者在 Gi
 
 ## 可选 Label
 
-仓库可保留小组 label 用于筛选和统计，但 PR Guard 不强制要求 PR 带小组
-label：
-
 ```text
 L1nggTeam
 PrimeTeam
 JerryTeam
 frontend
 backend
+documentation
+ci
+deployment
+trellis
+service:gateway
+service:auth
+service:file
+service:qa
+service:knowledge
+service:document
 ```
 
 检查现有 label：
 
 ```bash
 gh label list --repo Sakayori-Iroha-168/Software_Teamwork
-```
-
-缺失时创建：
-
-```bash
-gh label create L1nggTeam \
-  --repo Sakayori-Iroha-168/Software_Teamwork \
-  --description "第一组" \
-  --color ce4dcd
-
-gh label create PrimeTeam \
-  --repo Sakayori-Iroha-168/Software_Teamwork \
-  --description "第二组" \
-  --color a35250
-
-gh label create JerryTeam \
-  --repo Sakayori-Iroha-168/Software_Teamwork \
-  --description "第六组" \
-  --color fd390a
-
-gh label create backend \
-  --repo Sakayori-Iroha-168/Software_Teamwork \
-  --description "后端开发相关PR" \
-  --color 5319e7
 ```
 
 ## develop 分支保护
@@ -115,7 +98,7 @@ check 名称补入 `contexts`。
   ],
   "pathLabels": [
     {
-      "paths": ["frontend/**"],
+      "paths": ["apps/frontend/**"],
       "labels": ["frontend"]
     }
   ]

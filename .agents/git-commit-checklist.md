@@ -7,16 +7,15 @@ This file is for AI agents working in this repository. Read it before running
 
 Before committing, read these files in the current session:
 
-- [docs/git-workflow.md](../docs/git-workflow.md)
+- [CONTRIBUTING.md](../CONTRIBUTING.md)
 - [.trellis/spec/guides/commit-convention.md](../.trellis/spec/guides/commit-convention.md)
 
 ## Commit Gate
 
 Do not run `git commit` until you have checked:
 
-1. The work is on a dedicated branch based on the latest allowed integration
-   branch. Default target is `develop`; use `keep-shitting` only when the task
-   explicitly targets that branch. Never create a routine PR to `main`.
+1. The work is on a dedicated branch based on the latest `develop`. Never
+   create a routine PR to `main`.
 2. The commit includes only files related to the current task. Do not stage
    private local notes, Trellis runtime files, or unrelated user changes.
 3. Quality checks requested by the task or relevant docs have run, or the final
@@ -35,7 +34,7 @@ Do not run `git commit` until you have checked:
 ```text
 docs(workflow): add agent commit checklist
 chore(hooks): remind agents before git commit
-fix(ci): allow keep-shitting pull requests
+docs(workflow): merge cli workflow into contributing
 ```
 
 ## Stop Conditions
@@ -43,7 +42,7 @@ fix(ci): allow keep-shitting pull requests
 Stop and inspect the repo instead of committing when:
 
 - `git status` shows unrelated modified files.
-- The branch was not created from the latest target branch.
-- The target branch is unclear.
+- The branch was not created from the latest `develop`.
+- The PR target branch is unclear.
 - The only possible commit message would be vague, such as `update`, `wip`,
   `fix bug`, or `changes`.

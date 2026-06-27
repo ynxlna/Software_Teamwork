@@ -28,7 +28,7 @@ GIT_OPTIONS_WITH_VALUE = {
 }
 
 REQUIRED_DOCS = (
-    "docs/git-workflow.md",
+    "CONTRIBUTING.md",
     ".trellis/spec/guides/commit-convention.md",
     ".agents/git-commit-checklist.md",
 )

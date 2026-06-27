@@ -8,8 +8,8 @@
 
 ## 检查项
 
-- [ ] PR 目标分支是 `develop` 或 `keep-shitting`
+- [ ] PR 目标分支是 `develop`
 - [ ] PR 来源是个人 fork 的独立分支
-- [ ] 分支已经基于最新目标分支
+- [ ] 分支已经基于最新 `develop`
 - [ ] Commit message 符合 Conventional Commits
 - [ ] 已运行必要检查

@@ -15,9 +15,7 @@ A full-stack project managed with [Trellis](https://github.com/trellis-workflow)
 - Open PRs to `develop` only.
 - Keep `main` for release merges from `develop`.
 
-Full guide: [CONTRIBUTING.md](CONTRIBUTING.md)
-
-GitHub CLI workflow: [docs/git-workflow.md](docs/git-workflow.md)
+Full guide and GitHub CLI workflow: [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Repository guard settings: [docs/repository-settings.md](docs/repository-settings.md)
 

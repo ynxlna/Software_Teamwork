@@ -25,7 +25,7 @@
 Before running `git commit`, read the repository workflow and confirm the branch
 and PR rules still match your current work:
 
-- [docs/git-workflow.md](../../../docs/git-workflow.md)
+- [CONTRIBUTING.md](../../../CONTRIBUTING.md)
 - [.agents/git-commit-checklist.md](../../../.agents/git-commit-checklist.md)
 
 Do not commit unrelated user changes, private local notes, or Trellis runtime

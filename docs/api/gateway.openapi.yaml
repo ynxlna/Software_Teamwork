@@ -7,10 +7,24 @@ info:
     url: https://github.com/Sakayori-Iroha-168/Software_Teamwork
   description: |
     Frontend-facing API contract for the gateway service.
-    This revision only treats gateway health checks, auth, and file-owned routes
+    All stable public and service-to-service HTTP APIs must use RESTful resource-oriented paths.
+    This revision only treats gateway health checks, user/session, and file-owned routes
     as active contracts. Downstream knowledge, QA, document/report, and admin
     aggregation interfaces are intentionally marked under x-missing-contracts
     until their frontend/backend contracts are finalized.
+x-api-style:
+  required: RESTful resource-oriented HTTP APIs
+  appliesTo:
+  - public gateway APIs
+  - service-to-service HTTP APIs
+  rules:
+  - Model stable routes as resources or resource collections.
+  - Use HTTP methods for actions: GET reads, POST creates, PATCH updates, DELETE removes.
+  - Do not put action verbs such as login, logout, register, download, search, generate, export, retry, or revoke in stable paths.
+  - Model long-running work as resources such as jobs, files, sessions, messages, events, or queries.
+  exceptions:
+  - GET /healthz
+  - GET /readyz
 servers:
 - url: /
   description: Gateway root
@@ -20,9 +34,9 @@ tags:
 - name: health
   description: Gateway process and readiness checks.
 - name: auth
-  description: Authentication and current user APIs owned by auth service.
+  description: User and session APIs owned by auth service.
 - name: documents
-  description: File-owned document upload, metadata, deletion, and download APIs.
+  description: File-owned document upload, metadata, deletion, and content APIs.
 paths:
   /healthz:
     get:
@@ -58,12 +72,12 @@ paths:
           $ref: '#/components/responses/Error'
         '503':
           $ref: '#/components/responses/Error'
-  /api/v1/auth/register:
+  /api/v1/users:
     post:
       tags:
       - auth
-      summary: Register a user
-      operationId: registerUser
+      summary: Create user
+      operationId: createUser
       security: []
       x-owner-service: auth
       requestBody:
@@ -71,22 +85,22 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: '#/components/schemas/CreateUserRequest'
       responses:
         '201':
-          description: User registered.
+          description: User and session created.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/SessionResponse'
         '400':
           $ref: '#/components/responses/Error'
-  /api/v1/auth/login:
+  /api/v1/sessions:
     post:
       tags:
       - auth
-      summary: Login
-      operationId: login
+      summary: Create session
+      operationId: createSession
       security: []
       x-owner-service: auth
       requestBody:
@@ -94,31 +108,31 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: '#/components/schemas/CreateSessionRequest'
       responses:
         '200':
-          description: Login succeeded.
+          description: Session created.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: '#/components/schemas/SessionResponse'
         '400':
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
-  /api/v1/auth/logout:
-    post:
+  /api/v1/sessions/current:
+    delete:
       tags:
       - auth
-      summary: Logout
-      operationId: logout
+      summary: Delete current session
+      operationId: deleteCurrentSession
       x-owner-service: auth
       responses:
         '204':
-          description: Logout succeeded.
+          description: Current session deleted.
         '401':
           $ref: '#/components/responses/Error'
-  /api/v1/auth/me:
+  /api/v1/users/me:
     get:
       tags:
       - auth
@@ -206,12 +220,12 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
       description: Delete the file-owned document record and original object. Knowledge index cleanup contract is missing until finalized.
-  /api/v1/documents/{documentId}/download:
+  /api/v1/documents/{documentId}/content:
     get:
       tags:
       - documents
-      summary: Download original document
-      operationId: downloadDocument
+      summary: Get original document content
+      operationId: getDocumentContent
       x-owner-service: file
       parameters:
       - $ref: '#/components/parameters/DocumentId'
@@ -225,7 +239,7 @@ paths:
                 format: binary
         '404':
           $ref: '#/components/responses/Error'
-      description: Download the original file from the file service through gateway.
+      description: Return the original file content from the file service through gateway.
 components:
   securitySchemes:
     bearerAuth:
@@ -302,7 +316,7 @@ components:
           type: object
           additionalProperties:
             type: string
-    RegisterRequest:
+    CreateUserRequest:
       type: object
       required:
       - username
@@ -313,7 +327,7 @@ components:
         password:
           type: string
           format: password
-    LoginRequest:
+    CreateSessionRequest:
       type: object
       required:
       - username
@@ -365,7 +379,7 @@ components:
         expiresAt:
           type: string
           format: date-time
-    AuthResponse:
+    SessionResponse:
       type: object
       required:
       - data
@@ -458,19 +472,30 @@ x-missing-contracts:
   - GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents
   - GET /api/v1/documents/{documentId}
   - GET /api/v1/documents/{documentId}/chunks
-  - POST /api/v1/search
+  - POST /api/v1/knowledge-queries
 - service: qa
   status: missing
   reason: Frontend/backend chat and RAG contract is not finalized yet.
   placeholderOperations:
-  - /api/v1/chat/**
+  - GET/POST /api/v1/qa-sessions
+  - GET/DELETE /api/v1/qa-sessions/{sessionId}
+  - GET/POST /api/v1/qa-sessions/{sessionId}/messages
+  - GET /api/v1/qa-sessions/{sessionId}/events
 - service: document
   status: missing
   reason: Frontend/backend report-generation contract is not finalized yet.
   placeholderOperations:
-  - /api/v1/reports/**
+  - GET/POST /api/v1/reports
+  - GET/PATCH/DELETE /api/v1/reports/{reportId}
+  - GET/POST /api/v1/reports/{reportId}/outlines
+  - GET/POST /api/v1/reports/{reportId}/sections
+  - GET /api/v1/reports/{reportId}/events
+  - POST /api/v1/report-files
+  - GET /api/v1/report-files/{reportFileId}
+  - GET /api/v1/report-files/{reportFileId}/content
 - service: admin
   status: missing
   reason: Administration aggregation contract is not finalized yet.
   placeholderOperations:
-  - /api/v1/admin/**
+  - GET /api/v1/admin-overview
+  - GET /api/v1/admin-metrics

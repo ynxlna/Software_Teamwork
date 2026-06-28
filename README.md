@@ -10,7 +10,7 @@
 | --- | --- |
 | 前端 | React + TypeScript |
 | 后端 | Go 微服务 |
-| 服务通信 | HTTP/REST |
+| 服务通信 | RESTful HTTP API |
 | 关系数据库 | PostgreSQL |
 | 缓存 / 队列 | Redis |
 | 向量数据库 | Qdrant |
@@ -65,6 +65,8 @@ postgres + redis + qdrant + minio
 Gateway 基础契约文档：
 
 当前已确定的前后端公开契约只覆盖 gateway 健康检查、auth 和 file-owned 接口。`knowledge`、`qa`、`document` 和管理后台聚合接口仍在设计中，暂在 OpenAPI 中标记为缺失占位。
+
+所有前端到 gateway、gateway 到下游服务、服务到服务的 HTTP API 都必须使用 RESTful 资源路径，由 HTTP method 表达动作。除 `/healthz`、`/readyz` 外，不在稳定 path 中使用 `login`、`logout`、`register`、`download`、`search`、`generate`、`export`、`retry`、`revoke` 等动作词。
 
 - Gateway 服务规划：[docs/gateway.md](docs/gateway.md)
 - Auth 服务接口文档：[docs/auth.md](docs/auth.md)

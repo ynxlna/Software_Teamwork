@@ -2,18 +2,18 @@
 
 本文档定义 `auth` 服务在项目初期的职责边界和接口契约。当前仓库尚未落地 `services/auth/` 代码，因此本文档以现有 gateway OpenAPI、服务边界矩阵和前后端集成契约为准，用于指导后续 auth 服务实现与联调。
 
-详细的前端公开路径以 [`docs/api/gateway.openapi.yaml`](api/gateway.openapi.yaml) 为准。前端不得直接调用 auth 服务内部地址，只能通过 gateway 暴露的 `/api/v1/**` 入口访问认证能力。
+详细的前端公开路径以 [`docs/api/gateway.openapi.yaml`](api/gateway.openapi.yaml) 为准。前端不得直接调用 auth 服务内部地址，只能通过 gateway 暴露的 `/api/v1/**` 入口访问认证能力。公开和内部 HTTP API 都必须使用 RESTful 资源路径，用户创建使用 `users` 资源，会话创建、查询和删除使用 `sessions` 资源。
 
 ## 职责边界
 
 | 范围 | 说明 |
 | --- | --- |
 | 用户身份 | 维护用户账号、用户 ID、用户名和用户基础状态。 |
-| 凭证校验 | 负责注册、登录、密码校验和凭证安全策略。 |
+| 凭证校验 | 负责用户创建、会话创建、密码校验和凭证安全策略。 |
 | 会话 / 令牌 | 负责签发、校验、撤销 token 或 session，并返回 gateway 可缓存的会话身份。 |
 | 角色权限 | 维护用户角色、权限集合，并为 gateway 提供会话上下文。 |
 | 当前用户 | 根据认证凭据返回当前用户资料。 |
-| 安全事件 | 记录登录失败、登出、令牌撤销等安全相关事件，不能记录明文密码或 token。 |
+| 安全事件 | 记录会话创建失败、会话删除、令牌撤销等安全相关事件，不能记录明文密码或 token。 |
 
 `auth` 不负责文件、知识库、问答、报告生成等业务资源，也不直接暴露给前端。gateway 负责公开 API 路由、统一响应 envelope、request id 和错误响应归一化。
 
@@ -23,7 +23,7 @@
 frontend
    |
    v
-gateway /api/v1/auth/**
+gateway /api/v1/users, /api/v1/sessions, /api/v1/sessions/current, /api/v1/users/me
    |
    v
 auth service
@@ -48,10 +48,10 @@ Gateway 调用下游服务时应传递：
 
 | Method | Gateway Path | Auth | Owner | 说明 |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/v1/auth/register` | 不需要 | `auth` | 注册新用户。 |
-| `POST` | `/api/v1/auth/login` | 不需要 | `auth` | 使用用户名和密码登录。 |
-| `POST` | `/api/v1/auth/logout` | 需要 | `auth` | 注销当前登录态。 |
-| `GET` | `/api/v1/auth/me` | 需要 | `auth` | 获取当前用户资料。 |
+| `POST` | `/api/v1/users` | 不需要 | `auth` | 创建新用户并返回会话。 |
+| `POST` | `/api/v1/sessions` | 不需要 | `auth` | 使用用户名和密码创建会话。 |
+| `DELETE` | `/api/v1/sessions/current` | 需要 | `auth` | 删除当前登录会话。 |
+| `GET` | `/api/v1/users/me` | 需要 | `auth` | 获取当前用户资料。 |
 
 认证机制当前按公开契约使用 `bearerAuth`，即 `Authorization: Bearer <accessToken>`。Auth 服务签发 `sessionId` 和 `accessToken`，gateway 将 auth 返回的会话身份写入 Redis。后续请求由 gateway 基于 Redis 会话缓存完成身份读取和上下文注入。
 
@@ -87,13 +87,13 @@ Gateway 调用下游服务时应传递：
 
 Auth 服务是用户、角色、权限和会话签发的源服务；Gateway 是运行时会话缓存的使用方。二者协作方式如下：
 
-1. Gateway 接收前端登录或注册请求。
+1. Gateway 接收前端用户创建或会话创建请求。
 2. Gateway 调用 auth 服务内部接口。
 3. Auth 校验凭证或创建用户后，返回 `UserSummary` 和 `SessionSummary`。
 4. Gateway 将完整会话身份写入 Redis，缓存键使用 `gateway:session:<accessTokenHash>`。
 5. 前端后续请求携带 `Authorization: Bearer <accessToken>`。
 6. Gateway 用 token 派生 hash 查询 Redis，会话命中后向下游服务注入用户、角色、权限。
-7. 登出、账号禁用、权限变更或安全事件发生时，auth 负责让会话失效，gateway 负责删除 Redis 中对应缓存。
+7. 当前会话删除、账号禁用、权限变更或安全事件发生时，auth 负责让会话失效，gateway 负责删除 Redis 中对应缓存。
 
 Auth 返回给 gateway 的会话身份必须足以构造 Redis 缓存值：
 
@@ -111,7 +111,7 @@ Redis 不是 auth 的持久化数据库。Auth 仍需在自己的 PostgreSQL 或
 
 ## 数据结构
 
-### RegisterRequest
+### CreateUserRequest
 
 ```json
 {
@@ -125,7 +125,7 @@ Redis 不是 auth 的持久化数据库。Auth 仍需在自己的 PostgreSQL 或
 | `username` | `string` | 是 | 登录用户名。 |
 | `password` | `string` | 是 | 用户密码。请求、响应和日志中不得记录明文密码。 |
 
-### LoginRequest
+### CreateSessionRequest
 
 ```json
 {
@@ -175,7 +175,7 @@ Redis 不是 auth 的持久化数据库。Auth 仍需在自己的 PostgreSQL 或
 | `tokenType` | `string` | 是 | 当前固定为 `Bearer`。 |
 | `expiresAt` | `string(date-time)` | 是 | 会话过期时间。Gateway Redis TTL 必须与该时间对齐。 |
 
-### AuthResponse
+### SessionResponse
 
 ```json
 {
@@ -224,14 +224,14 @@ Redis 不是 auth 的持久化数据库。Auth 仍需在自己的 PostgreSQL 或
 
 ## Endpoint 详情
 
-### POST /api/v1/auth/register
+### POST /api/v1/users
 
-注册新用户。该接口不要求认证。
+创建新用户并返回会话。该接口不要求认证。
 
 **Request**
 
 ```http
-POST /api/v1/auth/register
+POST /api/v1/users
 Content-Type: application/json
 ```
 
@@ -246,7 +246,7 @@ Content-Type: application/json
 
 | Status | Body |
 | --- | --- |
-| `201 Created` | `AuthResponse` |
+| `201 Created` | `SessionResponse` |
 
 **Error**
 
@@ -265,14 +265,14 @@ Content-Type: application/json
 
 上述补充状态码加入 OpenAPI 前，前端不得作为公开契约依赖。非预期服务端错误仍按项目统一错误响应处理为 `internal_error`。
 
-### POST /api/v1/auth/login
+### POST /api/v1/sessions
 
-使用用户名和密码登录。该接口不要求认证。
+使用用户名和密码创建会话。该接口不要求认证。
 
 **Request**
 
 ```http
-POST /api/v1/auth/login
+POST /api/v1/sessions
 Content-Type: application/json
 ```
 
@@ -287,7 +287,7 @@ Content-Type: application/json
 
 | Status | Body |
 | --- | --- |
-| `200 OK` | `AuthResponse` |
+| `200 OK` | `SessionResponse` |
 
 `data.session.accessToken` 返回访问令牌，前端后续请求使用：
 
@@ -295,7 +295,7 @@ Content-Type: application/json
 Authorization: Bearer <accessToken>
 ```
 
-登录成功后，gateway 必须把 `data.user` 与 `data.session` 一起写入 Redis。
+会话创建成功后，gateway 必须把 `data.user` 与 `data.session` 一起写入 Redis。
 
 **Error**
 
@@ -310,20 +310,20 @@ Authorization: Bearer <accessToken>
 
 | Status | Code | 场景 |
 | --- | --- | --- |
-| `429` | `rate_limited` | 登录失败频率限制。 |
+| `429` | `rate_limited` | 会话创建失败频率限制。 |
 
 上述补充状态码加入 OpenAPI 前，前端不得作为公开契约依赖。非预期服务端错误仍按项目统一错误响应处理为 `internal_error`。
 
-登录失败响应不得区分“用户名不存在”和“密码错误”，避免泄露账号枚举信息。
+会话创建失败响应不得区分“用户名不存在”和“密码错误”，避免泄露账号枚举信息。
 
-### POST /api/v1/auth/logout
+### DELETE /api/v1/sessions/current
 
-注销当前登录态。该接口要求认证。
+删除当前登录会话。该接口要求认证。
 
 **Request**
 
 ```http
-POST /api/v1/auth/logout
+DELETE /api/v1/sessions/current
 Authorization: Bearer <accessToken>
 ```
 
@@ -343,16 +343,16 @@ Authorization: Bearer <accessToken>
 
 非预期服务端错误仍按项目统一错误响应处理为 `internal_error`。
 
-采用 token 机制时，auth 服务应明确 token 撤销策略，例如服务端 denylist、短期 access token 配合 refresh token，或其他可审计方案。登出成功后，gateway 必须删除 Redis 中的对应会话缓存。
+采用 token 机制时，auth 服务应明确 token 撤销策略，例如服务端 denylist、短期 access token 配合 refresh token，或其他可审计方案。当前会话删除成功后，gateway 必须删除 Redis 中的对应会话缓存。
 
-### GET /api/v1/auth/me
+### GET /api/v1/users/me
 
 获取当前用户资料。该接口要求认证。
 
 **Request**
 
 ```http
-GET /api/v1/auth/me
+GET /api/v1/users/me
 Authorization: Bearer <accessToken>
 ```
 
@@ -392,15 +392,15 @@ Auth 服务需要为 gateway 提供足够的信息，用于构造下游服务的
 | --- | --- | --- |
 | `GET` | `/healthz` | auth 进程存活检查。 |
 | `GET` | `/readyz` | auth 就绪检查，应覆盖 PostgreSQL 等关键依赖。 |
-| `POST` | `/internal/v1/auth/register` | 注册用户，返回用户身份和会话身份。 |
-| `POST` | `/internal/v1/auth/login` | 校验用户名密码，返回用户身份和会话身份。 |
-| `POST` | `/internal/v1/auth/logout` | 撤销当前会话。 |
-| `GET` | `/internal/v1/auth/sessions/{sessionId}` | 查询会话身份，用于缓存修复或调试，不作为 gateway 每次请求的默认路径。 |
-| `POST` | `/internal/v1/auth/sessions/{sessionId}/revoke` | 撤销指定会话，用于账号禁用、权限变更或安全事件。 |
+| `POST` | `/internal/v1/users` | 创建用户，返回用户身份和会话身份。 |
+| `POST` | `/internal/v1/sessions` | 校验用户名密码，返回用户身份和会话身份。 |
+| `DELETE` | `/internal/v1/sessions/current` | 删除当前会话。 |
+| `GET` | `/internal/v1/sessions/{sessionId}` | 查询会话身份，用于缓存修复或调试，不作为 gateway 每次请求的默认路径。 |
+| `DELETE` | `/internal/v1/sessions/{sessionId}` | 删除指定会话，用于账号禁用、权限变更或安全事件。 |
 
-### 内部 Login/Register 成功响应
+### 内部 User/Session 成功响应
 
-Auth 服务返回给 gateway 的成功响应应与公开 `AuthResponse` 的 `data` 对齐：
+Auth 服务返回给 gateway 的成功响应应与公开 `SessionResponse` 的 `data` 对齐：
 
 ```json
 {

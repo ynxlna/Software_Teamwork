@@ -7,6 +7,7 @@
 - `gateway` 是面向前端的后端统一入口，不是业务大单体。
 - 前端只调用 `gateway` 暴露的 `/api/v1/**` 接口，不直接调用内部服务。
 - `gateway` 通过 HTTP/REST 调用内部服务，不 import 其他服务的 Go `internal/` 包。
+- 所有稳定公开 API 和服务间 HTTP API 必须使用 RESTful 资源路径，由 HTTP method 表达动作；除 `/healthz`、`/readyz` 外，不在 path 中使用 `login`、`logout`、`register`、`download`、`search`、`generate`、`export`、`retry`、`revoke` 等动作词。
 - 领域业务规则尽量留在拥有该领域数据和流程的服务中。
 - 跨服务聚合接口必须有明确前端场景，不能把所有服务编排都放进 `gateway`。
 - OpenAPI 契约先行，代码实现必须跟随契约变更。
@@ -18,7 +19,7 @@
 | Public API surface | 暴露前端使用的 `/api/v1/**` HTTP API。 |
 | Routing | 将已确定的公开请求转发到 `auth`、`file` 等内部服务；未定下游服务只保留缺失占位。 |
 | Auth context | 基于 Redis 会话缓存读取用户身份，并向下游传递用户、角色、权限和 request id。 |
-| Session cache | 登录或注册成功后缓存 auth 返回的会话身份信息，后续请求优先从 Redis 获取会话上下文。 |
+| Session cache | 用户或会话创建成功后缓存 auth 返回的会话身份信息，后续请求优先从 Redis 获取会话上下文。 |
 | Response contract | 对前端保持统一成功响应、分页响应和错误响应结构。 |
 | Request correlation | 生成或透传 `X-Request-Id`，并要求下游服务保留该 request id。 |
 | Cross-service aggregation | 仅在前后端契约明确后提供聚合读接口；本轮管理后台概览暂标缺失。 |
@@ -57,10 +58,13 @@
 | --- | --- | --- |
 | `/healthz` | `gateway` | 进程存活检查。 |
 | `/readyz` | `gateway` | 就绪检查。 |
-| `/api/v1/auth/**` | `auth` | 注册、登录、登出、当前用户。 |
+| `/api/v1/users` | `auth` | 创建用户。 |
+| `/api/v1/sessions` | `auth` | 创建登录会话。 |
+| `/api/v1/sessions/current` | `auth` | 删除当前登录会话。 |
+| `/api/v1/users/me` | `auth` | 获取当前用户。 |
 | `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | `file` | 文件上传入口。知识库存在性校验和 ingestion handoff 契约暂未确定。 |
 | `/api/v1/documents/{documentId}` | `file` | 更新 file-owned 文档元数据、删除原始文件记录。 |
-| `/api/v1/documents/{documentId}/download` | `file` | 下载原始文件。 |
+| `/api/v1/documents/{documentId}/content` | `file` | 获取原始文件内容。 |
 
 暂缺的下游接口：
 
@@ -68,16 +72,16 @@
 | --- | --- | --- |
 | `GET/POST /api/v1/knowledge-bases` 和 `GET/PATCH/DELETE /api/v1/knowledge-bases/{knowledgeBaseId}` | `knowledge` | 缺失：知识库 CRUD 契约未定。 |
 | `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents`、`GET /api/v1/documents/{documentId}`、`GET /api/v1/documents/{documentId}/chunks` | `knowledge` | 缺失：知识库内文档列表、文档详情和 chunks 契约未定。 |
-| `/api/v1/search` | `knowledge` | 缺失：检索请求、过滤、排序、返回引用格式未定。 |
-| `/api/v1/chat/**` | `qa` | 缺失：会话、消息、非流式/流式回答、引用事件格式未定。 |
-| `/api/v1/reports/**` | `document` | 缺失：报告记录、大纲、章节生成、导出和下载契约未定。 |
-| `/api/v1/admin/**` | `gateway` + domain services | 缺失：聚合指标来源和展示字段未定。 |
+| `POST /api/v1/knowledge-queries` | `knowledge` | 缺失：检索请求、过滤、排序、返回引用格式未定。 |
+| `GET/POST /api/v1/qa-sessions`、`GET/DELETE /api/v1/qa-sessions/{sessionId}`、`GET/POST /api/v1/qa-sessions/{sessionId}/messages`、`GET /api/v1/qa-sessions/{sessionId}/events` | `qa` | 缺失：会话、消息、非流式/流式回答、引用事件格式未定。 |
+| `GET/POST /api/v1/reports`、`GET/PATCH/DELETE /api/v1/reports/{reportId}`、`GET/POST /api/v1/reports/{reportId}/outlines`、`GET/POST /api/v1/reports/{reportId}/sections`、`GET /api/v1/reports/{reportId}/events`、`GET/POST /api/v1/report-files` | `document` | 缺失：报告记录、大纲、章节、报告文件和内容契约未定。 |
+| `GET /api/v1/admin-overview`、`GET /api/v1/admin-metrics` | `gateway` + domain services | 缺失：聚合指标来源和展示字段未定。 |
 
 当某个 endpoint 涉及两个服务时，文档必须显式标注 workflow owner。默认规则是：拥有核心业务状态的服务拥有流程，gateway 只做入口和上下文传递。
 
 ## 认证与上下文传递
 
-认证机制初期采用 bearer token + Redis 会话缓存。Auth 服务负责认证、签发会话身份和撤销会话；Gateway 负责在登录或注册成功后写入 Redis，并在后续请求中从 Redis 读取会话上下文。
+认证机制初期采用 bearer token + Redis 会话缓存。Auth 服务负责认证、签发会话身份和撤销会话；Gateway 负责在用户或会话创建成功后写入 Redis，并在后续请求中从 Redis 读取会话上下文。
 
 前端请求：
 
@@ -88,14 +92,14 @@
 
 会话缓存流程：
 
-1. 前端调用 `/api/v1/auth/login` 或 `/api/v1/auth/register`。
+1. 前端调用 `/api/v1/sessions` 或 `/api/v1/users`。
 2. Gateway 将请求转发给 auth 服务。
 3. Auth 服务校验凭证，返回用户身份、角色、权限、`sessionId`、`accessToken` 和 `expiresAt`。
 4. Gateway 将完整会话身份写入 Redis，缓存键使用 `gateway:session:<accessTokenHash>`，TTL 与 `expiresAt` 对齐。
 5. 前端后续请求携带 `Authorization: Bearer <accessToken>`。
 6. Gateway 从 Redis 查询会话；命中且未过期时，不需要每次调用 auth 服务。
 7. Gateway 基于缓存的会话身份向下游服务注入 `X-User-Id`、`X-User-Roles`、`X-User-Permissions` 和 `X-Request-Id`。
-8. 登出时 Gateway 调用 auth 撤销会话，并删除 Redis 中的对应缓存。
+8. 当前会话删除时 Gateway 调用 auth 删除会话，并删除 Redis 中的对应缓存。
 
 Redis 会话缓存值应至少包含：
 
@@ -132,18 +136,18 @@ Gateway 调用下游服务时应传递：
 
 下游服务仍需在自己的边界做权限校验，不能只依赖前端传参。
 
-## Gateway Auth 接口
+## Gateway User / Session 接口
 
 Gateway 对前端暴露 auth 相关公开接口，具体 schema 以 [`docs/api/gateway.openapi.yaml`](api/gateway.openapi.yaml) 为准。
 
 | Method | Path | Auth | Gateway 行为 | Auth service 行为 |
 | --- | --- | --- | --- | --- |
-| `POST` | `/api/v1/auth/register` | 不需要 | 转发注册请求，成功后写入 Redis 会话缓存并返回统一 envelope。 | 创建用户、计算角色权限、签发会话身份。 |
-| `POST` | `/api/v1/auth/login` | 不需要 | 转发登录请求，成功后写入 Redis 会话缓存并返回统一 envelope。 | 校验凭证、计算角色权限、签发会话身份。 |
-| `POST` | `/api/v1/auth/logout` | 需要 | 从 Redis 定位当前会话，调用 auth 撤销会话，删除 Redis 缓存。 | 撤销会话或令牌，记录安全事件。 |
-| `GET` | `/api/v1/auth/me` | 需要 | 从 Redis 会话缓存读取当前用户并返回 `UserResponse`。 | 拥有用户和权限源数据；默认不参与每次 `/me` 查询。 |
+| `POST` | `/api/v1/users` | 不需要 | 转发用户创建请求，成功后写入 Redis 会话缓存并返回统一 envelope。 | 创建用户、计算角色权限、签发会话身份。 |
+| `POST` | `/api/v1/sessions` | 不需要 | 转发会话创建请求，成功后写入 Redis 会话缓存并返回统一 envelope。 | 校验凭证、计算角色权限、签发会话身份。 |
+| `DELETE` | `/api/v1/sessions/current` | 需要 | 从 Redis 定位当前会话，调用 auth 删除会话，删除 Redis 缓存。 | 删除会话或令牌，记录安全事件。 |
+| `GET` | `/api/v1/users/me` | 需要 | 从 Redis 会话缓存读取当前用户并返回 `UserResponse`。 | 拥有用户和权限源数据；默认不参与每次 `/me` 查询。 |
 
-登录和注册成功响应包含：
+用户或会话创建成功响应包含：
 
 ```json
 {

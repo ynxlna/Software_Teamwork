@@ -29,6 +29,20 @@ GET /readyz
 /api/v1/**
 ```
 
+Stable public gateway routes and service-to-service HTTP routes must be
+RESTful resource-oriented APIs:
+
+- model paths as resources or collections,
+- use HTTP methods for actions,
+- use `GET` for reads, `POST` for creation, `PATCH` for partial updates, and
+  `DELETE` for deletion,
+- do not put action verbs such as `login`, `logout`, `register`, `download`,
+  `search`, `generate`, `export`, `retry`, or `revoke` in stable paths,
+- model long-running work as resources such as `jobs`, `files`, `sessions`,
+  `messages`, `events`, or `queries`.
+
+`/healthz` and `/readyz` are allowed operational exceptions.
+
 Every OpenAPI operation must include:
 
 - `operationId`
@@ -136,6 +150,7 @@ For documentation-only contract changes:
 - Parse the YAML and verify `$ref` targets resolve.
 - Check route prefix consistency: health routes stay unversioned, public API
   routes use `/api/v1/**`.
+- Check stable and placeholder paths follow the RESTful resource-path rule.
 
 ### 7. Wrong vs Correct
 
@@ -149,10 +164,10 @@ gateway handler -> Qdrant query -> raw vector payload response
 #### Correct
 
 ```text
-frontend -> gateway /api/v1/search
+frontend -> gateway /api/v1/knowledge-queries
 gateway -> knowledge service
 knowledge service -> retrieval infrastructure
-gateway -> normalized SearchResponse or ErrorResponse
+gateway -> normalized KnowledgeQueryResponse or ErrorResponse
 ```
 
 ## Related Documents
@@ -213,8 +228,9 @@ placeholder operations are TODO markers only:
 - Good: keep `POST /api/v1/knowledge-bases/{knowledgeBaseId}/documents` active
   for file upload, while marking `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents`
   missing for the future knowledge-owned list contract.
-- Base: mention future `qa` chat routes in prose and mark `/api/v1/chat/**`
-  missing until message and SSE event shapes are agreed.
+- Base: mention future `qa` routes in prose and mark resource paths such as
+  `/api/v1/qa-sessions/{sessionId}/messages` missing until message and SSE
+  event shapes are agreed.
 - Bad: add full `knowledge`, `qa`, or `document` schemas to OpenAPI as if they
   were stable just to reserve routes.
 
@@ -233,14 +249,15 @@ For documentation-only contract changes:
 #### Wrong
 
 ```text
-OpenAPI paths include POST /api/v1/chat/sessions/{sessionId}/stream
+OpenAPI paths include POST /api/v1/qa-sessions/{sessionId}/messages:stream
 even though QA message and SSE event contracts are not agreed.
 ```
 
 #### Correct
 
 ```text
-x-missing-contracts lists /api/v1/chat/** as missing until the QA contract is finalized.
+x-missing-contracts lists resource placeholders such as
+GET /api/v1/qa-sessions/{sessionId}/events as missing until the QA contract is finalized.
 ```
 
 ## Scenario: Domain Service Interface Documents
@@ -269,7 +286,7 @@ it separate from the public gateway contract.
 
 Document request and response fields using the same public IDs, timestamps,
 envelopes, and error shapes defined in `docs/api/gateway.openapi.yaml`.
-Binary success responses, such as file downloads, may omit the JSON envelope,
+Binary success responses, such as file content, may omit the JSON envelope,
 but error responses must still use the standard error shape.
 
 ### 4. Validation & Error Matrix
@@ -311,7 +328,7 @@ gateway.openapi.yaml has no matching public path
 #### Correct
 
 ```text
-docs/file.md references /api/v1/documents/{documentId}/download
+docs/file.md references /api/v1/documents/{documentId}/content
 gateway.openapi.yaml owns the same public path and owner-service marker
 ```
 
@@ -319,8 +336,8 @@ gateway.openapi.yaml owns the same public path and owner-service marker
 
 ### 1. Scope / Trigger
 
-- Trigger: adding or changing auth login/register/logout/current-user
-  behavior, gateway auth middleware, or session identity fields.
+- Trigger: adding or changing user creation, session creation, current session
+  deletion, current-user behavior, auth middleware, or session identity fields.
 - Applies to `services/gateway/`, `services/auth/`, `docs/auth.md`,
   `docs/gateway.md`, `docs/frontend-backend-contract.md`, and
   `docs/api/gateway.openapi.yaml`.
@@ -330,10 +347,10 @@ gateway.openapi.yaml owns the same public path and owner-service marker
 Public auth routes stay under:
 
 ```text
-POST /api/v1/auth/register
-POST /api/v1/auth/login
-POST /api/v1/auth/logout
-GET  /api/v1/auth/me
+POST /api/v1/users
+POST /api/v1/sessions
+DELETE /api/v1/sessions/current
+GET  /api/v1/users/me
 ```
 
 Auth success responses must include `data.user` and `data.session`.
@@ -371,19 +388,19 @@ Redis is not the durable source of user, role, permission, or session truth.
 | --- | --- |
 | Missing bearer credential | `401 unauthorized` |
 | Redis session miss, expired session, or malformed cache value | `401 unauthorized` |
-| Auth rejects login credentials | `401 unauthorized` |
+| Auth rejects session credentials | `401 unauthorized` |
 | Gateway cannot access Redis for an authenticated business request | `502 dependency_error` |
-| Auth service or durable auth store is unavailable during login/logout | `502 dependency_error` |
+| Auth service or durable auth store is unavailable during user/session operations | `502 dependency_error` |
 
 Do not expose raw tokens, token hashes, Redis keys, session secrets, or auth
 internal URLs to frontend responses or logs.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: login response returns `user` plus `session`; gateway hashes the access
+- Good: session creation response returns `user` plus `session`; gateway hashes the access
   token for the Redis key, sets TTL from `expiresAt`, and injects downstream
   identity headers from the cache.
-- Base: `/auth/me` reads the Redis session cache and returns `UserResponse`
+- Base: `/api/v1/users/me` reads the Redis session cache and returns `UserResponse`
   without calling auth for every request.
 - Bad: gateway stores original access tokens in logs or treats Redis as the
   durable source of permissions.
@@ -392,18 +409,18 @@ internal URLs to frontend responses or logs.
 
 When implementation exists:
 
-- Auth handler/client tests assert `AuthResponse` includes `user.permissions`
+- Auth handler/client tests assert `SessionResponse` includes `user.permissions`
   and `session`.
 - Gateway auth middleware tests cover Redis hit, miss, expired session,
   malformed session, and Redis dependency failure.
 - Gateway downstream client tests assert `X-User-Id`, `X-User-Roles`,
   `X-User-Permissions`, and `X-Request-Id` are propagated.
-- Logout tests assert auth revocation is called and Redis cache is deleted.
+- Current-session deletion tests assert auth invalidation is called and Redis cache is deleted.
 
 For documentation-only changes:
 
 - Parse `docs/api/gateway.openapi.yaml`.
-- Verify `AuthResponse` requires `user` and `session`.
+- Verify `SessionResponse` requires `user` and `session`.
 - Verify docs mention `gateway:session:<accessTokenHash>` and Redis TTL.
 
 ### 7. Wrong vs Correct

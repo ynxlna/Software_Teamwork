@@ -2,7 +2,7 @@
 
 本文档定义 `file` 服务在项目初期的职责边界和接口契约。当前仓库尚未落地 `services/file/` 代码，因此本文档以现有 gateway OpenAPI、服务边界矩阵和前后端集成契约为准，用于指导后续 file 服务实现与联调。
 
-详细的前端公开路径以 [`docs/api/gateway.openapi.yaml`](api/gateway.openapi.yaml) 为准。前端不得直接调用 file 服务内部地址，只能通过 gateway 暴露的 `/api/v1/**` 入口访问文件能力。
+详细的前端公开路径以 [`docs/api/gateway.openapi.yaml`](api/gateway.openapi.yaml) 为准。前端不得直接调用 file 服务内部地址，只能通过 gateway 暴露的 `/api/v1/**` 入口访问文件能力。公开和内部 HTTP API 都必须使用 RESTful 资源路径，原始文件流使用 `documents/{documentId}/content` 子资源表示。
 
 ## 职责边界
 
@@ -11,7 +11,7 @@
 | 原始文件上传 | 接收上传文件，校验文件基础属性，将对象写入 MinIO。 |
 | 文件元数据 | 维护文件 ID、知识库 ID、原始文件名、内容类型、文件大小、标签、上传人和创建时间等元数据。 |
 | 对象存储协调 | 生成服务端 object key，管理 bucket/object 写入、读取和删除，不向前端暴露内部存储路径。 |
-| 文件下载 | 根据文档 ID、用户上下文和权限校验结果返回原始文件流。 |
+| 文件内容读取 | 根据文档 ID、用户上下文和权限校验结果返回原始文件流。 |
 | 文件删除 | 负责文件元数据生命周期和原始对象删除或延迟清理流程。 |
 | 上传工作流入口 | 保存原始文件并为后续 `knowledge` ingestion 预留上下文；handoff 契约暂缺。 |
 
@@ -24,7 +24,7 @@ frontend
    |
    v
 gateway /api/v1/knowledge-bases/{knowledgeBaseId}/documents
-gateway /api/v1/documents/{documentId}/download
+gateway /api/v1/documents/{documentId}/content
    |
    v
 file service
@@ -56,7 +56,7 @@ Gateway 调用 file 服务时应传递：
 | `POST` | `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | 需要 | `file` | 上传文件到知识库上下文。File 保存原始文件和元数据；knowledge handoff 暂缺。 |
 | `PATCH` | `/api/v1/documents/{documentId}` | 需要 | `file` | 更新文件标签等 file-owned 元数据。 |
 | `DELETE` | `/api/v1/documents/{documentId}` | 需要 | `file` | 删除文档对应的原始文件和 file-owned 元数据。 |
-| `GET` | `/api/v1/documents/{documentId}/download` | 需要 | `file` | 下载原始文件。 |
+| `GET` | `/api/v1/documents/{documentId}/content` | 需要 | `file` | 获取原始文件内容。 |
 
 相关但非 file-owned 的公开接口暂缺：
 
@@ -92,7 +92,7 @@ JSON 成功响应遵循 gateway 统一 envelope：
 }
 ```
 
-下载接口成功时返回文件流，不包裹 JSON envelope；失败时仍返回统一错误响应。
+文件内容接口成功时返回文件流，不包裹 JSON envelope；失败时仍返回统一错误响应。
 
 前端和调用方应优先匹配 `error.code`，不要解析 `message` 文案。
 
@@ -316,14 +316,14 @@ Authorization: Bearer <accessToken>
 
 上述补充状态码加入 OpenAPI 前，前端不得作为公开契约依赖。删除需要联动 `knowledge` 清理切片和索引时，file 服务不得自行操作 Qdrant；具体接口或事件机制暂缺。
 
-### GET /api/v1/documents/{documentId}/download
+### GET /api/v1/documents/{documentId}/content
 
-下载原始文件。该接口要求认证。
+获取原始文件内容。该接口要求认证。
 
 **Request**
 
 ```http
-GET /api/v1/documents/doc_123/download
+GET /api/v1/documents/doc_123/content
 Authorization: Bearer <accessToken>
 ```
 
@@ -342,7 +342,7 @@ Authorization: Bearer <accessToken>
 | `Content-Length` | 文件大小，能可靠获得时返回。 |
 | `X-Request-Id` | 与响应体或日志一致的 request id。 |
 
-当前 MVP 不要求断点续传或 Range 下载；如后续支持，需要同步更新 gateway OpenAPI、前后端集成契约和本文档。
+当前 MVP 不要求断点续传或 Range 内容读取；如后续支持，需要同步更新 gateway OpenAPI、前后端集成契约和本文档。
 
 **Error**
 
@@ -357,7 +357,7 @@ Authorization: Bearer <accessToken>
 | Status | Code | 场景 |
 | --- | --- | --- |
 | `401` | `unauthorized` | 缺少认证凭据或用户上下文无效。 |
-| `403` | `forbidden` | 已认证但无权下载该文档。 |
+| `403` | `forbidden` | 已认证但无权读取该文档内容。 |
 
 上述补充状态码加入 OpenAPI 前，前端不得作为公开契约依赖。File 服务不得把 MinIO 内部 URL、bucket、object key 或 access key 返回给前端。
 
@@ -372,9 +372,9 @@ Authorization: Bearer <accessToken>
 | `POST` | `/internal/v1/knowledge-bases/{knowledgeBaseId}/documents` | 接收 gateway 转发的 multipart 上传请求；knowledge handoff 暂缺。 |
 | `PATCH` | `/internal/v1/documents/{documentId}` | 更新 file-owned 元数据。 |
 | `DELETE` | `/internal/v1/documents/{documentId}` | 删除文件记录和原始对象，或标记删除并触发清理。 |
-| `GET` | `/internal/v1/documents/{documentId}/download` | 返回原始文件流给 gateway。 |
+| `GET` | `/internal/v1/documents/{documentId}/content` | 返回原始文件流给 gateway。 |
 
-内部接口也应使用稳定 JSON error shape，并保留 `X-Request-Id`。除下载成功响应外，不要返回裸数据结构。
+内部接口也应使用稳定 JSON error shape，并保留 `X-Request-Id`。除文件内容成功响应外，不要返回裸数据结构。
 
 ## 权限与上下文要求
 
@@ -385,7 +385,7 @@ File 服务需要基于 gateway 注入的认证上下文做服务边界校验。
 | 上传文件 | `document:upload` 或知识库级写权限。 |
 | 更新标签 | `document:update` 或知识库级写权限。 |
 | 删除文件 | `document:delete` 或知识库级管理权限。 |
-| 下载文件 | `document:download`、知识库级读权限或资源所有者权限。 |
+| 读取文件内容 | `document:read`、知识库级读权限或资源所有者权限。 |
 
 资源不存在和无权访问都可以返回 `404 not_found`，用于隐藏资源存在性；需要前端明确展示“无权限”时才返回 `403 forbidden`。
 
@@ -393,10 +393,10 @@ File 服务需要基于 gateway 注入的认证上下文做服务边界校验。
 
 - PostgreSQL 存储文件元数据、所有权、知识库关联、标签、大小、内容类型、checksum、创建时间和删除状态。
 - MinIO 存储原始文件对象；bucket 名按业务目的命名，object key 由 file 服务生成。
-- Object key、bucket、内部下载 URL、MinIO 错误和 access key 不得进入前端响应。
+- Object key、bucket、内部对象 URL、MinIO 错误和 access key 不得进入前端响应。
 - 上传文件名必须做展示层安全处理，不能直接用于 object key。
 - 文件删除应优先保证公开 API 视角下不可访问；物理删除失败时应有可重试的清理机制。
-- 如果生成报告文件也复用 file 服务存储，应由 `document` 服务拥有报告业务状态，file 只提供对象存储和下载能力。
+- 如果生成报告文件也复用 file 服务存储，应由 `document` 服务拥有报告业务状态，file 只提供对象存储和内容读取能力。
 
 ## 错误码约定
 
@@ -406,7 +406,7 @@ File 相关接口使用项目统一错误码：
 | --- | --- | --- |
 | `validation_error` | `400` | multipart 解析失败、缺少文件、文件为空、标签非法、文件类型或大小不满足规则。 |
 | `unauthorized` | `401` | 缺少认证凭据、认证无效或 gateway 未提供有效用户上下文。 |
-| `forbidden` | `403` | 已认证但缺少上传、修改、删除或下载权限。 |
+| `forbidden` | `403` | 已认证但缺少上传、修改、删除或读取内容权限。 |
 | `not_found` | `404` | 文档、知识库或原始对象不存在，或资源对当前用户隐藏。 |
 | `conflict` | `409` | 资源状态不允许当前操作，例如已删除或正在执行互斥流程。 |
 | `rate_limited` | `429` | 上传频率、容量、数量或租户配额超限。 |
@@ -451,8 +451,8 @@ services/file/
 - MinIO bucket 命名、object key 生成规则和本地开发配置。
 - Upload workflow 的最终 owner，以及 file 与 knowledge 的 ingestion handoff 契约。
 - 删除时 knowledge chunks、向量索引和原始对象之间的一致性策略。
-- 是否支持秒传、checksum 去重、断点续传、预签名下载或 Range 下载。
-- 报告导出文件是否通过 file 服务存储，以及 document 服务与 file 服务之间的内部接口。
+- 是否支持秒传、checksum 去重、断点续传、预签名内容 URL 或 Range 内容读取。
+- 报告文件是否通过 file 服务存储，以及 document 服务与 file 服务之间的内部接口。
 
 如果上述决策影响公开字段、错误码或状态码，必须同步更新：
 

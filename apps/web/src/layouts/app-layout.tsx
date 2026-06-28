@@ -48,7 +48,7 @@ export function AppLayout({ children }: PropsWithChildren) {
       <div className="workspace">
         <header className="topbar">
           <div>
-            <p className="eyebrow">frontend-dev</p>
+            <p className="eyebrow">develop</p>
             <h1>技术监督辅助平台</h1>
           </div>
           <div className="status-pill">Bun + React + TypeScript</div>

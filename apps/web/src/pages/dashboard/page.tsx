@@ -22,10 +22,10 @@ const modules = [
 ]
 
 const workflowSteps = [
-  '从 upstream/frontend-dev 拉取功能分支',
+  '从 upstream/develop 创建个人功能分支',
   '在 apps/web/src 内开发前端功能',
-  '运行 bun --cwd apps/web run check 和 build',
-  '从 fork 分支发起 PR 到 upstream/frontend-dev',
+  '运行 bun run --cwd apps/web check 和 build',
+  '从 fork 分支发起 PR 到 upstream/develop',
 ]
 
 export function DashboardPage() {

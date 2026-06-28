@@ -4,28 +4,22 @@ services:
   knowledge-api:
     build:
       context: .
-      args:
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
     image: software-teamwork/knowledge-service:local
     container_name: knowledge-api
     environment:
-      KNOWLEDGE_SERVICE_NAME: knowledge-api
-      KNOWLEDGE_SERVICE_VERSION: ${KNOWLEDGE_SERVICE_VERSION:-0.2.0}
+      KNOWLEDGE_HTTP_ADDR: ":8000"
+      KNOWLEDGE_SERVICE_VERSION: ${KNOWLEDGE_SERVICE_VERSION:-0.3.0}
       KNOWLEDGE_ENV: ${KNOWLEDGE_ENV:-local}
+      KNOWLEDGE_STORAGE_BACKEND: ${KNOWLEDGE_STORAGE_BACKEND:-memory}
+      DATABASE_URL: ${DATABASE_URL:-postgres://knowledge:knowledge@postgres:5432/knowledge?sslmode=disable}
+      FILE_SERVICE_BASE_URL: ${FILE_SERVICE_BASE_URL:-}
       EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local_hashing}
       EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}
-      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-https://api.siliconflow.cn/v1}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
-      POSTGRES_DSN: postgresql://${POSTGRES_USER:-knowledge}:${POSTGRES_PASSWORD:-knowledge}@postgres:5432/${POSTGRES_DB:-knowledge}
-      REDIS_URL: redis://redis:6379/0
-      QDRANT_URL: http://qdrant:6333
-      MINIO_ENDPOINT: minio:9000
-      MINIO_BUCKET: ${MINIO_BUCKET:-knowledge-documents}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-local_hashing}
+      QDRANT_URL: ${QDRANT_URL:-}
+      QDRANT_COLLECTION: ${QDRANT_COLLECTION:-knowledge_chunks}
     ports:
       - "${KNOWLEDGE_API_PORT:-8000}:8000"
-    volumes:
-      - ./app:/app/app:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -36,54 +30,11 @@ services:
       minio:
         condition: service_healthy
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=2)",
-        ]
+      test: ["CMD", "/app/knowledge-server", "healthcheck"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
-    restart: unless-stopped
-
-  knowledge-worker:
-    build:
-      context: .
-      args:
-        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
-    image: software-teamwork/knowledge-service:local
-    container_name: knowledge-worker
-    environment:
-      KNOWLEDGE_SERVICE_NAME: knowledge-worker
-      KNOWLEDGE_SERVICE_VERSION: ${KNOWLEDGE_SERVICE_VERSION:-0.2.0}
-      KNOWLEDGE_ENV: ${KNOWLEDGE_ENV:-local}
-      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-local_hashing}
-      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-384}
-      EMBEDDING_API_BASE: ${EMBEDDING_API_BASE:-https://api.siliconflow.cn/v1}
-      EMBEDDING_API_KEY: ${EMBEDDING_API_KEY:-}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-BAAI/bge-m3}
-      POSTGRES_DSN: postgresql://${POSTGRES_USER:-knowledge}:${POSTGRES_PASSWORD:-knowledge}@postgres:5432/${POSTGRES_DB:-knowledge}
-      REDIS_URL: redis://redis:6379/0
-      QDRANT_URL: http://qdrant:6333
-      MINIO_ENDPOINT: minio:9000
-      MINIO_BUCKET: ${MINIO_BUCKET:-knowledge-documents}
-    command: ["python", "-m", "app.worker"]
-    volumes:
-      - ./app:/app/app:ro
-    depends_on:
-      knowledge-api:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      qdrant:
-        condition: service_started
-      minio:
-        condition: service_healthy
+      start_period: 10s
     restart: unless-stopped
 
   postgres:

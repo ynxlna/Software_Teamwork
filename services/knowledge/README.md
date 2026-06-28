@@ -1,26 +1,87 @@
 # Knowledge Service
 
-This directory contains the knowledge ingestion, chunking, embedding, and retrieval service.
-It lives under `services/knowledge/` to match the upstream service boundary docs.
+`services/knowledge` is the Go microservice that owns knowledge ingestion state,
+chunks, embeddings, Qdrant indexing, and retrieval coordination. The previous
+Python/FastAPI prototype has been removed from this service directory so future
+work happens against the repository standard Go service layout.
 
-## Local Startup
+Frontend callers must not call this service directly. Public routes stay behind
+gateway and are documented in `docs/api/gateway.openapi.yaml`.
+
+## Current Scope
+
+Implemented now:
+
+- `GET /healthz`
+- `GET /readyz`
+- `GET /internal/v1/knowledge-bases`
+- `POST /internal/v1/knowledge-bases`
+- `GET /internal/v1/knowledge-bases/{knowledgeBaseId}`
+- `PATCH /internal/v1/knowledge-bases/{knowledgeBaseId}`
+- `DELETE /internal/v1/knowledge-bases/{knowledgeBaseId}`
+- `GET /internal/v1/knowledge-bases/{knowledgeBaseId}/documents`
+- `POST /internal/v1/knowledge-bases/{knowledgeBaseId}/ingestion-jobs`
+- `POST /internal/v1/knowledge-bases/{knowledgeBaseId}/jobs`
+- `GET /internal/v1/documents/{documentId}`
+- `GET /internal/v1/documents/{documentId}/chunks`
+- `GET /internal/v1/jobs/{jobId}`
+- `POST /internal/v1/jobs/{jobId}/processing-runs`
+- `POST /internal/v1/knowledge-queries`
+- `GET /internal/v1/runtime-config`
+- `PATCH /internal/v1/runtime-config`
+- `GET /internal/v1/knowledge-stats`
+- Go service-local module, HTTP server, configuration loading, response
+  envelope, error envelope, memory/PostgreSQL repositories, parser/chunker,
+  embedding/vector adapters, tests, Dockerfile, and service-local OpenAPI.
+
+Next migration slices:
+
+- Real asynchronous worker/queue execution for ingestion and reprocessing.
+- Production embedding provider adapter and rerank provider adapter.
+- File service handoff integration after upload.
+- Gateway exposure for selected P1 admin endpoints after public OpenAPI review.
+
+Out of scope for this baseline:
+
+- File upload ownership.
+- Public frontend exposure for internal runtime config/statistics endpoints.
+
+## Local Run
 
 ```bash
 cd services/knowledge
-cp .env.example .env
-docker compose up -d --build
+go test ./...
+go build ./cmd/server
+KNOWLEDGE_HTTP_ADDR=:8000 go run ./cmd/server
+```
+
+Check the service:
+
+```bash
 curl http://localhost:8000/healthz
+curl http://localhost:8000/readyz
 ```
 
-Swagger is available at:
+## Configuration
 
-```text
-http://localhost:8000/docs
-```
+| Variable | Default | Description |
+| --- | --- | --- |
+| `KNOWLEDGE_HTTP_ADDR` | `:8000` | HTTP listen address. |
+| `KNOWLEDGE_SERVICE_VERSION` | `0.3.0` | Service version shown by readiness. |
+| `KNOWLEDGE_ENV` | `local` | Runtime environment label. |
+| `KNOWLEDGE_STORAGE_BACKEND` | `memory` | Metadata backend. Supported values: `memory`, `postgres`. |
+| `DATABASE_URL` | unset | PostgreSQL connection string required when `KNOWLEDGE_STORAGE_BACKEND=postgres`. |
+| `FILE_SERVICE_BASE_URL` | unset | Optional File Service base URL used by ingestion pipeline source reads. |
+| `KNOWLEDGE_SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout. |
+| `EMBEDDING_PROVIDER` | `local_hashing` | Embedding provider label for readiness and future pipeline wiring. |
+| `EMBEDDING_MODEL` | `local_hashing` | Embedding model label. |
+| `EMBEDDING_DIMENSION` | `384` | Embedding vector dimension. |
+| `QDRANT_URL` | unset | Optional Qdrant REST base URL. When unset, the service uses an in-memory vector index for local tests. |
+| `QDRANT_COLLECTION` | `knowledge_chunks` | Qdrant collection name for vector indexing and retrieval. |
 
-Detailed local setup notes are in [docs/local-docker-compose.md](docs/local-docker-compose.md).
+## Response Shape
 
-Most JSON responses use the gateway-style envelope:
+JSON success responses use:
 
 ```json
 {
@@ -29,82 +90,60 @@ Most JSON responses use the gateway-style envelope:
 }
 ```
 
-Knowledge debugging responses include `_fieldDescriptions`, a Chinese field explanation map for backend inspection.
+JSON errors use:
 
-## Local API Surface
-
-The local service uses resource-style paths that match the active gateway knowledge contract where possible:
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/healthz` | Liveness check |
-| `GET` | `/readyz` | Readiness and model/vector configuration check |
-| `POST` | `/api/v1/knowledge-bases` | Create or update a local knowledge base |
-| `GET` | `/api/v1/knowledge-bases` | List knowledge bases |
-| `GET` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | Get knowledge base details |
-| `PATCH` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | Update knowledge base metadata or strategies |
-| `DELETE` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | Delete knowledge base metadata, chunks, and Qdrant points |
-| `POST` | `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | Upload a document and run local ingestion |
-| `GET` | `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | List documents in a knowledge base |
-| `GET` | `/api/v1/documents/{documentId}` | Get document processing details |
-| `PATCH` | `/api/v1/documents/{documentId}` | Update document tags |
-| `DELETE` | `/api/v1/documents/{documentId}` | Delete document chunks and Qdrant points |
-| `GET` | `/api/v1/documents/{documentId}/chunks` | List semantic chunks |
-| `GET` | `/api/v1/jobs/{jobId}` | Get ingest job status |
-| `POST` | `/api/v1/knowledge-queries` | Run vector retrieval |
-| `GET` | `/api/v1/admin-overview` | Local overview statistics |
-
-Note: upstream `docs/api/gateway.openapi.yaml` now contains active knowledge-owned paths for knowledge bases, document processing details, chunks, and knowledge queries. This local service is used to verify those capabilities before gateway proxy implementation; local-only endpoints such as jobs and admin overview are not frontend-stable unless they are added to the gateway OpenAPI.
-
-## Folder Ingest
-
-Scan a folder and output candidate files:
-
-```bash
-cd services/knowledge
-scripts/ingest_folder.sh \
-  --dir /home/bao/Obsidian/Computer/软件工程合作/要求 \
-  --recursive \
-  --output /tmp/knowledge_candidates.txt \
-  --show-excluded
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "request validation failed",
+    "requestId": "req_123"
+  }
+}
 ```
 
-Upload candidates into a local knowledge base and run service-side chunking/vectorization:
+The service must not return SQL details, object keys, raw vectors, prompts,
+tokens, API keys, or internal URLs in HTTP responses.
 
-```bash
-scripts/ingest_folder.sh \
-  --dir /home/bao/projects/linux \
-  --recursive \
-  --upload \
-  --kb-id kb_linux \
-  --kb-name "Linux Knowledge Base" \
-  --tags '["linux","local-test"]' \
-  --max-files 20 \
-  --show-excluded
-```
+## Contract Notes
 
-The shell script only scans and calls the API. Parsing, semantic chunking, embedding, PostgreSQL writes, and Qdrant writes happen inside `knowledge-api`.
+Gateway active public Knowledge operations remain:
 
-For metadata-style local filtering, `--tags '{"数据集":"linux","来源":"本地测试"}'` is still accepted by the service, but the upstream public upload contract uses `string[]` tags.
+- `GET /api/v1/knowledge-bases`
+- `POST /api/v1/knowledge-bases`
+- `GET /api/v1/knowledge-bases/{knowledgeBaseId}`
+- `PATCH /api/v1/knowledge-bases/{knowledgeBaseId}`
+- `DELETE /api/v1/knowledge-bases/{knowledgeBaseId}`
+- `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents`
+- `GET /api/v1/documents/{documentId}`
+- `GET /api/v1/documents/{documentId}/chunks`
+- `POST /api/v1/knowledge-queries`
 
-## Embedding
+Service-to-service implementation routes will live under `/internal/v1/**` as
+they are migrated. Do not revive older `/api/v1/knowledge/...` or action-suffix
+paths such as `:retry` as stable public API.
 
-The default embedding provider is `local_hashing`, which is offline and only intended to verify the pipeline. For real semantic retrieval, configure an OpenAI-compatible embedding API in `.env`:
+## Internal Knowledge Base API
+
+Business routes require gateway-injected user context:
 
 ```text
-EMBEDDING_PROVIDER=siliconflow
-EMBEDDING_DIMENSION=1024
-EMBEDDING_API_BASE=https://api.siliconflow.cn/v1
-EMBEDDING_API_KEY=your-key
-EMBEDDING_MODEL=BAAI/bge-m3
+X-User-Id: usr_123
+X-Request-Id: req_123
 ```
 
-When changing `EMBEDDING_DIMENSION`, clear or recreate the Qdrant collection before re-ingesting.
+Create a knowledge base:
 
-## Current Scope
+```bash
+curl -X POST http://localhost:8000/internal/v1/knowledge-bases \
+  -H 'Content-Type: application/json' \
+  -H 'X-User-Id: usr_123' \
+  -d '{"name":"General","docType":"GENERAL"}'
+```
 
-- `knowledge-api`: FastAPI app with knowledge base, document upload, chunk listing, job lookup, and retrieval endpoints.
-- `knowledge-worker`: placeholder worker process for the future async ingest queue.
-- PostgreSQL, Redis, Qdrant, MinIO, Adminer, and Redis Commander via service-local Docker Compose.
+List knowledge bases:
 
-The current ingestion path runs inline inside the API process for local development. The service boundaries are structured so it can move to the worker later without changing the folder script contract.
+```bash
+curl 'http://localhost:8000/internal/v1/knowledge-bases?page=1&pageSize=20&keyword=general&docType=GENERAL' \
+  -H 'X-User-Id: usr_123'
+```

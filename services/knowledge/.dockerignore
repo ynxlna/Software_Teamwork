@@ -1,6 +1,7 @@
 .env
 data/
 legacy-runtime-data/
+knowledge-server
 __pycache__/
 *.py[cod]
 .pytest_cache/

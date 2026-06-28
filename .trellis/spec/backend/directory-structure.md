@@ -110,6 +110,25 @@ When adding a service:
 6. Add CI path filters for `services/<service>/**`.
 7. Update README and this spec if the service changes architecture.
 
+### Baseline Slice For Service Migration
+
+When replacing a prototype service with the standard Go microservice shape, the
+first implementation slice should establish a runnable baseline before moving
+business workflows:
+
+- service-local `go.mod` and `cmd/server/main.go`,
+- `internal/config` with validated env keys and documented local defaults,
+- `GET /healthz` and `GET /readyz` using the standard JSON envelope,
+- service-local `api/openapi.yaml` for implemented internal or operational
+  routes,
+- handler tests for response envelopes and request ID propagation,
+- Dockerfile and local Compose wiring when the service has a local stack,
+- README notes that identify any retained prototype code as migration reference
+  rather than stable runtime behavior.
+
+This keeps the ownership boundary testable while avoiding a risky one-shot
+rewrite of ingestion, retrieval, storage, and gateway proxy behavior.
+
 ---
 
 ## Common Mistakes

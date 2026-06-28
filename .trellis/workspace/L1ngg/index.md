@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 10
+- **Total Sessions**: 11
 - **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~338 | Active |
+| `journal-1.md` | ~374 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 11 | 2026-06-28 | Knowledge Go Service Migration | `6c29227`, `fbe56ae`, `afd7784`, `5dece29` | `L1nggTeam/feat/knowledge-go-service` |
 | 10 | 2026-06-28 | Sync API contract decisions | `738c0ec` | `develop` |
 | 9 | 2026-06-28 | 整体需求与 OpenAPI 契约分析 | `3ab21af` | `develop` |
 | 8 | 2026-06-28 | Expand knowledge QA requirements analysis | `e763d20`, `6387d86` | `develop` |

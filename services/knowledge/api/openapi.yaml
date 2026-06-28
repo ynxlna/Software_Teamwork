@@ -1,0 +1,1179 @@
+openapi: 3.0.3
+info:
+  title: Knowledge Service Internal API
+  version: 0.3.0
+  description: >
+    Service-local API contract for the Go-based Knowledge service. Public
+    frontend contracts remain owned by the gateway OpenAPI. This service
+    exposes operational endpoints and service-local /internal/v1 resources for
+    knowledge metadata, document processing state, ingestion jobs, retrieval,
+    runtime config, and statistics.
+servers:
+  - url: http://localhost:8000
+tags:
+  - name: operations
+  - name: knowledge-bases
+paths:
+  /healthz:
+    get:
+      tags: [operations]
+      summary: Liveness check
+      operationId: getKnowledgeHealth
+      responses:
+        '200':
+          description: Service is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+  /readyz:
+    get:
+      tags: [operations]
+      summary: Readiness and local configuration check
+      operationId: getKnowledgeReadiness
+      responses:
+        '200':
+          description: Service is ready with validated local configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-bases:
+    get:
+      tags: [knowledge-bases]
+      summary: List knowledge bases
+      operationId: listInternalKnowledgeBases
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: docType
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Knowledge bases visible to the gateway user context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [knowledge-bases]
+      summary: Create knowledge base
+      operationId: createInternalKnowledgeBase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKnowledgeBaseRequest'
+      responses:
+        '201':
+          description: Knowledge base created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-bases/{knowledgeBaseId}:
+    parameters:
+      - name: knowledgeBaseId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [knowledge-bases]
+      summary: Get knowledge base
+      operationId: getInternalKnowledgeBase
+      responses:
+        '200':
+          description: Knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [knowledge-bases]
+      summary: Update knowledge base
+      operationId: updateInternalKnowledgeBase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKnowledgeBaseRequest'
+      responses:
+        '200':
+          description: Knowledge base updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [knowledge-bases]
+      summary: Delete knowledge base
+      operationId: deleteInternalKnowledgeBase
+      responses:
+        '204':
+          description: Knowledge base deleted.
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-bases/{knowledgeBaseId}/documents:
+    parameters:
+      - name: knowledgeBaseId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [knowledge-bases]
+      summary: List knowledge-base documents
+      operationId: listInternalKnowledgeBaseDocuments
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentStatus'
+      responses:
+        '200':
+          description: Documents in the knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-bases/{knowledgeBaseId}/ingestion-jobs:
+    parameters:
+      - name: knowledgeBaseId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [knowledge-bases]
+      summary: Create ingestion job from file handoff
+      operationId: createInternalIngestionJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HandoffRequest'
+      responses:
+        '201':
+          description: Ingestion job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HandoffResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-bases/{knowledgeBaseId}/jobs:
+    parameters:
+      - name: knowledgeBaseId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [knowledge-bases]
+      summary: Create knowledge-base job
+      operationId: createInternalKnowledgeBaseJob
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                jobType:
+                  type: string
+                  enum: [reprocess]
+      responses:
+        '202':
+          description: Reprocessing job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/documents/{documentId}:
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [knowledge-bases]
+      summary: Get document processing details
+      operationId: getInternalDocument
+      responses:
+        '200':
+          description: Document processing details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/documents/{documentId}/chunks:
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [knowledge-bases]
+      summary: List document chunks
+      operationId: listInternalDocumentChunks
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 50
+      responses:
+        '200':
+          description: Document chunks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentChunkListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /internal/v1/jobs/{jobId}:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [knowledge-bases]
+      summary: Get processing job
+      operationId: getInternalProcessingJob
+      responses:
+        '200':
+          description: Processing job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/jobs/{jobId}/processing-runs:
+    parameters:
+      - name: jobId
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [knowledge-bases]
+      summary: Run an ingestion processing job
+      operationId: createInternalProcessingRun
+      responses:
+        '201':
+          description: Processing run completed for the current synchronous MVP implementation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-queries:
+    post:
+      tags: [knowledge-bases]
+      summary: Create knowledge query
+      operationId: createInternalKnowledgeQuery
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQueryRequest'
+      responses:
+        '201':
+          description: Knowledge query result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeQueryResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+  /internal/v1/runtime-config:
+    get:
+      tags: [knowledge-bases]
+      summary: Get sanitized runtime configuration
+      operationId: getInternalRuntimeConfig
+      responses:
+        '200':
+          description: Sanitized runtime configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeConfigResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [knowledge-bases]
+      summary: Update runtime configuration
+      operationId: updateInternalRuntimeConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RuntimeConfigUpdateRequest'
+      responses:
+        '200':
+          description: Sanitized runtime configuration.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RuntimeConfigResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /internal/v1/knowledge-stats:
+    get:
+      tags: [knowledge-bases]
+      summary: Get knowledge statistics
+      operationId: getInternalKnowledgeStats
+      responses:
+        '200':
+          description: Knowledge statistics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeStatsResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+components:
+  responses:
+    Error:
+      description: Standard error envelope.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          required: [service, status]
+          properties:
+            service:
+              type: string
+              example: knowledge
+            status:
+              type: string
+              example: ok
+        requestId:
+          type: string
+          example: req_123
+    ReadyResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          type: object
+          required:
+            - service
+            - status
+            - version
+            - environment
+            - storageBackend
+            - embeddingProvider
+            - embeddingModel
+            - embeddingDimension
+            - qdrantCollection
+          properties:
+            service:
+              type: string
+              example: knowledge
+            status:
+              type: string
+              example: ready
+            version:
+              type: string
+              example: 0.3.0
+            environment:
+              type: string
+              example: local
+            storageBackend:
+              type: string
+              example: memory
+            embeddingProvider:
+              type: string
+              example: local_hashing
+            embeddingModel:
+              type: string
+              example: local_hashing
+            embeddingDimension:
+              type: integer
+              example: 384
+            qdrantCollection:
+              type: string
+              example: knowledge_chunks
+        requestId:
+          type: string
+          example: req_123
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code:
+              type: string
+              enum:
+                - validation_error
+                - unauthorized
+                - forbidden
+                - not_found
+                - conflict
+                - rate_limited
+                - dependency_error
+                - internal_error
+            message:
+              type: string
+            requestId:
+              type: string
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+    PageInfo:
+      type: object
+      required: [page, pageSize, total]
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    ChunkStrategy:
+      type: object
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          example: SEMANTIC_TEXT
+        chunkSize:
+          type: integer
+          minimum: 1
+        overlap:
+          type: integer
+          minimum: 0
+        separators:
+          type: array
+          items:
+            type: string
+    RetrievalStrategy:
+      type: object
+      additionalProperties: true
+      properties:
+        mode:
+          type: string
+          example: VECTOR
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+        scoreThreshold:
+          type: number
+          minimum: 0
+        rerankTopN:
+          type: integer
+          nullable: true
+          minimum: 1
+    CreateKnowledgeBaseRequest:
+      type: object
+      required: [name]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+    UpdateKnowledgeBaseRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+    KnowledgeBaseSummary:
+      type: object
+      required:
+        - id
+        - name
+        - description
+        - docType
+        - chunkStrategy
+        - retrievalStrategy
+        - documentCount
+        - chunkCount
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+        documentCount:
+          type: integer
+          minimum: 0
+        chunkCount:
+          type: integer
+          minimum: 0
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    KnowledgeBaseResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeBaseSummary'
+        requestId:
+          type: string
+    KnowledgeBaseListResponse:
+      type: object
+      required: [data, page, requestId]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeBaseSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    DocumentStatus:
+      type: string
+      enum:
+        - uploaded
+        - parsing
+        - chunking
+        - embedding
+        - ready
+        - failed
+    DocumentSummary:
+      type: object
+      required:
+        - id
+        - knowledgeBaseId
+        - name
+        - status
+        - chunkCount
+        - createdAt
+      properties:
+        id:
+          type: string
+        knowledgeBaseId:
+          type: string
+        name:
+          type: string
+        contentType:
+          type: string
+          nullable: true
+        sizeBytes:
+          type: integer
+          minimum: 0
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        chunkCount:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+        parserBackend:
+          type: string
+          nullable: true
+        createdBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        jobId:
+          type: string
+          nullable: true
+    DocumentResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/DocumentSummary'
+        requestId:
+          type: string
+    DocumentListResponse:
+      type: object
+      required: [data, page, requestId]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    DocumentChunk:
+      type: object
+      required:
+        - id
+        - knowledgeBaseId
+        - documentId
+        - chunkIndex
+        - content
+        - tokenCount
+        - createdAt
+      properties:
+        id:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        chunkIndex:
+          type: integer
+          minimum: 0
+        sectionPath:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tokenCount:
+          type: integer
+          minimum: 0
+        chunkType:
+          type: string
+          nullable: true
+        qdrantPointId:
+          type: string
+          nullable: true
+        embeddingProvider:
+          type: string
+          nullable: true
+        embeddingDimension:
+          type: integer
+          minimum: 1
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    DocumentChunkListResponse:
+      type: object
+      required: [data, page, requestId]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentChunk'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    HandoffRequest:
+      type: object
+      required: [fileId, name]
+      properties:
+        fileId:
+          type: string
+        name:
+          type: string
+        contentType:
+          type: string
+        sizeBytes:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+        createdBy:
+          type: string
+        idempotencyKey:
+          type: string
+    HandoffResult:
+      type: object
+      required: [documentId, jobId, status]
+      properties:
+        documentId:
+          type: string
+        jobId:
+          type: string
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+    HandoffResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/HandoffResult'
+        requestId:
+          type: string
+    ProcessingJob:
+      type: object
+      required:
+        - id
+        - knowledgeBaseId
+        - jobType
+        - status
+        - progressPercent
+        - attempts
+        - maxAttempts
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+          nullable: true
+        jobType:
+          type: string
+          enum: [ingest, reprocess, delete_cleanup]
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed, cancelled]
+        currentStage:
+          type: string
+          nullable: true
+        progressPercent:
+          type: integer
+          minimum: 0
+          maximum: 100
+        message:
+          type: string
+          nullable: true
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+        attempts:
+          type: integer
+          minimum: 0
+        maxAttempts:
+          type: integer
+          minimum: 1
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProcessingJobResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/ProcessingJob'
+        requestId:
+          type: string
+    KnowledgeQueryRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+        knowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        scoreThreshold:
+          type: number
+          minimum: 0
+          default: 0
+        tags:
+          type: array
+          items:
+            type: string
+        metadataFilter:
+          type: object
+          additionalProperties:
+            type: string
+        rerank:
+          type: boolean
+          default: false
+        rerankTopN:
+          type: integer
+          nullable: true
+          minimum: 1
+    KnowledgeQueryResult:
+      type: object
+      required: [score, knowledgeBaseId, documentId, chunkId, documentName, contentPreview]
+      properties:
+        score:
+          type: number
+        pointId:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        chunkId:
+          type: string
+        documentName:
+          type: string
+        sectionPath:
+          type: string
+          nullable: true
+        chunkIndex:
+          type: integer
+          nullable: true
+          minimum: 0
+        chunkType:
+          type: string
+          nullable: true
+        contentPreview:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    KnowledgeQueryTrace:
+      type: object
+      required: [embeddingProvider, embeddingModel, embeddingDimension, qdrantCollection, searchTopK, scoreThreshold, hitCount, rerank]
+      properties:
+        embeddingProvider:
+          type: string
+        embeddingModel:
+          type: string
+        embeddingDimension:
+          type: integer
+          minimum: 1
+        qdrantCollection:
+          type: string
+        searchTopK:
+          type: integer
+          minimum: 1
+        scoreThreshold:
+          type: number
+          minimum: 0
+        hitCount:
+          type: integer
+          minimum: 0
+        rerank:
+          type: boolean
+        rerankTopN:
+          type: integer
+          nullable: true
+          minimum: 1
+    KnowledgeQuerySummary:
+      type: object
+      required: [id, query, results, trace]
+      properties:
+        id:
+          type: string
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeQueryResult'
+        trace:
+          $ref: '#/components/schemas/KnowledgeQueryTrace'
+    KnowledgeQueryResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeQuerySummary'
+        requestId:
+          type: string
+    RuntimeConfig:
+      type: object
+      required:
+        - embeddingProvider
+        - embeddingModel
+        - embeddingDimension
+        - qdrantCollection
+        - parserBackend
+        - rerankProvider
+        - retrievalTopK
+        - scoreThreshold
+        - maxConcurrentJobs
+        - processingTimeoutSec
+      properties:
+        embeddingProvider:
+          type: string
+        embeddingModel:
+          type: string
+        embeddingDimension:
+          type: integer
+          minimum: 1
+        qdrantCollection:
+          type: string
+        parserBackend:
+          type: string
+        rerankProvider:
+          type: string
+        rerankModel:
+          type: string
+        retrievalTopK:
+          type: integer
+          minimum: 1
+          maximum: 100
+        scoreThreshold:
+          type: number
+          minimum: 0
+        maxConcurrentJobs:
+          type: integer
+          minimum: 1
+        processingTimeoutSec:
+          type: integer
+          minimum: 1
+        secretRefs:
+          type: object
+          additionalProperties:
+            type: string
+    RuntimeConfigUpdateRequest:
+      type: object
+      properties:
+        parserBackend:
+          type: string
+        rerankProvider:
+          type: string
+        rerankModel:
+          type: string
+        retrievalTopK:
+          type: integer
+          minimum: 1
+          maximum: 100
+        scoreThreshold:
+          type: number
+          minimum: 0
+        maxConcurrentJobs:
+          type: integer
+          minimum: 1
+        processingTimeoutSec:
+          type: integer
+          minimum: 1
+        secretRefs:
+          type: object
+          additionalProperties:
+            type: string
+    RuntimeConfigResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/RuntimeConfig'
+        requestId:
+          type: string
+    DailyUploadStat:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+    KnowledgeStats:
+      type: object
+      required: [knowledgeBaseCount, documentCount, chunkCount, readyDocumentCount, failedDocumentCount, recentUploads]
+      properties:
+        knowledgeBaseCount:
+          type: integer
+          minimum: 0
+        documentCount:
+          type: integer
+          minimum: 0
+        chunkCount:
+          type: integer
+          minimum: 0
+        readyDocumentCount:
+          type: integer
+          minimum: 0
+        failedDocumentCount:
+          type: integer
+          minimum: 0
+        recentUploads:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyUploadStat'
+    KnowledgeStatsResponse:
+      type: object
+      required: [data, requestId]
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeStats'
+        requestId:
+          type: string

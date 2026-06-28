@@ -7,7 +7,7 @@
 ## Confirmed Decisions
 
 - Knowledge 模块迁回 README 规划的 Go 微服务，不继续把现有 Python FastAPI 服务作为正式 MVP 技术栈。
-- 现有 `services/knowledge` Python/FastAPI 代码只作为原型参考和迁移依据；正式实现应建立服务本地 Go module、`cmd/server`、`internal/*`、`api/openapi.yaml`、`migrations/`、Dockerfile 和测试。
+- 旧 `services/knowledge` Python/FastAPI 原型已移除；正式实现应继续基于服务本地 Go module、`cmd/server`、`internal/*`、`api/openapi.yaml`、`migrations/`、Dockerfile 和测试。
 - 当前稳定对外契约以 `docs/api/gateway.openapi.yaml` 和 `docs/services/knowledge.md` 为准。
 - `docs/接口契约/知识管理-api契约.md` 和 `docs/接口契约/openapi/knowledge.openapi.yaml` 是早期分析产物，其中 `/api/v1/knowledge/...`、`:batch-delete`、`:retry` 等路径不作为当前稳定公开 API。
 - File Service 拥有原始文件上传、原文件内容和 file-owned 标签/元数据更新；Knowledge Service 拥有知识库元数据、文档处理状态、chunks、embedding、Qdrant 索引和检索。
@@ -28,7 +28,7 @@
 - `docs/接口契约/知识管理-api契约.md`
 - `docs/接口契约/openapi/knowledge.openapi.yaml`
 - `services/knowledge/README.md`
-- `services/knowledge/app/main.py`
+- 旧 `services/knowledge/app/` Python 原型目录（现已移除）
 - `.trellis/spec/backend/index.md`
 - `.trellis/spec/backend/directory-structure.md`
 - `services/file/README.md`
@@ -64,7 +64,7 @@
 - 完整管理后台聚合指标，除非 gateway OpenAPI 明确接收。
 - 组织、电厂、专业等复杂多维数据权限。
 - OCR、多模态图片 chunk 和本地模型部署能力。
-- 一次性完整迁移 Python 原型的所有本地调试能力；迁移应按 Go 服务稳定契约分阶段进行。
+- 一次性恢复旧 Python 原型的所有本地调试能力；后续能力应按 Go 服务稳定契约分阶段重建。
 
 ## External API Surface To Provide
 
@@ -97,13 +97,13 @@
 
 ### Task 1: Go Service Baseline And Contract Reconciliation
 
-目标：建立 Knowledge Go 微服务骨架，把当前权威契约、历史契约和 Python 原型差异对齐，形成可执行实现基线。
+目标：建立 Knowledge Go 微服务骨架，把当前权威契约、历史契约和旧 Python 原型移除状态对齐，形成可执行实现基线。
 
 交付：
 - `services/knowledge` 切换为 Go module 布局。
 - `GET /healthz`、`GET /readyz` 可运行并有测试。
 - `api/openapi.yaml` 或服务接口文档明确内部接口和 gateway 对齐关系。
-- 文档说明 Python 原型的保留/迁移策略，以及历史契约废弃路径。
+- 文档说明 Python 原型已移除，以及历史契约废弃路径。
 - 形成 P0/P1 API 差距清单。
 
 ### Task 2: Knowledge Metadata Persistence And Public DTO Alignment
@@ -124,7 +124,7 @@
 - 内部 handoff 接口或消息契约。
 - 创建 ingestion job 后能持久化状态，并驱动解析、切片、embedding、Qdrant 写入。
 - 失败原因、attempt、progress/currentStage 可查询。
-- 如保留 Python parser/ingest 逻辑，必须包在明确的 adapter 或 worker 边界后面，不影响 Go API 契约。
+- 不重新引入 Python/FastAPI runtime；parser/ingest 能力后续按 Go adapter 或 worker 边界重建，不影响 Go API 契约。
 
 ### Task 4: Retrieval API And Qdrant Contract Hardening
 
@@ -167,7 +167,7 @@
 
 ## Technical Notes
 
-- 当前 `services/knowledge/` 已建立 Go module；旧 Python 原型保留为迁移参考。
+- 当前 `services/knowledge/` 已建立 Go module；旧 Python 原型文件已从服务目录移除。
 - `services/file/` 可作为当前仓库内 Go 服务布局、README 和内部 RESTful 口径的参考。
 - 后续进入实现前需要读取 `.trellis/spec/backend/index.md`、`directory-structure.md`、`database-guidelines.md`、`api-contracts.md`、`error-handling.md`、`logging-guidelines.md`、`quality-guidelines.md`。
 - 若前端开始接入，需要同时加载项目级 `frontend-workflow` skill，并遵循 `.trellis/spec/frontend/index.md`。

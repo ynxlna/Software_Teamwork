@@ -5,8 +5,8 @@ info:
   description: >
     Service-local API contract for the Go-based Knowledge service. Public
     frontend contracts remain owned by the gateway OpenAPI. This service
-    currently exposes only operational readiness endpoints while the Python
-    prototype is migrated into Go vertical slices.
+    currently exposes only operational readiness endpoints; ingestion and
+    retrieval behavior will be rebuilt as Go vertical slices.
 servers:
   - url: http://localhost:8000
 tags:

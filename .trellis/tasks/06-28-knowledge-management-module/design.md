@@ -21,7 +21,7 @@ services/knowledge/
 └── README.md
 ```
 
-现有 Python/FastAPI 原型只作为迁移参考。Go 服务的 HTTP 契约、DTO、错误码和边界以 gateway OpenAPI、`docs/services/knowledge.md` 和 backend spec 为准。
+旧 Python/FastAPI 原型已从 `services/knowledge/` 移除。Go 服务的 HTTP 契约、DTO、错误码和边界以 gateway OpenAPI、`docs/services/knowledge.md` 和 backend spec 为准。
 
 ## Boundaries
 
@@ -43,10 +43,10 @@ services/knowledge/
 
 - Keep stable public paths as `/api/v1/knowledge-bases`, `/api/v1/documents/{documentId}`, `/api/v1/documents/{documentId}/chunks`, `/api/v1/knowledge-queries`.
 - Do not revive older `/api/v1/knowledge/...` or action suffix paths as stable public API.
-- If Python parsing code remains temporarily useful, call it through an adapter/worker boundary rather than exposing Python service contracts to frontend or gateway as final API.
+- Do not reintroduce Python/FastAPI as the service runtime; rebuild parsing and ingestion behind Go service-owned adapter or worker boundaries.
 
 ## Risks
 
-- Python prototype currently contains the most complete local ingestion logic; migrating to Go may temporarily reduce capability. Mitigation: migrate by vertical slices and keep reference behavior documented.
+- Removing the Python prototype temporarily reduces local ingestion capability. Mitigation: rebuild metadata, handoff, ingestion, and retrieval as Go vertical slices with tests.
 - Gateway and File handoff are not fully implemented yet. Mitigation: start with internal HTTP resource contracts and memory/PostgreSQL-friendly ports so wiring can evolve.
 - Qdrant and embedding provider setup can slow MVP. Mitigation: keep platform clients behind service-owned interfaces and allow a deterministic local embedding adapter for tests.

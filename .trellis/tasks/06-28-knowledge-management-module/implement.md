@@ -6,7 +6,7 @@
    - [x] 创建 `services/knowledge/go.mod`。
    - [x] 添加 `cmd/server/main.go`、config、HTTP router、health/readiness handlers。
    - [x] 添加 README、Dockerfile、`api/openapi.yaml` baseline。
-   - [x] 保留 Python 原型作为迁移参考，并更新实现说明，避免它继续被误认为正式服务。
+   - [x] 移除旧 Python 原型，并更新实现说明，避免它继续被误认为正式服务。
 
 2. Task 2: 元数据和 DTO。
    - 设计 KnowledgeBase、KnowledgeDocument、DocumentChunk、ProcessingJob domain model。
@@ -54,12 +54,12 @@ go test ./...
 
 ## Risky Files
 
-- `services/knowledge/`：当前已有 Python 原型，迁移时不能静默删除有参考价值的逻辑；需要明确迁移/保留策略。
+- `services/knowledge/`：旧 Python 原型已移除；后续能力需要按 Go vertical slice 重建。
 - `docs/api/gateway.openapi.yaml`：公开契约改动必须谨慎，不能让历史动作式路径重新进入稳定 API。
 - `docs/services/knowledge.md`：服务接口文档必须和 gateway OpenAPI 保持一致。
 
 ## Rollback Points
 
 - Task 1 只建立 Go skeleton 和文档基线，风险较低。
-- 迁移 ingestion/retrieval 前保留 Python 原型可读状态，直到 Go pipeline 覆盖相同核心能力。
+- ingestion/retrieval 需要在 Go pipeline 中逐步重建；当前 baseline 不再依赖旧 Python runtime。
 - Gateway proxy 上线前先用 service-local tests 和 contract tests 验证字段与错误响应。

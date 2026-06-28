@@ -1,9 +1,9 @@
 # Knowledge Service
 
 `services/knowledge` is the Go microservice that owns knowledge ingestion state,
-chunks, embeddings, Qdrant indexing, and retrieval coordination. The service is
-being migrated from the previous Python/FastAPI prototype to the repository
-standard Go service layout.
+chunks, embeddings, Qdrant indexing, and retrieval coordination. The previous
+Python/FastAPI prototype has been removed from this service directory so future
+work happens against the repository standard Go service layout.
 
 Frontend callers must not call this service directly. Public routes stay behind
 gateway and are documented in `docs/api/gateway.openapi.yaml`.
@@ -28,18 +28,10 @@ Next migration slices:
 
 Out of scope for this baseline:
 
-- Python ingestion parity.
 - PostgreSQL persistence.
 - Qdrant writes and retrieval.
 - File upload ownership.
 - Public frontend routing through gateway.
-
-## Legacy Python Prototype
-
-The `app/`, `requirements.txt`, `scripts/ingest_folder.sh`, and historical local
-Compose notes are retained as migration references only. They are not the
-official runtime for the Knowledge service after this baseline. Do not expose
-the Python prototype as the stable service contract.
 
 ## Local Run
 

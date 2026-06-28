@@ -2,7 +2,7 @@
 
 版本：v0.3
 日期：2026-06-28
-范围：`services/knowledge/` Go 微服务基线、Python 原型迁移边界、与上游契约的对齐说明
+范围：`services/knowledge/` Go 微服务基线、旧 Python 原型移除状态、与上游契约的对齐说明
 
 ## 1. 文档定位
 
@@ -23,7 +23,7 @@
 
 ## 2. 当前结论
 
-Knowledge Service 已从 Python/FastAPI 原型迁回 README 规划的 Go 微服务方向。当前 Go 基线位于：
+Knowledge Service 已从 Python/FastAPI 原型迁回 README 规划的 Go 微服务方向，旧 Python 原型文件已从 `services/knowledge/` 移除。当前 Go 基线位于：
 
 ```text
 services/knowledge/
@@ -47,7 +47,7 @@ GET /healthz
 GET /readyz
 ```
 
-旧 Python/FastAPI 代码仍保留在 `services/knowledge/app/`，`requirements.txt` 和 `scripts/ingest_folder.sh` 也暂时保留，但它们只作为迁移参考，不再是正式运行时契约。
+`services/knowledge/app/`、`requirements.txt` 和 `scripts/ingest_folder.sh` 已移除。后续 ingestion、parser、embedding、Qdrant 和 retrieval 能力应按 Go vertical slice 在 `internal/` 下重新实现。
 
 ## 3. 服务边界
 
@@ -289,16 +289,16 @@ docker compose up -d --build
 
 当前 Docker Compose 是 knowledge 组本地开发拓扑，不放在仓库根目录，避免影响其他组。
 
-## 10. 与 Python 原型的关系
+## 10. 旧 Python 原型移除状态
 
-旧 Python 原型曾经实现本地 multipart 上传、解析、切片、embedding、Qdrant 写入、job 查询、`admin-overview` 和 folder ingest。这些能力暂不作为当前 Go baseline 的已实现能力。
+旧 Python 原型曾经实现本地 multipart 上传、解析、切片、embedding、Qdrant 写入、job 查询、`admin-overview` 和 folder ingest。这些能力已随原型移除，暂不作为当前 Go baseline 的已实现能力。
 
-迁移原则：
+后续重建原则：
 
 - 先以 Go 服务稳定工程骨架、HTTP envelope、错误码和配置入口。
 - 再迁移知识库 metadata、文档状态、chunks、job 和 retrieval 的 vertical slice。
-- 如果短期复用 Python parser/ingest 逻辑，必须包在明确 adapter 或 worker 边界后面，不影响 Go API 契约。
-- 不允许前端或 gateway 依赖 Python 原型的临时调试字段，例如 `_fieldDescriptions`。
+- 不允许重新引入 Python/FastAPI runtime 作为正式服务入口。
+- 不允许前端或 gateway 依赖旧 Python 原型的临时调试字段，例如 `_fieldDescriptions`。
 
 ## 11. 后续对齐步骤
 
@@ -320,7 +320,7 @@ Knowledge 相关公开契约已进入 gateway OpenAPI。后续接入实现按以
 - Docker image 能 build。
 - `docker compose config --quiet` 通过。
 - `GET /healthz` 和 `GET /readyz` 返回统一 envelope。
-- README、service-local OpenAPI 和本实现说明不再把 Python/FastAPI 原型描述为正式运行时。
+- README、service-local OpenAPI 和本实现说明不再保留 Python/FastAPI 原型运行入口。
 
 后续业务能力验收：
 

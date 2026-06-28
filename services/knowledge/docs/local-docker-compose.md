@@ -16,8 +16,7 @@ from `services/knowledge/`.
 | `redis-commander` | <http://localhost:8081> | Redis web UI |
 
 The current Go baseline exposes only `/healthz` and `/readyz`. The previous
-Python/FastAPI ingest API remains in `app/` as migration reference and is not
-started by this Compose file.
+Python/FastAPI ingest API has been removed from this service directory.
 
 ## First Run
 
@@ -132,9 +131,9 @@ Validate Compose syntax:
 docker compose config
 ```
 
-## Legacy Python Prototype
+## Removed Prototype
 
 Historical folder-ingest commands and FastAPI Swagger examples from the Python
-prototype are intentionally not documented as current runtime behavior. Use the
-files under `app/` and `scripts/` only as migration references while rebuilding
-the Knowledge service as Go vertical slices.
+prototype are no longer part of this service. Rebuild ingestion, parser,
+embedding, and retrieval behavior as Go vertical slices under the service-local
+`internal/` packages.

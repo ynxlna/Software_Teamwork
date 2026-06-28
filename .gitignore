@@ -1,61 +1,116 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+lerna-debug.log*
+
+# TypeScript / React / Vite / Bun
+node_modules/
+.bun/
+dist/
+dist-ssr/
+build/
+.vite/
+.vite-inspect/
+.cache/
+coverage/
+*.tsbuildinfo
+
+# Next.js or other future frontend build outputs
+.next/
+out/
+
+# Go binaries and compiled objects
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Go test binaries and coverage artifacts
 *.test
-
-# Code coverage profiles and other test artifacts
 *.out
 coverage.*
 *.coverprofile
 profile.cov
 
-# Dependency directories (remove the comment below to include it)
+# Go dependency directories
 # vendor/
 
-# Go workspace file
+# Go workspace files are local unless the team explicitly adopts a shared workspace.
 go.work
 go.work.sum
 
-# env file
-.env
-.env.*
-!.env.example
-.env.local
-.env.*.local
-
-# TypeScript / React / Node / Bun
-node_modules/
-dist/
-build/
-.next/
-out/
-coverage/
-*.tsbuildinfo
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# PostgreSQL
+# Docker Compose and infrastructure data
 pgdata/
+redis-data/
+qdrant_storage/
+minio-data/
 *.dump
+*.sql.gz
+*.tar.gz
 
-# Build artifacts
-/bin/
+# Local runtime artifacts
+.worktrees/
 tmp/
+temp/
+*.pid
+*.seed
 
-# OS
-.DS_Store
-Thumbs.db
+# Build artifacts shared by services
+bin/
+debug/
+release/
 
-# Editor/IDE
-.idea/
-.vscode/
+# Tool caches
+.eslintcache
+.prettier-cache
+.turbo/
+.parcel-cache/
+.rollup.cache/
+
+# Test and report output
+playwright-report/
+test-results/
+reports/rendered_pages/
+
+# Local certificates and keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+!*.example.pem
+!*.example.key
+!*.example.crt
+
+# Local archives and backups
+*.bak
+*.tmp
+*.orig

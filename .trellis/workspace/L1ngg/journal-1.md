@@ -303,3 +303,36 @@ Supplemented the knowledge management and smart QA requirements analysis with so
 ### Next Steps
 
 - None - task complete
+
+
+## Session 10: Sync API contract decisions
+
+**Date**: 2026-06-28
+**Task**: Sync API contract decisions
+**Branch**: `develop`
+
+### Summary
+
+Reviewed requirements and API contract docs, restored the decision sync checklist, aligned OpenAPI drafts with Markdown contracts, validated OpenAPI descriptions, then archived the Trellis task.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `738c0ec` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

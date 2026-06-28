@@ -1,0 +1,61 @@
+openapi: 3.0.3
+info:
+  title: QA Service API
+  version: 0.1.0
+paths:
+  /api/conversations/{conversation_id}:
+    get:
+      summary: Return structured conversation history.
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: X-User-ID
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Conversation history.
+        "401":
+          description: Authentication is missing.
+        "403":
+          description: Conversation belongs to another user.
+        "404":
+          description: Conversation was not found.
+  /api/chat/stream:
+    post:
+      summary: Accept the current user message and build backend context.
+      parameters:
+        - name: X-User-ID
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - conversation_id
+                - message
+              additionalProperties: false
+              properties:
+                conversation_id:
+                  type: string
+                message:
+                  type: string
+      responses:
+        "200":
+          description: SSE stream with accepted context metadata.
+        "400":
+          description: Invalid request shape.
+        "401":
+          description: Authentication is missing.
+        "403":
+          description: Conversation belongs to another user.

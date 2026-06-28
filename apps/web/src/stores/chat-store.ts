@@ -1,8 +1,8 @@
 /**
- * Chat UI state — conversations cache, streaming flag, error tracking.
+ * Chat UI state — sessions cache, streaming flag, error tracking.
  *
- * Full conversation objects live in memory only (they come from the server).
- * Only conversation IDs are persisted to localStorage so the sidebar can
+ * Full session objects live in memory only (they come from the server).
+ * Only session IDs are persisted to localStorage so the sidebar can
  * restore the session list across page reloads.
  */
 
@@ -12,11 +12,11 @@ import { persist } from 'zustand/middleware'
 import type { Conversation, Message } from '@/lib/types'
 
 export interface ChatState {
-  /** Full conversation objects (in-memory, fetched from server). */
-  conversations: Conversation[]
-  /** Conversation IDs persisted to localStorage for session recovery. */
-  conversationIds: string[]
-  /** Currently selected conversation. */
+  /** Full session objects (in-memory, fetched from server or created locally). */
+  sessions: Conversation[]
+  /** Session IDs persisted to localStorage for session recovery. */
+  sessionIds: string[]
+  /** Currently selected session. */
   activeId: string | null
   /** Whether an SSE stream is in progress. */
   streaming: boolean
@@ -27,12 +27,16 @@ export interface ChatState {
 
   // ── Actions ──
 
-  setConversations: (conversations: Conversation[]) => void
-  setConversationIds: (ids: string[]) => void
+  /** Bulk-set sessions (used when syncing from server). */
+  setSessions: (sessions: Conversation[]) => void
+  setSessionIds: (ids: string[]) => void
   setActiveId: (id: string | null) => void
-  addConversation: (conversation: Conversation) => void
-  removeConversation: (id: string) => void
-  updateConversationMessages: (id: string, messages: Message[]) => void
+  /** Prepend a new session, deduping by id. Also updates persisted sessionIds. */
+  addSession: (session: Conversation) => void
+  /** Remove a session and its persisted id. Clears activeId if it matches. */
+  removeSession: (id: string) => void
+  /** Replace the messages array for a given session. */
+  updateSessionMessages: (id: string, messages: Message[]) => void
   setStreaming: (streaming: boolean) => void
   setError: (error: string | null) => void
   setLastFailedMsg: (msg: string | null) => void
@@ -42,44 +46,44 @@ export interface ChatState {
 export const useChatStore = create<ChatState>()(
   persist(
     (set) => ({
-      conversations: [],
-      conversationIds: [],
+      sessions: [],
+      sessionIds: [],
       activeId: null,
       streaming: false,
       error: null,
       lastFailedMsg: null,
 
-      setConversations: (conversations) => set({ conversations }),
+      setSessions: (sessions) => set({ sessions }),
 
-      setConversationIds: (ids) => set({ conversationIds: ids }),
+      setSessionIds: (ids) => set({ sessionIds: ids }),
 
       setActiveId: (id) => set({ activeId: id }),
 
-      addConversation: (conversation) =>
+      addSession: (session) =>
         set((state) => {
-          if (state.conversations.some((c) => c.id === conversation.id)) {
+          if (state.sessions.some((s) => s.id === session.id)) {
             return state
           }
           return {
-            conversations: [conversation, ...state.conversations],
-            conversationIds: [
-              conversation.id,
-              ...state.conversationIds.filter((cid) => cid !== conversation.id),
+            sessions: [session, ...state.sessions],
+            sessionIds: [
+              session.id,
+              ...state.sessionIds.filter((sid) => sid !== session.id),
             ],
           }
         }),
 
-      removeConversation: (id) =>
+      removeSession: (id) =>
         set((state) => ({
-          conversations: state.conversations.filter((c) => c.id !== id),
-          conversationIds: state.conversationIds.filter((cid) => cid !== id),
+          sessions: state.sessions.filter((s) => s.id !== id),
+          sessionIds: state.sessionIds.filter((sid) => sid !== id),
           activeId: state.activeId === id ? null : state.activeId,
         })),
 
-      updateConversationMessages: (id, messages) =>
+      updateSessionMessages: (id, messages) =>
         set((state) => ({
-          conversations: state.conversations.map((c) =>
-            c.id === id ? { ...c, messages } : c,
+          sessions: state.sessions.map((s) =>
+            s.id === id ? { ...s, messages } : s,
           ),
         })),
 
@@ -92,8 +96,8 @@ export const useChatStore = create<ChatState>()(
       clearError: () => set({ error: null, lastFailedMsg: null }),
     }),
     {
-      name: 'qa-chat-store-conversations',
-      partialize: (state) => ({ conversationIds: state.conversationIds }),
+      name: 'qa-sessions-ids',
+      partialize: (state) => ({ sessionIds: state.sessionIds }),
     },
   ),
 )

@@ -1,37 +1,33 @@
 /**
- * Session (conversation) CRUD — API doc section 2.
+ * Session (qa-sessions) CRUD — API doc section 2.
  *
- * Based on frontend/src/api/chat.ts session section.
+ * All functions use the doRequest helper for unified { code, message, data }
+ * error handling.  File name kept as conversations.ts for compatibility;
+ * internal naming uses "session" / "sessions".
  */
 
-import type { Conversation, ConversationListItem } from '@/lib/types'
+import type { Conversation, ConversationListItem, Message } from '@/lib/types'
 
-import { apiClient,ApiError } from './client'
+import { doRequest } from './client'
 
 // ---------------------------------------------------------------------------
-// 2.1  Create
+// 2.1  Create session
 // ---------------------------------------------------------------------------
 
-export async function createConversation(
+export async function createSession(
   title = '新对话',
 ): Promise<Conversation> {
-  const res = await fetch(`${apiClient.baseUrl}/conversations`, {
+  return doRequest<Conversation>('/qa-sessions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ title }),
   })
-  if (!res.ok) throw new ApiError(res.status, '创建会话失败')
-  const json: { code: number; message: string; data: Conversation } =
-    await res.json()
-  if (json.code !== 0) throw new ApiError(json.code, json.message)
-  return json.data
 }
 
 // ---------------------------------------------------------------------------
-// 2.2  List (paginated)
+// 2.2  List sessions (paginated)
 // ---------------------------------------------------------------------------
 
-export async function listConversations(
+export async function listSessions(
   page = 1,
   pageSize = 20,
 ): Promise<{ items: ConversationListItem[]; total: number }> {
@@ -40,69 +36,59 @@ export async function listConversations(
     page_size: String(pageSize),
     sort: 'updated_at_desc',
   })
-  const res = await fetch(
-    `${apiClient.baseUrl}/conversations?${params}`,
+  return doRequest<{ items: ConversationListItem[]; total: number }>(
+    `/qa-sessions?${params}`,
   )
-  if (!res.ok) throw new ApiError(res.status, '获取会话列表失败')
-  const json: {
-    code: number
-    message: string
-    data: { items: ConversationListItem[]; total: number }
-  } = await res.json()
-  if (json.code !== 0) throw new ApiError(json.code, json.message)
-  return json.data
 }
 
 // ---------------------------------------------------------------------------
-// 2.3  Get detail (with messages)
+// 2.3  Get session detail
 // ---------------------------------------------------------------------------
 
-export async function getConversation(
+export async function getSession(
   id: string,
 ): Promise<Conversation> {
-  const res = await fetch(
-    `${apiClient.baseUrl}/conversations/${encodeURIComponent(id)}`,
+  return doRequest<Conversation>(
+    `/qa-sessions/${encodeURIComponent(id)}`,
   )
-  if (!res.ok) throw new ApiError(res.status, '获取会话详情失败')
-  const json: { code: number; message: string; data: Conversation } =
-    await res.json()
-  if (json.code !== 0) throw new ApiError(json.code, json.message)
-  return json.data
 }
 
 // ---------------------------------------------------------------------------
-// 2.4  Update (rename) — present in API doc, not in source
+// 2.4  Rename session (PATCH)
 // ---------------------------------------------------------------------------
 
-export async function updateConversation(
-  id: string,
+export async function renameSession(
+  sessionId: string,
   title: string,
 ): Promise<Conversation> {
-  const res = await fetch(
-    `${apiClient.baseUrl}/conversations/${encodeURIComponent(id)}`,
+  return doRequest<Conversation>(
+    `/qa-sessions/${encodeURIComponent(sessionId)}`,
     {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
       body: JSON.stringify({ title }),
     },
   )
-  if (!res.ok) throw new ApiError(res.status, '更新会话失败')
-  const json: { code: number; message: string; data: Conversation } =
-    await res.json()
-  if (json.code !== 0) throw new ApiError(json.code, json.message)
-  return json.data
 }
 
 // ---------------------------------------------------------------------------
-// 2.5  Delete
+// 2.5  Delete session
 // ---------------------------------------------------------------------------
 
-export async function deleteConversation(id: string): Promise<void> {
-  const res = await fetch(
-    `${apiClient.baseUrl}/conversations/${encodeURIComponent(id)}`,
+export async function deleteSession(id: string): Promise<void> {
+  await doRequest<void>(
+    `/qa-sessions/${encodeURIComponent(id)}`,
     { method: 'DELETE' },
   )
-  if (!res.ok) throw new ApiError(res.status, '删除会话失败')
-  const json: { code: number; message: string } = await res.json()
-  if (json.code !== 0) throw new ApiError(json.code, json.message)
+}
+
+// ---------------------------------------------------------------------------
+// 2.6  Get session messages
+// ---------------------------------------------------------------------------
+
+export async function getSessionMessages(
+  sessionId: string,
+): Promise<Message[]> {
+  return doRequest<Message[]>(
+    `/qa-sessions/${encodeURIComponent(sessionId)}/messages`,
+  )
 }

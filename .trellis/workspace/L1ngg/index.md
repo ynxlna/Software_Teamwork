@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-06-28
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~238 | Active |
+| `journal-1.md` | ~272 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-06-28 | Expand knowledge QA requirements analysis | `e763d20`, `6387d86` | `develop` |
 | 7 | 2026-06-28 | Clean legacy frontend path references | `5acc533`, `78af49b`, `d2b4a17` | `develop` |
 | 6 | 2026-06-28 | Align frontend workflow with contributing rules | `1008569` | `develop` |
 | 5 | 2026-06-28 | Integrate frontend scaffold onto develop | `c80987b` | `develop` |

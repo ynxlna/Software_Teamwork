@@ -1,0 +1,12 @@
+.env
+data/
+legacy-runtime-data/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+dist/
+build/
+*.egg-info/

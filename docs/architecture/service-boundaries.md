@@ -11,7 +11,7 @@
 | `gateway` | Public API, routing, Redis-backed session cache, auth context propagation, response/error envelope, request id, lightweight aggregation. | `/api/v1/**`, `/healthz`, `/readyz`. | Durable user/role/permission persistence, document parsing, vector search, LLM workflows, report generation business logic. |
 | `auth` | Users, credentials, roles, permissions, sessions or tokens, session identity issuing and revocation. | User creation, session creation/deletion, current user, permission checks, session identity for gateway caching. | File metadata, knowledge indexing, QA messages, report records. |
 | `file` | Uploads, original files, object storage coordination, file metadata lifecycle. | Upload, file content, file metadata, file deletion. | Knowledge chunking, vector index, RAG, report generation. |
-| `knowledge` | Knowledge bases, document ingestion state, chunks, embeddings, retrieval policies, retrieval queries. | Missing/TBD: frontend-backend contract not finalized. | User identity, raw object storage, LLM answer generation, DOCX export. |
+| `knowledge` | Knowledge bases, document ingestion state, chunks, embeddings, retrieval policies, retrieval queries. | Knowledge base CRUD, document processing details, chunk listing, and knowledge queries through gateway. | User identity, raw object storage, LLM answer generation, DOCX export. |
 | `qa` | Chat sessions, messages, intent routing for QA, RAG answer generation, citations. | Missing/TBD: frontend-backend contract not finalized. | Knowledge base CRUD, file upload, report record management. |
 | `document` | Report templates, report records, outlines, section content, DOCX export. | Missing/TBD: frontend-backend contract not finalized. | QA chat, knowledge indexing, auth persistence. |
 
@@ -22,11 +22,11 @@
 | User and session creation | Public entrypoint, response normalization, Redis session cache write. | `auth` | Password validation and session/token issuing stay in auth; auth returns identity/session payload for gateway caching. |
 | Current session deletion | Public entrypoint, response normalization, Redis session cache delete. | `auth` | Session/token invalidation stays in auth; gateway deletes the matching Redis cache entry. |
 | Current user | Read Redis session cache and normalize response. | `auth` | Auth owns user/session source data; gateway owns runtime cache lookup and downstream context injection. |
-| Knowledge base CRUD | Missing public contract. | `knowledge` | Placeholder only. Do not expose as stable frontend API until the contract is finalized. |
-| Upload document to knowledge base | Public file upload entrypoint. | `file`; knowledge handoff TBD. | File service owns raw upload; knowledge ingestion/indexing handoff is intentionally missing until finalized. Gateway must not implement parsing or indexing. |
-| Document processing jobs | Missing public contract. | `knowledge` | Placeholder only. State transitions must be defined by the future knowledge contract. |
+| Knowledge base CRUD | Public entrypoint and response normalization. | `knowledge` | Active gateway contract. Gateway must not store knowledge-base business state. |
+| Upload document to knowledge base | Public file upload entrypoint. | `file`; knowledge owns post-upload ingestion state. | File service owns raw upload; internal file -> knowledge handoff is an implementation detail. Gateway must not implement parsing or indexing. |
+| Document processing status and chunks | Public read entrypoint and response normalization. | `knowledge` | Active gateway contract for document details and chunks. Gateway must not implement parsing, chunking, embedding, or Qdrant access. |
 | Original document content | Route and enforce auth context. | `file` | File service owns object lookup and content authorization details. |
-| Frontend knowledge queries | Missing public contract. | `knowledge` | Placeholder only. Query filters, ranking, and result shape are not stable. |
+| Frontend knowledge queries | Public entrypoint and response normalization. | `knowledge` | Active gateway contract. Query execution is modeled as `knowledge-queries`, not as an action-style search path. |
 | Chat answer generation | Missing public contract. | `qa` | Placeholder only. Streaming/non-streaming message and citation formats are not stable. |
 | Citation source lookup | Missing public contract. | `qa` or `knowledge`, depending on final citation model. | Placeholder only. The service storing citation references will own lookup. |
 | Report outline generation | Missing public contract. | `document` | Placeholder only. |
@@ -36,13 +36,12 @@
 
 ## Missing Contract Register
 
-The following downstream frontend/backend interfaces are intentionally blank in
+The following downstream frontend/backend interfaces remain intentionally blank in
 `docs/api/gateway.openapi.yaml` until the teams finalize their request and
 response shapes:
 
 | Area | Placeholder paths | Owner |
 | --- | --- | --- |
-| Knowledge base and retrieval | `GET/POST /api/v1/knowledge-bases`, `GET/PATCH/DELETE /api/v1/knowledge-bases/{knowledgeBaseId}`, `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents`, `GET /api/v1/documents/{documentId}`, `GET /api/v1/documents/{documentId}/chunks`, `POST /api/v1/knowledge-queries` | `knowledge` |
 | QA chat and RAG | `GET/POST /api/v1/qa-sessions`, `GET/DELETE /api/v1/qa-sessions/{sessionId}`, `GET/POST /api/v1/qa-sessions/{sessionId}/messages`, `GET /api/v1/qa-sessions/{sessionId}/events` | `qa` |
 | Report generation | `GET/POST /api/v1/reports`, `GET/PATCH/DELETE /api/v1/reports/{reportId}`, `GET/POST /api/v1/reports/{reportId}/outlines`, `GET/POST /api/v1/reports/{reportId}/sections`, `GET /api/v1/reports/{reportId}/events`, `GET/POST /api/v1/report-files`, `GET /api/v1/report-files/{reportFileId}/content` | `document` |
 | Administration aggregation | `GET /api/v1/admin-overview`, `GET /api/v1/admin-metrics` | `gateway` plus domain services |

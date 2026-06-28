@@ -27,6 +27,8 @@
 | [Gateway 服务规划](services/gateway.md) | Gateway 的设计原则、公开 API、认证上下文、响应约定和后续扩展。 |
 | [Auth 服务接口文档](services/auth.md) | 用户、会话、权限上下文和 auth 内部服务接口草案。 |
 | [File 服务接口文档](services/file.md) | 文件上传、元数据、原文件内容读取和 file 内部服务接口草案。 |
+| [Knowledge 服务接口文档](services/knowledge.md) | 知识库、文档处理状态、切片、向量索引和检索接口契约。 |
+| [Knowledge Service 实现说明](services/knowledge-service-design.md) | `services/knowledge/` 本地服务实现、Docker Compose 和入库链路说明。 |
 | [前后端集成契约](architecture/frontend-backend-contract.md) | 前端调用 gateway 的入口、认证、请求/响应、错误、分页、SSE 和 mock 约定。 |
 | [Gateway OpenAPI 契约](api/gateway.openapi.yaml) | 当前稳定的 gateway 公开 API 机器可读契约。 |
 
@@ -46,10 +48,10 @@
 - Gateway 健康检查。
 - Auth 相关用户与会话接口。
 - File-owned 文件上传、元数据更新、删除和原文件内容读取接口。
+- Knowledge-owned 知识库、文档处理状态、切片详情和知识检索接口。
 
 仍待补齐的契约包括：
 
-- `knowledge` 的知识库、文档处理、chunks 和检索接口。
 - `qa` 的会话、消息、意图路由、引用和流式问答接口。
 - `document` 的报告记录、大纲、章节、报告文件和导出接口。
 - 管理后台聚合指标和跨服务统计接口。

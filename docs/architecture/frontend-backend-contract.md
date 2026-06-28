@@ -19,7 +19,7 @@
 - 后端实现 endpoint 前，应先更新 OpenAPI。
 - 破坏性字段变更必须同步更新 OpenAPI 和本契约文档。
 - 所有前端到 gateway、gateway 到下游服务的 HTTP API 必须使用 RESTful 资源路径，由 HTTP method 表达动作；健康检查是唯一已允许的非 `/api/v1` 例外。
-- 本轮只把 gateway 健康检查、auth 和 file-owned 接口列为已确定契约；`knowledge`、`qa`、`document` 和管理后台聚合接口暂缺，见 OpenAPI 顶层 `x-missing-contracts`。
+- 本轮把 gateway 健康检查、auth、file-owned 接口和 knowledge-owned 知识库/文档处理/切片/检索接口列为已确定契约；`qa`、`document` 和管理后台聚合接口暂缺，见 OpenAPI 顶层 `x-missing-contracts`。
 
 ## 认证约定
 
@@ -107,7 +107,7 @@
 
 ## 分页、过滤和查询
 
-分页、过滤和查询属于下游服务契约的一部分，目前除通用响应 envelope 外暂未确定。后续补齐列表接口时，优先使用以下约定：
+分页、过滤和查询属于下游服务契约的一部分。Knowledge 相关列表和检索参数已经进入 OpenAPI；其他下游接口后续补齐时优先使用以下约定：
 
 ```text
 ?page=1&pageSize=20&keyword=xxx&status=ready
@@ -118,7 +118,22 @@
 - `keyword` 表示模糊查询关键词。
 - 多值过滤可使用逗号分隔字符串，具体字段由 OpenAPI endpoint 定义。
 - 排序参数后续统一为 `sort`，例如 `sort=-createdAt`，本轮只保留扩展空间。
-- 在对应 OpenAPI path 补齐前，前端不得依赖知识库列表、检索、聊天、报告或管理后台聚合接口。
+- 在对应 OpenAPI path 补齐前，前端不得依赖聊天、报告或管理后台聚合接口。
+
+## Knowledge 接口
+
+知识库管理、文档处理状态、切片详情和知识检索已经进入 gateway OpenAPI。前端应只调用 gateway 暴露的以下资源路径，不能直接调用 `services/knowledge`：
+
+| Method | Path | 说明 |
+| --- | --- | --- |
+| `GET/POST` | `/api/v1/knowledge-bases` | 分页查询知识库、创建知识库。 |
+| `GET/PATCH/DELETE` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | 查询、更新、删除知识库。 |
+| `GET` | `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | 查询知识库内文档处理状态列表。 |
+| `GET` | `/api/v1/documents/{documentId}` | 查询文档处理详情。 |
+| `GET` | `/api/v1/documents/{documentId}/chunks` | 查询文档切片详情。 |
+| `POST` | `/api/v1/knowledge-queries` | 创建一次知识检索查询并返回召回结果。 |
+
+检索使用 `knowledge-queries` 资源，不使用 `/search`、`/retrieval/search` 或其他动作路径。返回字段、分页结构和错误响应以 [`docs/api/gateway.openapi.yaml`](../api/gateway.openapi.yaml) 为准。
 
 ## SSE 与流式 UI
 
@@ -137,7 +152,7 @@
 
 - 上传使用 `multipart/form-data`。
 - 上传 endpoint 由 gateway 暴露，实际文件对象归 `file` 服务管理。
-- 文档处理状态、知识库列表和 ingestion handoff 归 `knowledge` 服务后续契约补齐；当前只稳定 file-owned 上传返回和原文件内容读取。
+- 文档处理状态、知识库列表、切片详情和知识检索归 `knowledge` 服务并已进入 gateway OpenAPI；当前原始文件上传和原文件内容读取仍由 `file` 服务拥有。
 - 前端读取原文件内容时，只使用 gateway 提供的 `GET /api/v1/documents/{documentId}/content`。
 - 生成报告和报告文件内容接口暂缺，后续由 `document` 契约补齐。
 - 前端不得依赖 MinIO object key 或内部存储路径。

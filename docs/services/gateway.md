@@ -17,7 +17,7 @@
 | 能力 | 说明 |
 | --- | --- |
 | Public API surface | 暴露前端使用的 `/api/v1/**` HTTP API。 |
-| Routing | 将已确定的公开请求转发到 `auth`、`file` 等内部服务；未定下游服务只保留缺失占位。 |
+| Routing | 将已确定的公开请求转发到 `auth`、`file`、`knowledge` 等内部服务；未定下游服务只保留缺失占位。 |
 | Auth context | 基于 Redis 会话缓存读取用户身份，并向下游传递用户、角色、权限和 request id。 |
 | Session cache | 用户或会话创建成功后缓存 auth 返回的会话身份信息，后续请求优先从 Redis 获取会话上下文。 |
 | Response contract | 对前端保持统一成功响应、分页响应和错误响应结构。 |
@@ -62,17 +62,20 @@
 | `/api/v1/sessions` | `auth` | 创建登录会话。 |
 | `/api/v1/sessions/current` | `auth` | 删除当前登录会话。 |
 | `/api/v1/users/me` | `auth` | 获取当前用户。 |
-| `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | `file` | 文件上传入口。知识库存在性校验和 ingestion handoff 契约暂未确定。 |
-| `/api/v1/documents/{documentId}` | `file` | 更新 file-owned 文档元数据、删除原始文件记录。 |
+| `/api/v1/knowledge-bases` | `knowledge` | 创建知识库、分页查询知识库。 |
+| `/api/v1/knowledge-bases/{knowledgeBaseId}` | `knowledge` | 查询、更新、删除知识库。 |
+| `POST /api/v1/knowledge-bases/{knowledgeBaseId}/documents` | `file` | 文件上传入口。File 保存原文件和 file-owned 元数据；Knowledge 拥有后续入库状态、切片和向量索引。 |
+| `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents` | `knowledge` | 查询知识库内文档列表和处理状态。 |
+| `GET /api/v1/documents/{documentId}` | `knowledge` | 查询文档处理详情。 |
+| `PATCH/DELETE /api/v1/documents/{documentId}` | `file` | 更新 file-owned 文档元数据、删除原始文件记录。 |
+| `/api/v1/documents/{documentId}/chunks` | `knowledge` | 查询文档切片详情。 |
 | `/api/v1/documents/{documentId}/content` | `file` | 获取原始文件内容。 |
+| `/api/v1/knowledge-queries` | `knowledge` | 创建一次知识检索查询，返回召回结果和 trace。 |
 
-暂缺的下游接口：
+仍暂缺的下游接口：
 
 | Placeholder | 预期 owner | 状态 |
 | --- | --- | --- |
-| `GET/POST /api/v1/knowledge-bases` 和 `GET/PATCH/DELETE /api/v1/knowledge-bases/{knowledgeBaseId}` | `knowledge` | 缺失：知识库 CRUD 契约未定。 |
-| `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents`、`GET /api/v1/documents/{documentId}`、`GET /api/v1/documents/{documentId}/chunks` | `knowledge` | 缺失：知识库内文档列表、文档详情和 chunks 契约未定。 |
-| `POST /api/v1/knowledge-queries` | `knowledge` | 缺失：检索请求、过滤、排序、返回引用格式未定。 |
 | `GET/POST /api/v1/qa-sessions`、`GET/DELETE /api/v1/qa-sessions/{sessionId}`、`GET/POST /api/v1/qa-sessions/{sessionId}/messages`、`GET /api/v1/qa-sessions/{sessionId}/events` | `qa` | 缺失：会话、消息、非流式/流式回答、引用事件格式未定。 |
 | `GET/POST /api/v1/reports`、`GET/PATCH/DELETE /api/v1/reports/{reportId}`、`GET/POST /api/v1/reports/{reportId}/outlines`、`GET/POST /api/v1/reports/{reportId}/sections`、`GET /api/v1/reports/{reportId}/events`、`GET/POST /api/v1/report-files` | `document` | 缺失：报告记录、大纲、章节、报告文件和内容契约未定。 |
 | `GET /api/v1/admin-overview`、`GET /api/v1/admin-metrics` | `gateway` + domain services | 缺失：聚合指标来源和展示字段未定。 |
@@ -171,6 +174,26 @@ Gateway 对前端暴露 auth 相关公开接口，具体 schema 以 [`docs/api/g
 
 Gateway 必须只把 `data.session.accessToken` 返回给前端，不得把 Redis key、token hash、内部 auth URL 或 session secret 暴露给前端。
 
+## Gateway Knowledge 接口
+
+Gateway 对前端暴露 knowledge 相关公开接口，具体 schema 以 [`docs/api/gateway.openapi.yaml`](../api/gateway.openapi.yaml) 为准。Gateway 只负责鉴权上下文传递、路由和响应归一化，不执行解析、切片、embedding、Qdrant 检索或重排序。
+
+| Method | Path | Auth | Gateway 行为 | Knowledge service 行为 |
+| --- | --- | --- | --- | --- |
+| `POST` | `/api/v1/knowledge-bases` | 需要 | 转发知识库创建请求并返回统一 envelope。 | 创建知识库元数据、保存切片和检索策略。 |
+| `GET` | `/api/v1/knowledge-bases` | 需要 | 转发分页查询参数并返回统一分页 envelope。 | 返回用户可访问的知识库列表和统计字段。 |
+| `GET` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | 需要 | 转发知识库详情查询。 | 返回知识库元数据、文档数、切片数和策略配置。 |
+| `PATCH` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | 需要 | 转发局部更新请求。 | 更新知识库元数据、分段策略或检索策略；必要时触发后续重处理流程。 |
+| `DELETE` | `/api/v1/knowledge-bases/{knowledgeBaseId}` | 需要 | 转发删除请求。 | 删除知识库业务状态、切片和向量索引，或按实现策略标记删除并异步清理。 |
+| `GET` | `/api/v1/knowledge-bases/{knowledgeBaseId}/documents` | 需要 | 转发分页和状态过滤参数。 | 返回知识库内文档处理状态列表。 |
+| `GET` | `/api/v1/documents/{documentId}` | 需要 | 转发文档详情查询。 | 返回文档处理状态、错误摘要、切片数量和解析信息。 |
+| `GET` | `/api/v1/documents/{documentId}/chunks` | 需要 | 转发分页参数。 | 返回文档切片、章节路径、embedding 元数据和 Qdrant point ID。 |
+| `POST` | `/api/v1/knowledge-queries` | 需要 | 转发检索请求并返回统一 envelope。 | 执行向量召回、过滤、可选重排序预留，并返回命中文档、分数、摘要和 trace。 |
+
+检索被建模为 `knowledge-queries` 资源创建，因此公开路径使用 `POST /api/v1/knowledge-queries`，不使用 `/search` 或 `/retrieval/search`。
+
+同一个公开资源可能按 method 分属不同服务：`POST /api/v1/knowledge-bases/{knowledgeBaseId}/documents` 仍由 `file` 拥有原文件上传；`GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents` 由 `knowledge` 拥有文档处理状态列表。`PATCH/DELETE /api/v1/documents/{documentId}` 当前仍是 file-owned 元数据和原文件生命周期操作，Knowledge 索引清理需要通过后续实现或内部协调完成，Gateway 不直接操作 Qdrant。
+
 ## 响应约定
 
 成功响应使用稳定 JSON envelope：
@@ -226,7 +249,7 @@ Gateway 必须只把 `data.session.accessToken` 返回给前端，不得把 Redi
 
 ## 缺失下游接口
 
-知识库、问答、报告生成和管理后台聚合的前后端接口尚未完全确定。当前 OpenAPI 只在顶层 `x-missing-contracts` 标记缺失范围，不把这些 endpoint 作为可依赖的公开契约。
+问答、报告生成和管理后台聚合的前后端接口尚未完全确定。当前 OpenAPI 只在顶层 `x-missing-contracts` 标记这些缺失范围，不把这些 endpoint 作为可依赖的公开契约。
 
 后续补齐任一缺失接口时，需要同步更新：
 

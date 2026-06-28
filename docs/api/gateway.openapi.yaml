@@ -8,10 +8,10 @@ info:
   description: |
     Frontend-facing API contract for the gateway service.
     All stable public and service-to-service HTTP APIs must use RESTful resource-oriented paths.
-    This revision only treats gateway health checks, user/session, and file-owned routes
-    as active contracts. Downstream knowledge, QA, document/report, and admin
-    aggregation interfaces are intentionally marked under x-missing-contracts
-    until their frontend/backend contracts are finalized.
+    This revision treats gateway health checks, user/session, file-owned routes,
+    and knowledge-owned knowledge base, document processing, chunk, and retrieval
+    routes as active contracts. Downstream QA, document/report, and admin
+    aggregation interfaces remain under x-missing-contracts until finalized.
 x-api-style:
   required: RESTful resource-oriented HTTP APIs
   appliesTo:
@@ -35,6 +35,8 @@ tags:
   description: Gateway process and readiness checks.
 - name: auth
   description: User and session APIs owned by auth service.
+- name: knowledge
+  description: Knowledge base, document processing, chunk, and retrieval APIs owned by knowledge service.
 - name: documents
   description: File-owned document upload, metadata, deletion, and content APIs.
 paths:
@@ -148,16 +150,160 @@ paths:
                 $ref: '#/components/schemas/UserResponse'
         '401':
           $ref: '#/components/responses/Error'
+  /api/v1/knowledge-bases:
+    get:
+      tags:
+      - knowledge
+      summary: List knowledge bases
+      operationId: listKnowledgeBases
+      x-owner-service: knowledge
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 20
+      responses:
+        '200':
+          description: Knowledge bases.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - knowledge
+      summary: Create knowledge base
+      operationId: createKnowledgeBase
+      x-owner-service: knowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKnowledgeBaseRequest'
+      responses:
+        '201':
+          description: Knowledge base created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/knowledge-bases/{knowledgeBaseId}:
+    parameters:
+    - $ref: '#/components/parameters/KnowledgeBaseId'
+    get:
+      tags:
+      - knowledge
+      summary: Get knowledge base
+      operationId: getKnowledgeBase
+      x-owner-service: knowledge
+      responses:
+        '200':
+          description: Knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - knowledge
+      summary: Update knowledge base
+      operationId: updateKnowledgeBase
+      x-owner-service: knowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKnowledgeBaseRequest'
+      responses:
+        '200':
+          description: Knowledge base updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+      description: Updating chunk or retrieval strategies may require reprocessing documents; reprocessing job behavior is owned by knowledge service.
+    delete:
+      tags:
+      - knowledge
+      summary: Delete knowledge base
+      operationId: deleteKnowledgeBase
+      x-owner-service: knowledge
+      responses:
+        '204':
+          description: Knowledge base deleted.
+        '404':
+          $ref: '#/components/responses/Error'
   /api/v1/knowledge-bases/{knowledgeBaseId}/documents:
     parameters:
     - $ref: '#/components/parameters/KnowledgeBaseId'
+    get:
+      tags:
+      - knowledge
+      summary: List knowledge-base documents
+      operationId: listKnowledgeBaseDocuments
+      x-owner-service: knowledge
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 20
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/DocumentStatus'
+      responses:
+        '200':
+          description: Documents in the knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
     post:
       tags:
       - documents
       summary: Upload a document to a knowledge base
       operationId: uploadKnowledgeBaseDocument
       x-owner-service: file
-      description: Gateway exposes the file upload workflow. File service owns raw upload and file metadata. Knowledge ingestion/indexing handoff is intentionally missing until the knowledge service contract is finalized.
+      description: Gateway exposes the file upload workflow. File service owns raw upload and file metadata; knowledge service owns ingestion state, chunks, embeddings, and retrieval after handoff.
       requestBody:
         required: true
         content:
@@ -186,6 +332,21 @@ paths:
   /api/v1/documents/{documentId}:
     parameters:
     - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags:
+      - knowledge
+      summary: Get document processing details
+      operationId: getDocument
+      x-owner-service: knowledge
+      responses:
+        '200':
+          description: Document processing details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          $ref: '#/components/responses/Error'
     patch:
       tags:
       - documents
@@ -207,7 +368,7 @@ paths:
                 $ref: '#/components/schemas/DocumentResponse'
         '404':
           $ref: '#/components/responses/Error'
-      description: Update file-owned document metadata only. Knowledge-owned document processing fields are missing until finalized.
+      description: Update file-owned document metadata only. Knowledge-owned processing fields are not mutated by this operation.
     delete:
       tags:
       - documents
@@ -219,7 +380,43 @@ paths:
           description: Document deleted.
         '404':
           $ref: '#/components/responses/Error'
-      description: Delete the file-owned document record and original object. Knowledge index cleanup contract is missing until finalized.
+      description: Delete the file-owned document record and original object. Gateway or file service must coordinate knowledge index cleanup through the knowledge-owned document lifecycle.
+  /api/v1/documents/{documentId}/chunks:
+    parameters:
+    - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags:
+      - knowledge
+      summary: List document chunks
+      operationId: listDocumentChunks
+      x-owner-service: knowledge
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 50
+      responses:
+        '200':
+          description: Document chunks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentChunkListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
   /api/v1/documents/{documentId}/content:
     get:
       tags:
@@ -240,6 +437,31 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
       description: Return the original file content from the file service through gateway.
+  /api/v1/knowledge-queries:
+    post:
+      tags:
+      - knowledge
+      summary: Create knowledge query
+      operationId: createKnowledgeQuery
+      x-owner-service: knowledge
+      description: Run a resource-mode knowledge retrieval query. Query execution is modeled as creating a knowledge-query resource, not as an action-style search path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQueryRequest'
+      responses:
+        '201':
+          description: Knowledge query result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeQueryResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
 components:
   securitySchemes:
     bearerAuth:
@@ -407,6 +629,163 @@ components:
           $ref: '#/components/schemas/UserSummary'
         requestId:
           type: string
+    PageInfo:
+      type: object
+      required:
+      - page
+      - pageSize
+      - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    JsonObject:
+      type: object
+      additionalProperties: true
+    ChunkStrategy:
+      type: object
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          example: SEMANTIC_TEXT
+        chunkSize:
+          type: integer
+          minimum: 1
+          example: 1600
+        overlap:
+          type: integer
+          minimum: 0
+          example: 200
+        separators:
+          type: array
+          items:
+            type: string
+    RetrievalStrategy:
+      type: object
+      additionalProperties: true
+      properties:
+        mode:
+          type: string
+          example: VECTOR
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 10
+        scoreThreshold:
+          type: number
+          minimum: 0
+          example: 0.35
+        rerankTopN:
+          type: integer
+          minimum: 1
+          nullable: true
+    CreateKnowledgeBaseRequest:
+      type: object
+      required:
+      - name
+      properties:
+        id:
+          type: string
+          description: Optional client-supplied ID for import or local integration workflows. Gateway implementations may ignore this field and generate an ID.
+        name:
+          type: string
+        description:
+          type: string
+          default: ''
+        docType:
+          type: string
+          example: GENERAL
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+    UpdateKnowledgeBaseRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+          example: GENERAL
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+    KnowledgeBaseSummary:
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - docType
+      - chunkStrategy
+      - retrievalStrategy
+      - documentCount
+      - chunkCount
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+        documentCount:
+          type: integer
+          minimum: 0
+        chunkCount:
+          type: integer
+          minimum: 0
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    KnowledgeBaseResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeBaseSummary'
+        requestId:
+          type: string
+    KnowledgeBaseListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeBaseSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
     DocumentStatus:
       type: string
       enum:
@@ -423,27 +802,55 @@ components:
       - knowledgeBaseId
       - name
       - status
+      - chunkCount
       - createdAt
       properties:
         id:
           type: string
         knowledgeBaseId:
           type: string
-          description: Target knowledge base context for this uploaded file. Knowledge-base APIs are missing until finalized.
+          description: Target knowledge base context for this document.
         name:
           type: string
+        contentType:
+          type: string
+          nullable: true
+        sizeBytes:
+          type: integer
+          minimum: 0
         status:
           $ref: '#/components/schemas/DocumentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+          description: Processing failure summary. Must not include object keys, internal paths, SQL details, MinIO errors, or stack traces.
+        chunkCount:
+          type: integer
+          minimum: 0
         tags:
           type: array
           items:
             type: string
-        errorMessage:
+        parserBackend:
           type: string
-          description: File-level processing or handoff error message. Knowledge-owned processing details are missing until finalized.
+          nullable: true
+        createdBy:
+          type: string
+          nullable: true
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        jobId:
+          type: string
+          nullable: true
+          description: Ingestion job ID when a request starts or observes a processing job.
     UpdateDocumentRequest:
       type: object
       properties:
@@ -461,18 +868,222 @@ components:
           $ref: '#/components/schemas/DocumentSummary'
         requestId:
           type: string
+    DocumentListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    DocumentChunk:
+      type: object
+      required:
+      - id
+      - knowledgeBaseId
+      - documentId
+      - chunkIndex
+      - content
+      - tokenCount
+      - createdAt
+      properties:
+        id:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        chunkIndex:
+          type: integer
+          minimum: 0
+        sectionPath:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tokenCount:
+          type: integer
+          minimum: 0
+        chunkType:
+          type: string
+          nullable: true
+        qdrantPointId:
+          type: string
+          nullable: true
+        embeddingProvider:
+          type: string
+          nullable: true
+        embeddingDimension:
+          type: integer
+          minimum: 1
+          nullable: true
+        embeddingPreview:
+          type: array
+          nullable: true
+          items:
+            type: number
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+        createdAt:
+          type: string
+          format: date-time
+    DocumentChunkListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentChunk'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    KnowledgeQueryRequest:
+      type: object
+      required:
+      - query
+      properties:
+        query:
+          type: string
+        knowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        scoreThreshold:
+          type: number
+          minimum: 0
+          default: 0
+        tags:
+          type: array
+          items:
+            type: string
+        metadataFilter:
+          type: object
+          additionalProperties:
+            type: string
+        rerank:
+          type: boolean
+          default: false
+        rerankTopN:
+          type: integer
+          minimum: 1
+          nullable: true
+    KnowledgeQueryResult:
+      type: object
+      required:
+      - score
+      - knowledgeBaseId
+      - documentId
+      - chunkId
+      - documentName
+      - contentPreview
+      properties:
+        score:
+          type: number
+        pointId:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        chunkId:
+          type: string
+        documentName:
+          type: string
+        sectionPath:
+          type: string
+          nullable: true
+        chunkIndex:
+          type: integer
+          minimum: 0
+          nullable: true
+        contentPreview:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    KnowledgeQueryTrace:
+      type: object
+      required:
+      - embeddingProvider
+      - embeddingModel
+      - embeddingDimension
+      - qdrantCollection
+      - searchTopK
+      - scoreThreshold
+      - hitCount
+      - rerank
+      properties:
+        embeddingProvider:
+          type: string
+        embeddingModel:
+          type: string
+        embeddingDimension:
+          type: integer
+          minimum: 1
+        qdrantCollection:
+          type: string
+        searchTopK:
+          type: integer
+          minimum: 1
+        scoreThreshold:
+          type: number
+          minimum: 0
+        hitCount:
+          type: integer
+          minimum: 0
+        rerank:
+          type: boolean
+        rerankTopN:
+          type: integer
+          nullable: true
+          minimum: 1
+    KnowledgeQuerySummary:
+      type: object
+      required:
+      - id
+      - query
+      - results
+      - trace
+      properties:
+        id:
+          type: string
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeQueryResult'
+        trace:
+          $ref: '#/components/schemas/KnowledgeQueryTrace'
+    KnowledgeQueryResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeQuerySummary'
+        requestId:
+          type: string
 x-missing-contracts:
-- service: knowledge
-  status: missing
-  reason: Frontend/backend contract is not finalized yet.
-  placeholderOperations:
-  - GET /api/v1/knowledge-bases
-  - POST /api/v1/knowledge-bases
-  - GET/PATCH/DELETE /api/v1/knowledge-bases/{knowledgeBaseId}
-  - GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents
-  - GET /api/v1/documents/{documentId}
-  - GET /api/v1/documents/{documentId}/chunks
-  - POST /api/v1/knowledge-queries
 - service: qa
   status: missing
   reason: Frontend/backend chat and RAG contract is not finalized yet.

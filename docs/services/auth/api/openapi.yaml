@@ -1,0 +1,611 @@
+openapi: 3.0.3
+info:
+  title: Power Knowledge Platform Auth Service API
+  version: 0.1.0
+  license:
+    name: Unspecified
+    url: https://github.com/Sakayori-Iroha-168/Software_Teamwork
+  description: |
+    Service-level API contract for the auth service.
+
+    This file documents auth-owned internal service-to-service resources used by
+    gateway. It is not the frontend-facing contract. Stable frontend paths remain
+    owned by docs/services/gateway/api/openapi.yaml and are exposed through
+    /api/v1/users, /api/v1/sessions, /api/v1/sessions/current, and /api/v1/users/me.
+
+    All stable paths are RESTful resource-oriented paths. User registration is
+    modeled as user creation, login as session creation, logout as session
+    deletion, and token/session revocation as deleting a session resource.
+    Access tokens are opaque bearer credentials, not JWTs; callers must not
+    parse claims from them.
+x-api-scope: internal-service
+x-api-style:
+  required: RESTful resource-oriented HTTP APIs
+  appliesTo:
+  - service-to-service HTTP APIs
+  rules:
+  - Use /internal/v1 for internal business resources.
+  - Model stable routes as resources or resource collections.
+  - Use HTTP methods for actions.
+  - Do not put action verbs such as login, logout, register, revoke, validate, or check in stable paths.
+  - Model authentication attempts as sessions.
+  - Model permission lookup as user permission resources.
+  exceptions:
+  - GET /healthz
+  - GET /readyz
+servers:
+- url: /
+  description: Auth service root
+security:
+- serviceTokenAuth: []
+tags:
+- name: health
+  description: Auth process and readiness checks.
+- name: users
+  description: User identity resources.
+- name: sessions
+  description: Session and token resources.
+- name: permissions
+  description: User permission resources.
+paths:
+  /healthz:
+    get:
+      tags:
+      - health
+      summary: Liveness check
+      operationId: getHealthz
+      security: []
+      responses:
+        '200':
+          description: Auth process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '429':
+          $ref: '#/components/responses/Error'
+  /readyz:
+    get:
+      tags:
+      - health
+      summary: Readiness check
+      operationId: getReadyz
+      security: []
+      responses:
+        '200':
+          description: Auth is ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Auth is not ready to serve one or more dependencies.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '429':
+          $ref: '#/components/responses/Error'
+  /internal/v1/users:
+    parameters:
+    - $ref: '#/components/parameters/RequestIdHeader'
+    - $ref: '#/components/parameters/CallerServiceHeader'
+    post:
+      tags:
+      - users
+      summary: Create user
+      operationId: createUser
+      x-owner-service: auth
+      description: |
+        Creates a user resource and returns a newly issued session for gateway
+        to cache. Gateway exposes this as POST /api/v1/users.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User and session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /internal/v1/users/{userId}:
+    parameters:
+    - $ref: '#/components/parameters/RequestIdHeader'
+    - $ref: '#/components/parameters/CallerServiceHeader'
+    - $ref: '#/components/parameters/UserId'
+    get:
+      tags:
+      - users
+      summary: Get user
+      operationId: getUser
+      x-owner-service: auth
+      description: |
+        Returns user identity and authorization summary for internal cache repair,
+        admin workflows, or audit workflows. Gateway does not need to call this
+        on every authenticated business request when Redis session cache is valid.
+      responses:
+        '200':
+          description: User record.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserRecordResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/users/{userId}/permissions:
+    parameters:
+    - $ref: '#/components/parameters/RequestIdHeader'
+    - $ref: '#/components/parameters/CallerServiceHeader'
+    - $ref: '#/components/parameters/UserId'
+    get:
+      tags:
+      - permissions
+      summary: Get user permissions
+      operationId: getUserPermissions
+      x-owner-service: auth
+      description: |
+        Returns the current roles and permission strings for a user. This resource
+        is intended for cache refresh, permission-change propagation, and internal
+        service boundary checks.
+      responses:
+        '200':
+          description: User permissions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPermissionsResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/sessions:
+    parameters:
+    - $ref: '#/components/parameters/RequestIdHeader'
+    - $ref: '#/components/parameters/CallerServiceHeader'
+    post:
+      tags:
+      - sessions
+      summary: Create session
+      operationId: createSession
+      x-owner-service: auth
+      description: |
+        Creates a session resource from username and password credentials.
+        Gateway exposes this as POST /api/v1/sessions and caches the returned
+        user/session identity in Redis.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+  /internal/v1/sessions/{sessionId}:
+    parameters:
+    - $ref: '#/components/parameters/RequestIdHeader'
+    - $ref: '#/components/parameters/CallerServiceHeader'
+    - $ref: '#/components/parameters/SessionId'
+    get:
+      tags:
+      - sessions
+      summary: Get session
+      operationId: getSession
+      x-owner-service: auth
+      description: |
+        Returns session identity for cache repair, diagnostics, or security
+        workflows. Gateway should use its Redis session cache as the default path
+        for ordinary authenticated requests.
+      responses:
+        '200':
+          description: Session identity.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionIdentityResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - sessions
+      summary: Delete session
+      operationId: deleteSession
+      x-owner-service: auth
+      description: |
+        Deletes or revokes a session resource. Gateway uses this for current
+        session deletion after resolving the current session id from Redis, and
+        auth can use it for user disablement, permission changes, or security
+        events.
+      responses:
+        '204':
+          description: Session deleted.
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    serviceTokenAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: service-token
+      description: Internal service credential used by gateway and trusted backend services.
+  parameters:
+    RequestIdHeader:
+      name: X-Request-Id
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Caller-provided request id. Auth should return the effective request id in response body and logs.
+    CallerServiceHeader:
+      name: X-Caller-Service
+      in: header
+      required: false
+      schema:
+        type: string
+      description: Name of the internal caller, for audit and rate policy decisions.
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Public user id.
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Auth-issued session id.
+  responses:
+    Error:
+      description: Error response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - status
+          properties:
+            status:
+              type: string
+              enum:
+              - ok
+        requestId:
+          type: string
+    ReadinessResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - status
+          - checks
+          properties:
+            status:
+              type: string
+              enum:
+              - ready
+              - not_ready
+            checks:
+              type: object
+              additionalProperties:
+                $ref: '#/components/schemas/DependencyCheck'
+        requestId:
+          type: string
+    DependencyCheck:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - degraded
+          - failed
+        message:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      required:
+      - code
+      - message
+      - requestId
+      properties:
+        code:
+          type: string
+          enum:
+          - validation_error
+          - unauthorized
+          - forbidden
+          - not_found
+          - conflict
+          - rate_limited
+          - dependency_error
+          - internal_error
+        message:
+          type: string
+        requestId:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+    CreateUserRequest:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Login username. Final format rules are owned by auth implementation.
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 1024
+          writeOnly: true
+          description: Plain password supplied only in the request body. Must never be logged or returned; auth stores an argon2id-v1 hash.
+    CreateSessionRequest:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+          minLength: 1
+          maxLength: 128
+        password:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 1024
+          writeOnly: true
+          description: Plain password supplied only in the request body. Must never be logged or returned; auth verifies it against an argon2id-v1 hash.
+    UserStatus:
+      type: string
+      enum:
+      - active
+      - disabled
+      - locked
+      description: Internal user status. Public gateway UserSummary does not currently expose this field.
+    UserSummary:
+      type: object
+      required:
+      - id
+      - username
+      - roles
+      - permissions
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    UserRecord:
+      allOf:
+      - $ref: '#/components/schemas/UserSummary'
+      - type: object
+        required:
+        - status
+        - createdAt
+        - updatedAt
+        properties:
+          status:
+            $ref: '#/components/schemas/UserStatus'
+          createdAt:
+            type: string
+            format: date-time
+          updatedAt:
+            type: string
+            format: date-time
+    SessionSummary:
+      type: object
+      required:
+      - sessionId
+      - accessToken
+      - tokenType
+      - expiresAt
+      properties:
+        sessionId:
+          type: string
+        accessToken:
+          type: string
+          minLength: 32
+          example: atk_v1_7Qb4mK9xZ2nH8pL5rT1cV6yS3wE0aD
+          x-token-format: opaque
+          description: Opaque bearer credential sent by the frontend on later requests. This is not a JWT and must never be logged or parsed for claims.
+        tokenType:
+          type: string
+          enum:
+          - Bearer
+          default: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+    SessionIdentity:
+      type: object
+      required:
+      - sessionId
+      - user
+      - tokenType
+      - expiresAt
+      - issuedAt
+      properties:
+        sessionId:
+          type: string
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        tokenType:
+          type: string
+          enum:
+          - Bearer
+        expiresAt:
+          type: string
+          format: date-time
+        issuedAt:
+          type: string
+          format: date-time
+        revokedAt:
+          type: string
+          format: date-time
+          nullable: true
+        revokeReason:
+          type: string
+          nullable: true
+        accessTokenHash:
+          type: string
+          example: hmac-sha256:v1:6f1c2d3e4a5b
+          description: Optional internal token hash for diagnostics. Uses the shared gateway/auth token hash rule; never return the original access token.
+    UserPermissions:
+      type: object
+      required:
+      - userId
+      - roles
+      - permissions
+      - updatedAt
+      properties:
+        userId:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+        updatedAt:
+          type: string
+          format: date-time
+    SessionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - user
+          - session
+          properties:
+            user:
+              $ref: '#/components/schemas/UserSummary'
+            session:
+              $ref: '#/components/schemas/SessionSummary'
+        requestId:
+          type: string
+    UserResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/UserSummary'
+        requestId:
+          type: string
+    UserRecordResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/UserRecord'
+        requestId:
+          type: string
+    UserPermissionsResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/UserPermissions'
+        requestId:
+          type: string
+    SessionIdentityResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/SessionIdentity'
+        requestId:
+          type: string

@@ -6,7 +6,7 @@ Python/FastAPI prototype has been removed from this service directory so future
 work happens against the repository standard Go service layout.
 
 Frontend callers must not call this service directly. Public routes stay behind
-gateway and are documented in `docs/api/gateway.openapi.yaml`.
+gateway and are documented in `docs/services/gateway/api/openapi.yaml`.
 
 ## Current Scope
 

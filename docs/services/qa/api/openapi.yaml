@@ -1,0 +1,834 @@
+openapi: 3.0.3
+info:
+  title: QA API
+  version: 0.1.0
+  description: Service-level QA API reference for Agent Host sessions, messages, response runs, SSE answering, citations, config versions, retrieval tests, and stats. The stable frontend-facing gateway contract is docs/services/gateway/api/openapi.yaml; this file is kept as QA service design context. JSON endpoints are wrapped by the gateway response envelope for frontend consumption; SSE endpoints use POST plus text/event-stream and are consumed with a fetch stream reader. Public requests use opaque Bearer token auth; model calls use AI Gateway with OpenAI-compatible function-calling transport; tool execution is owned by QA through an MCP SDK or sidecar.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+x-implementation-baseline:
+  language: Go
+  httpRouter: Go 1.22 net/http ServeMux
+  database: PostgreSQL with pgx and sqlc
+  migrations: goose
+  config: envconfig-style structured environment loading
+  logging: log/slog JSON in production
+  auth: opaque Bearer token through gateway-authenticated context
+  sseClient: fetch stream reader with AbortController
+  mcp: mature MCP SDK or independent MCP sidecar
+tags:
+  - name: Sessions
+  - name: Messages
+  - name: Citations
+  - name: Reasoning
+  - name: AgentRuns
+  - name: Settings
+  - name: RetrievalTests
+  - name: Stats
+paths:
+  /qa-sessions:
+    get:
+      tags: [Sessions]
+      summary: List QA sessions
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: q
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: QA session list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QASessionPage' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Sessions]
+      summary: Create QA session
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateQASessionRequest' }
+      responses:
+        '201':
+          description: Created QA session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QASession' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionId'
+    get:
+      tags: [Sessions]
+      summary: Get QA session
+      responses:
+        '200':
+          description: QA session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QASession' }
+        default: { $ref: '#/components/responses/Error' }
+    patch:
+      tags: [Sessions]
+      summary: Update QA session
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateQASessionRequest' }
+      responses:
+        '200':
+          description: Updated QA session
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QASession' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      tags: [Sessions]
+      summary: Delete QA session
+      responses:
+        '204': { description: Deleted }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-sessions/{sessionId}/messages:
+    get:
+      tags: [Messages]
+      summary: List messages
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Message list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MessagePage' }
+        default: { $ref: '#/components/responses/Error' }
+    post:
+      tags: [Messages]
+      summary: Ask question and create an Agent response run
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AskRequest' }
+      responses:
+        '200':
+          description: Full answer or SSE stream when Accept is text/event-stream.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AskResponse' }
+            text/event-stream:
+              schema:
+                type: string
+                description: SSE stream. Events include message.created, agent.iteration.started, tool.started, tool.completed, tool.failed, reasoning.step, answer.delta, citation.delta, answer.completed, error.
+        default: { $ref: '#/components/responses/Error' }
+  /qa-sessions/{sessionId}/events:
+    get:
+      tags: [AgentRuns]
+      summary: Replay short-lived QA stream events
+      parameters:
+        - $ref: '#/components/parameters/SessionId'
+        - $ref: '#/components/parameters/ResponseRunIdQuery'
+        - $ref: '#/components/parameters/AfterEventSeq'
+      responses:
+        '200':
+          description: Short-lived SSE event replay.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StreamEventListResponse' }
+        default: { $ref: '#/components/responses/Error' }
+  /response-runs/{responseRunId}:
+    patch:
+      tags: [AgentRuns]
+      summary: Cancel response run
+      parameters:
+        - $ref: '#/components/parameters/ResponseRunId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateResponseRunRequest' }
+      responses:
+        '200':
+          description: Updated response run.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ResponseRun' }
+        default: { $ref: '#/components/responses/Error' }
+  /messages/{messageId}/citations:
+    get:
+      tags: [Citations]
+      summary: List message citations
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: Citation list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Citation' }
+        default: { $ref: '#/components/responses/Error' }
+  /citations/{citationId}:
+    get:
+      tags: [Citations]
+      summary: Get citation detail
+      parameters:
+        - name: citationId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Citation detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CitationDetail' }
+        default: { $ref: '#/components/responses/Error' }
+  /citation-lookups:
+    post:
+      tags: [Citations]
+      summary: Batch lookup citation snapshots
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CitationLookupRequest' }
+      responses:
+        '200':
+          description: Citation snapshots
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CitationListResponse' }
+        default: { $ref: '#/components/responses/Error' }
+  /messages/{messageId}/reasoning-steps:
+    get:
+      tags: [Reasoning]
+      summary: List reasoning or process summary steps
+      parameters:
+        - $ref: '#/components/parameters/MessageId'
+      responses:
+        '200':
+          description: Reasoning steps
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/ReasoningStep' }
+        default: { $ref: '#/components/responses/Error' }
+  /response-runs/{responseRunId}/tool-calls:
+    get:
+      tags: [AgentRuns]
+      summary: List response run tool calls
+      parameters:
+        - $ref: '#/components/parameters/ResponseRunId'
+      responses:
+        '200':
+          description: Tool call summaries.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AgentToolCallListResponse' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-config-versions/current:
+    get:
+      tags: [Settings]
+      summary: Get current QA config version
+      responses:
+        '200':
+          description: QA settings
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QaSettings' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-config-versions:
+    post:
+      tags: [Settings]
+      summary: Create QA config version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QaSettingsUpdate' }
+      responses:
+        '201':
+          description: Created QA config version timestamp
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UpdatedAt' }
+        default: { $ref: '#/components/responses/Error' }
+  /llm-config-versions/current:
+    get:
+      tags: [Settings]
+      summary: Get current LLM config version
+      responses:
+        '200':
+          description: Current LLM config version. Provider secrets and base URLs are owned by AI Gateway and are never returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LlmConfigVersion' }
+        default: { $ref: '#/components/responses/Error' }
+  /llm-config-versions:
+    post:
+      tags: [Settings]
+      summary: Create LLM config version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LlmConfigVersionCreate' }
+      responses:
+        '201':
+          description: Created LLM config version
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LlmConfigVersion' }
+        default: { $ref: '#/components/responses/Error' }
+  /llm-connection-tests:
+    post:
+      tags: [Settings]
+      summary: Test LLM profile connection through AI Gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LlmConnectionTestRequest' }
+      responses:
+        '201':
+          description: Redacted LLM connection test result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LlmConnectionTestResult' }
+        default: { $ref: '#/components/responses/Error' }
+  /retrieval-test-runs:
+    post:
+      tags: [RetrievalTests]
+      summary: Create QA retrieval test run
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RetrievalTestRequest' }
+      responses:
+        '201':
+          description: Retrieval test result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetrievalTestResponse' }
+        default: { $ref: '#/components/responses/Error' }
+  /retrieval-test-runs/{testRunId}:
+    get:
+      tags: [RetrievalTests]
+      summary: Get QA retrieval test run
+      parameters:
+        - $ref: '#/components/parameters/TestRunId'
+      responses:
+        '200':
+          description: Retrieval test run result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/RetrievalTestResponse' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-metrics/overview:
+    get:
+      tags: [Stats]
+      summary: Get QA overview stats
+      responses:
+        '200':
+          description: QA stats
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QaStats' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-metrics/trend:
+    get:
+      tags: [Stats]
+      summary: Get QA trend stats
+      parameters:
+        - $ref: '#/components/parameters/Days'
+      responses:
+        '200':
+          description: QA trend stats
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QaTrendStats' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-metrics/top-queries:
+    get:
+      tags: [Stats]
+      summary: Get top QA queries
+      parameters:
+        - $ref: '#/components/parameters/Days'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Top QA queries
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QaTopQueries' }
+        default: { $ref: '#/components/responses/Error' }
+  /qa-metrics/intent-distribution:
+    get:
+      tags: [Stats]
+      summary: Get QA intent distribution
+      parameters:
+        - $ref: '#/components/parameters/Days'
+      responses:
+        '200':
+          description: QA intent distribution
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QaIntentDistribution' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Access token is an opaque bearer token authenticated by gateway; QA does not parse JWT claims from the token.
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string }
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      schema: { type: string }
+    ResponseRunId:
+      name: responseRunId
+      in: path
+      required: true
+      schema: { type: string }
+    ResponseRunIdQuery:
+      name: responseRunId
+      in: query
+      required: true
+      schema: { type: string }
+    AfterEventSeq:
+      name: afterEventSeq
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0 }
+    TestRunId:
+      name: testRunId
+      in: path
+      required: true
+      schema: { type: string }
+    Days:
+      name: days
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 365, default: 30 }
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorResponse' }
+  schemas:
+    QASession:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        ownerUserId: { type: string }
+        status: { type: string, enum: [active, archived] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        lastMessageAt: { type: string, format: date-time }
+    CreateQASessionRequest:
+      type: object
+      properties:
+        title: { type: string }
+    UpdateQASessionRequest:
+      type: object
+      properties:
+        title: { type: string }
+    QASessionPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/QASession' }
+    Message:
+      type: object
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        role: { type: string, enum: [user, assistant, system] }
+        content: { type: string }
+        intent: { $ref: '#/components/schemas/Intent' }
+        status: { type: string, enum: [queued, streaming, completed, stopped, failed, cancelled] }
+        createdAt: { type: string, format: date-time }
+    MessagePage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/Message' }
+    Intent:
+      type: string
+      description: data_analysis is reserved for future use and returns unsupported_intent in MVP.
+      enum: [knowledge_qa, general_chat, report_generation, data_analysis, unknown]
+    AskRequest:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+        mode: { $ref: '#/components/schemas/Intent' }
+        agent: { $ref: '#/components/schemas/AgentOptions' }
+        knowledgeBaseIds:
+          type: array
+          items: { type: string }
+        retrieval: { $ref: '#/components/schemas/RetrievalOptions' }
+    RetrievalOptions:
+      type: object
+      properties:
+        topK: { type: integer }
+        scoreThreshold: { type: number }
+        rerankThreshold: { type: number }
+        rerankTopN: { type: integer }
+        enableRerank: { type: boolean }
+        tagFilters:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    AskResponse:
+      type: object
+      properties:
+        userMessage: { $ref: '#/components/schemas/Message' }
+        assistantMessage: { $ref: '#/components/schemas/Message' }
+        responseRun: { $ref: '#/components/schemas/ResponseRun' }
+        errorCode:
+          type: string
+          nullable: true
+          description: For unsupported reserved intents, returns unsupported_intent.
+        citations:
+          type: array
+          items: { $ref: '#/components/schemas/Citation' }
+        reasoningSteps:
+          type: array
+          items: { $ref: '#/components/schemas/ReasoningStep' }
+    ResponseRun:
+      type: object
+      properties:
+        id: { type: string }
+        sessionId: { type: string }
+        status: { type: string, enum: [queued, running, streaming, completed, failed, cancelled] }
+        currentIteration: { type: integer }
+        maxIterations: { type: integer }
+        terminationReason:
+          type: string
+          nullable: true
+          enum: [completed, max_iterations, timeout, cancelled, tool_error, model_error, policy_denied, null]
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+    UpdateResponseRunRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [cancelled]
+    Citation:
+      type: object
+      properties:
+        id: { type: string }
+        messageId: { type: string }
+        chunkId: { type: string }
+        documentId: { type: string }
+        knowledgeBaseId: { type: string }
+        documentName: { type: string }
+        sectionPath: { type: string }
+        contentPreview: { type: string }
+        score: { type: number }
+        rerankScore: { type: number, nullable: true }
+        chunkType: { type: string }
+        isSourceAvailable: { type: boolean }
+    CitationDetail:
+      allOf:
+        - $ref: '#/components/schemas/Citation'
+        - type: object
+          properties:
+            content: { type: string }
+            source:
+              type: object
+              properties:
+                available: { type: boolean }
+                reason: { type: string }
+                downloadEndpoint: { type: string }
+    CitationLookupRequest:
+      type: object
+      required: [citationIds]
+      properties:
+        citationIds:
+          type: array
+          items: { type: string }
+    CitationListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/Citation' }
+    StreamEvent:
+      type: object
+      properties:
+        eventSeq: { type: integer }
+        eventType:
+          type: string
+          enum: [message.created, agent.iteration.started, reasoning.step, tool.started, tool.completed, tool.failed, answer.delta, citation.delta, answer.completed, error]
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string, format: date-time }
+    StreamEventListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/StreamEvent' }
+    ReasoningStep:
+      type: object
+      properties:
+        id: { type: string }
+        messageId: { type: string }
+        type: { type: string }
+        title: { type: string }
+        summary: { type: string }
+        status: { type: string, enum: [queued, running, completed, failed] }
+        createdAt: { type: string, format: date-time }
+    AgentToolCallListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AgentToolCall'  }
+    AgentOptions:
+      type: object
+      properties:
+        enabledToolNames:
+          type: array
+          items: { type: string }
+        maxIterations: { type: integer, minimum: 1, maximum: 10 }
+    AgentToolCall:
+      type: object
+      properties:
+        id: { type: string }
+        responseRunId: { type: string }
+        toolCallId: { type: string }
+        toolName: { type: string }
+        argumentsSummary:
+          type: object
+          additionalProperties: true
+        resultSummary:
+          type: object
+          additionalProperties: true
+        status: { type: string, enum: [running, completed, failed, cancelled] }
+        latencyMs: { type: integer }
+    QaSettings:
+      type: object
+      properties:
+        defaultKnowledgeBaseIds:
+          type: array
+          items: { type: string }
+        retrieval: { $ref: '#/components/schemas/RetrievalOptions' }
+        llm: { $ref: '#/components/schemas/ModelConfigPublic' }
+        agent: { $ref: '#/components/schemas/AgentConfig' }
+    QaSettingsUpdate:
+      allOf:
+        - $ref: '#/components/schemas/QaSettings'
+        - type: object
+          properties:
+            llm: { $ref: '#/components/schemas/ModelConfigWritable' }
+    AgentConfig:
+      type: object
+      properties:
+        maxIterations: { type: integer, default: 5 }
+        toolTimeoutSeconds: { type: integer, default: 10 }
+        modelTimeoutSeconds: { type: integer, default: 60 }
+        overallTimeoutSeconds: { type: integer, default: 120 }
+        enabledToolNames:
+          type: array
+          items: { type: string }
+    ModelConfigPublic:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: Fixed to ai-gateway for MVP.
+          example: ai-gateway
+        profileId:
+          type: string
+          description: AI Gateway model profile id.
+        modelName: { type: string }
+        timeoutSeconds: { type: integer }
+    ModelConfigWritable:
+      allOf:
+        - $ref: '#/components/schemas/ModelConfigPublic'
+    LlmConfigVersion:
+      allOf:
+        - $ref: '#/components/schemas/ModelConfigPublic'
+        - type: object
+          properties:
+            id: { type: string }
+            versionNo: { type: integer }
+            temperature: { type: number }
+            maxTokens: { type: integer }
+            isActive: { type: boolean }
+            createdAt: { type: string, format: date-time }
+    LlmConfigVersionCreate:
+      allOf:
+        - $ref: '#/components/schemas/ModelConfigPublic'
+        - type: object
+          properties:
+            temperature: { type: number }
+            maxTokens: { type: integer }
+            activate: { type: boolean }
+    LlmConnectionTestRequest:
+      allOf:
+        - $ref: '#/components/schemas/ModelConfigPublic'
+    LlmConnectionTestResult:
+      type: object
+      properties:
+        id: { type: string }
+        success: { type: boolean }
+        latencyMs: { type: integer }
+        modelName: { type: string }
+        errorCode: { type: string, nullable: true }
+        errorMessage: { type: string, nullable: true }
+        testedAt: { type: string, format: date-time }
+    RetrievalTestRequest:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string }
+        question:
+          type: string
+          deprecated: true
+          description: Legacy alias for query.
+        knowledgeBaseIds:
+          type: array
+          items: { type: string }
+        retrieval: { $ref: '#/components/schemas/RetrievalOptions' }
+        overrides: { $ref: '#/components/schemas/RetrievalOptions' }
+    RetrievalTestResponse:
+      type: object
+      properties:
+        id: { type: string }
+        results:
+          type: array
+          items:
+            type: object
+            properties:
+              documentName: { type: string }
+              sectionPath: { type: string }
+              score: { type: number }
+              rerankScore: { type: number }
+              contentPreview: { type: string }
+        createdAt: { type: string, format: date-time }
+    QaStats:
+      type: object
+      properties:
+        totalQuestionCount: { type: integer }
+        conversationCount: { type: integer }
+        trend30d:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              questionCount: { type: integer }
+    QaTrendStats:
+      type: object
+      properties:
+        days: { type: integer }
+        points:
+          type: array
+          items:
+            type: object
+            properties:
+              date: { type: string, format: date }
+              count: { type: integer }
+    QaTopQueries:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              query: { type: string }
+              count: { type: integer }
+              lastAskedAt: { type: string, format: date-time }
+    QaIntentDistribution:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              intent: { $ref: '#/components/schemas/Intent' }
+              count: { type: integer }
+              percent: { type: number }
+    UpdatedAt:
+      type: object
+      properties:
+        updatedAt: { type: string, format: date-time }
+    Page:
+      type: object
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [validation_error, unauthorized, forbidden, not_found, conflict, rate_limited, dependency_error, internal_error, unsupported_intent, unsupported_mode, unsupported_numbering_mode]
+            message: { type: string }
+            requestId: { type: string }
+            fields:
+              type: object
+              additionalProperties: { type: string }

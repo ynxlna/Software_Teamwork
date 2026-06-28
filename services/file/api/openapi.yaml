@@ -1,13 +1,13 @@
 openapi: 3.0.3
 info:
   title: File Service Internal API
-  version: 0.1.0
-  description: Internal file-service API used by gateway and future backend integration. Public frontend contracts remain in docs/api/gateway.openapi.yaml. This MVP exposes a knowledge-document shaped upload route; report templates, report materials, and generated report files require a future generic file-object internal API and must not reuse the knowledge-base document path.
+  version: 0.2.0
+  description: Internal base file-object API used by owner services such as knowledge and document. Public frontend contracts remain in docs/services/gateway/api/openapi.yaml and must be reached only through gateway /api/v1/**. This contract intentionally avoids knowledge-base, report-template, report-material, and report-file business fields; those are owned by their corresponding services. The current code still keeps knowledge-document shaped MVP routes for compatibility, but new integrations should use /internal/v1/files/**.
 servers:
   - url: http://localhost:8082
 tags:
   - name: health
-  - name: documents
+  - name: files
 paths:
   /healthz:
     get:
@@ -33,83 +33,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HealthResponse'
-  /internal/v1/knowledge-bases/{knowledgeBaseId}/documents:
+  /internal/v1/files:
     post:
-      tags: [documents]
-      summary: Upload a document into a knowledge-base context
-      operationId: uploadKnowledgeBaseDocument
-      parameters:
-        - $ref: '#/components/parameters/KnowledgeBaseId'
+      tags: [files]
+      summary: Create base file object
+      operationId: createFile
+      description: Stores a raw file object and returns only base file metadata. Caller-owned business metadata such as knowledgeBaseId, reportId, templateId, materialId, reportFileId, tags, processing state, and ACLs must be stored by the caller's owner service.
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
-              type: object
-              required: [file]
-              properties:
-                file:
-                  type: string
-                  format: binary
-                tags:
-                  type: array
-                  items:
-                    type: string
-              description: Tags are encoded as repeated multipart fields named tags.
+              $ref: '#/components/schemas/CreateFileRequest'
       responses:
         '201':
-          description: Document uploaded.
+          description: File object created.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DocumentResponse'
+                $ref: '#/components/schemas/FileResponse'
         '400':
           $ref: '#/components/responses/Error'
         '401':
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
-  /internal/v1/documents/{documentId}:
+        '413':
+          $ref: '#/components/responses/Error'
+  /internal/v1/files/{fileId}:
     get:
-      tags: [documents]
-      summary: Get file-owned document metadata
-      operationId: getDocument
+      tags: [files]
+      summary: Get base file metadata
+      operationId: getFile
       parameters:
-        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/FileId'
       responses:
         '200':
-          description: Document metadata.
+          description: File metadata.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DocumentResponse'
-        '401':
-          $ref: '#/components/responses/Error'
-        '403':
-          $ref: '#/components/responses/Error'
-        '404':
-          $ref: '#/components/responses/Error'
-    patch:
-      tags: [documents]
-      summary: Replace file-owned document tags
-      operationId: updateDocument
-      parameters:
-        - $ref: '#/components/parameters/DocumentId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateDocumentRequest'
-      responses:
-        '200':
-          description: Document updated.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DocumentResponse'
-        '400':
-          $ref: '#/components/responses/Error'
+                $ref: '#/components/schemas/FileResponse'
         '401':
           $ref: '#/components/responses/Error'
         '403':
@@ -117,27 +81,29 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
     delete:
-      tags: [documents]
-      summary: Delete a document
-      operationId: deleteDocument
+      tags: [files]
+      summary: Delete base file object
+      operationId: deleteFile
       parameters:
-        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/FileId'
       responses:
         '204':
-          description: Document deleted.
+          description: File deleted or marked deleted.
         '401':
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-  /internal/v1/documents/{documentId}/content:
+        '409':
+          $ref: '#/components/responses/Error'
+  /internal/v1/files/{fileId}/content:
     get:
-      tags: [documents]
-      summary: Get original document content
-      operationId: getDocumentContent
+      tags: [files]
+      summary: Get original file content
+      operationId: getFileContent
       parameters:
-        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/FileId'
       responses:
         '200':
           description: Original file stream.
@@ -161,14 +127,8 @@ paths:
           $ref: '#/components/responses/Error'
 components:
   parameters:
-    KnowledgeBaseId:
-      name: knowledgeBaseId
-      in: path
-      required: true
-      schema:
-        type: string
-    DocumentId:
-      name: documentId
+    FileId:
+      name: fileId
       in: path
       required: true
       schema:
@@ -197,51 +157,47 @@ components:
               example: ready
         requestId:
           type: string
-    UpdateDocumentRequest:
+    CreateFileRequest:
       type: object
+      required: [file]
       properties:
-        tags:
-          type: array
-          items:
-            type: string
-    DocumentStatus:
-      type: string
-      enum: [uploaded]
-    DocumentSummary:
+        file:
+          type: string
+          format: binary
+        checksumSha256:
+          type: string
+          description: Optional caller-computed SHA-256 checksum. File service may compute it when omitted.
+      description: Multipart request for creating a base file object. Do not include business owner fields here.
+    FileObject:
       type: object
-      required: [id, knowledgeBaseId, name, status, createdAt, contentType, sizeBytes]
+      required: [id, filename, contentType, sizeBytes, createdAt]
       properties:
         id:
           type: string
-        knowledgeBaseId:
+          description: Internal file id for owner services. Frontend public responses for report templates, materials, and report files must not expose this internal id.
+        filename:
           type: string
-        name:
+        contentType:
           type: string
-        status:
-          $ref: '#/components/schemas/DocumentStatus'
-        tags:
-          type: array
-          items:
-            type: string
-        errorMessage:
+        sizeBytes:
+          type: integer
+          minimum: 0
+        checksumSha256:
           type: string
           nullable: true
         createdAt:
           type: string
           format: date-time
-        contentType:
+        deletedAt:
           type: string
-          description: Stored original content type, defaulting to application/octet-stream when unknown.
-        sizeBytes:
-          type: integer
-          format: int64
-          description: Stored original file size in bytes.
-    DocumentResponse:
+          format: date-time
+          nullable: true
+    FileResponse:
       type: object
       required: [data, requestId]
       properties:
         data:
-          $ref: '#/components/schemas/DocumentSummary'
+          $ref: '#/components/schemas/FileObject'
         requestId:
           type: string
     ErrorResponse:

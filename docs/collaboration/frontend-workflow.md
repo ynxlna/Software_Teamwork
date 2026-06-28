@@ -140,6 +140,21 @@ eslint-config-prettier
 - `any` 初期设为 warning，代码稳定后升为 error。
 - `console` 设为 warning，允许 `console.warn` 和 `console.error`。
 
+## API 类型和请求封装
+
+前端 API 类型统一从 gateway OpenAPI 生成：
+
+```bash
+bunx openapi-typescript docs/services/gateway/api/openapi.yaml -o apps/web/src/api/generated/gateway.ts
+```
+
+规则：
+
+- `apps/web/src/api/generated/` 只存放生成文件，不手工修改。
+- `apps/web/src/api/client.ts` 只负责 typed fetch wrapper：base URL、`Authorization: Bearer <accessToken>`、request id、JSON/form/SSE 处理、项目 envelope 和错误归一化。
+- 不继续扩展旧的 `{ code, message, data }` API client；gateway 项目自有 JSON 接口成功响应为 `{ data, requestId }`，错误响应为 `{ error }`。
+- SSE 主路径使用 `fetch` stream reader 和 `AbortController`，不使用原生 `EventSource` 作为 POST 流式接口的主实现。
+
 ## 提交信息规范
 
 使用 Conventional Commits：

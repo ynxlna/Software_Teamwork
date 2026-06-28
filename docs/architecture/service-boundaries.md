@@ -6,85 +6,86 @@
 
 ## 总览
 
-| Service | Owns | Exposes to gateway | Must not own |
+| 服务 | 负责 | 通过 gateway 暴露 | 不得负责 |
 | --- | --- | --- | --- |
-| `gateway` | Public API for frontend, admin, backend-module, and tool callers; routing; Redis-backed session cache; auth context propagation; response/error envelope; request id; lightweight aggregation. | `/api/v1/**`, `/healthz`, `/readyz`. | Durable user/role/permission persistence, document parsing, vector search, LLM workflows, report generation business logic. |
-| `auth` | Users, credentials, roles, permissions, sessions or tokens, session identity issuing and revocation. | User creation, session creation/deletion, current user, permission checks, session identity for gateway caching. | File metadata, knowledge indexing, QA messages, report records. |
-| `file` | Basic file upload/content APIs, original objects, object storage coordination, file-owned metadata lifecycle, MinIO middleware for backend services. | Knowledge document upload/content today; internal file-object APIs for other services once finalized. | Knowledge chunking, vector index, RAG, report generation, report material/template/report-file business state. |
-| `knowledge` | Knowledge bases, document ingestion state, chunks, embeddings workflow, retrieval policies, retrieval queries, Qdrant index ownership. | Knowledge base CRUD, document processing details, chunk listing, and knowledge queries through gateway; calls AI Gateway internally for embeddings or rerank when needed. | User identity, raw object storage, LLM answer generation, DOCX export, provider API key storage. |
-| `qa` | Chat sessions, messages, Agent Host / ReAct loop, MCP tool orchestration, response runs, model invocation summaries, tool-call records, citations. | Missing/TBD: frontend-backend contract not finalized; calls AI Gateway internally for OpenAI-compatible chat completions and function-calling transport; calls MCP Client for tool discovery/execution. | Knowledge base CRUD, file upload, report record management, provider API key storage, concrete MCP server implementation, direct provider calls. |
-| `document` | Report templates, materials, report records, outlines, section content, report jobs, generated file metadata, statistics, and report operation logs. | Report generation routes under `/api/v1/report-*` and `/api/v1/reports/**`; uses file service for file-object storage/content and AI Gateway for model calls when files or model output are involved. | QA chat, knowledge indexing, auth persistence, provider API key storage, direct exposure of MinIO object keys or storage URLs. |
-| `ai-gateway` | Model profiles, provider configuration, API key write state, OpenAI-compatible chat completions, Function Calling transport, embeddings, OpenAI-style rerankings, provider error normalization. | Internal `/internal/v1/model-profiles`, `/internal/v1/chat/completions`, `/internal/v1/embeddings`, `/internal/v1/rerankings`; health and readiness checks. | Frontend-facing APIs, QA sessions/messages, Agent Run state, MCP tool discovery/execution, knowledge chunk persistence, Qdrant writes, report records, report export, domain permission decisions. |
+| `gateway` | 面向前端、管理端、后端模块和工具调用方的公开 API；路由；基于 Redis 的会话缓存；认证上下文透传；响应/错误包裹结构；请求 ID；轻量聚合。 | `/api/v1/**`、`/healthz`、`/readyz`。 | 持久化用户/角色/权限、文档解析、向量检索、LLM 工作流、报告生成业务逻辑。 |
+| `auth` | 用户、凭证、角色、权限、会话或令牌、会话身份签发和撤销。 | 用户创建、会话创建/删除、当前用户、权限检查、供 gateway 缓存的会话身份。 | 文件元数据、知识索引、QA 消息、报告记录。 |
+| `file` | 基础文件上传/内容 API、原始对象、对象存储协调、最小 file 元数据生命周期、面向后端服务的 MinIO 中间层。 | 不直接拥有前端公开 API；通过内部 `/internal/v1/files/**` 为 `knowledge`、`document` 等 owner service 提供基础文件能力。 | 知识库归属、知识文档状态、知识分块、向量索引、RAG、报告生成、报告材料/模板/报告文件业务状态。 |
+| `knowledge` | 知识库、知识文档上传入口、文档摄取状态、原始文档内容资源、分块、嵌入工作流、检索策略、检索查询、Qdrant 索引归属、文档解析器运行时配置。 | 通过 gateway 暴露知识库 CRUD、文档上传/详情/内容/分块列表、知识查询和管理员解析器配置资源；需要保存原始文件时内部调用 file，需要生成嵌入或 rerank 时内部调用 AI Gateway。 | 用户身份、底层对象存储实现、LLM 答案生成、DOCX 导出、provider API key 存储。 |
+| `qa` | 聊天会话、消息、Agent Host / ReAct 循环、MCP 工具编排、响应运行记录、模型调用摘要、工具调用记录、引用、QA 配置版本、检索测试运行和 QA 指标。 | 暴露 `/api/v1/qa-sessions/**`、`/api/v1/response-runs/**`、`/api/v1/messages/{messageId}/citations`、`/api/v1/citations/**`、`/api/v1/qa-config-versions/**`、`/api/v1/llm-config-versions/**`、`/api/v1/llm-connection-tests`、`/api/v1/retrieval-test-runs/**`、`/api/v1/qa-metrics/**` 下的 QA 路由；内部调用 AI Gateway 获取 OpenAI 兼容的 chat completions 和 Function Calling 传输；调用 MCP Client 进行工具发现/执行。 | 知识库 CRUD、文件上传、报告记录管理、provider API key 存储、具体 MCP server 实现、直接 provider 调用、在公开前端契约中暴露原始 MCP 工具 schema 或原始工具结果。 |
+| `document` | 报告模板、材料、报告记录、大纲、章节内容、报告任务、生成文件元数据、统计数据和报告操作日志。 | 暴露 `/api/v1/report-*` 和 `/api/v1/reports/**` 下的报告生成路由；涉及文件或模型输出时，使用 file 服务处理文件对象存储/内容，使用 AI Gateway 进行模型调用。 | QA 聊天、知识索引、auth 持久化、provider API key 存储、直接暴露 MinIO object key 或存储 URL。 |
+| `ai-gateway` | 模型 profile、provider 配置、API key 写入状态、OpenAI 兼容的 chat completions、Function Calling 传输、embeddings、OpenAI 风格 rerankings、provider 错误归一化。 | 内部 `/internal/v1/model-profiles`、`/internal/v1/chat/completions`、`/internal/v1/embeddings`、`/internal/v1/rerankings`；健康检查和就绪检查。 | 面向前端的 API、QA 会话/消息、Agent Run 状态、MCP 工具发现/执行、知识分块持久化、Qdrant 写入、报告记录、报告导出、领域权限决策。 |
 
-## Workflow Ownership
+## 工作流归属
 
-| Workflow | Gateway role | Owner service | Notes |
+| 工作流 | Gateway 角色 | 归属服务 | 说明 |
 | --- | --- | --- | --- |
-| User and session creation | Public entrypoint, response normalization, Redis session cache write. | `auth` | Password validation and session/token issuing stay in auth; auth returns identity/session payload for gateway caching. |
-| Current session deletion | Public entrypoint, response normalization, Redis session cache delete. | `auth` | Session/token invalidation stays in auth; gateway deletes the matching Redis cache entry. |
-| Current user | Read Redis session cache and normalize response. | `auth` | Auth owns user/session source data; gateway owns runtime cache lookup and downstream context injection. |
-| Knowledge base CRUD | Public entrypoint and response normalization. | `knowledge` | Active gateway contract. Gateway must not store knowledge-base business state. |
-| Upload document to knowledge base | Public file upload entrypoint. | `file`; knowledge owns post-upload ingestion state. | File service owns raw upload; internal file -> knowledge handoff is an implementation detail. Gateway must not implement parsing or indexing. |
-| Document processing status and chunks | Public read entrypoint and response normalization. | `knowledge` | Active gateway contract for document details and chunks. Gateway must not implement parsing, chunking, embedding, or Qdrant access. Knowledge may call AI Gateway for embedding generation but owns chunk and vector persistence. |
-| Original document content | Route and enforce auth context. | `file` | File service owns object lookup and content authorization details. |
-| Frontend knowledge queries | Public entrypoint and response normalization. | `knowledge` | Active gateway contract. Query execution is modeled as `knowledge-queries`, not as an action-style search path. Retrieval and rerank business rules stay in knowledge; model rerank calls can go through AI Gateway. |
-| QA Agent answer generation | Missing public contract. | `qa` | Placeholder only. Streaming/non-streaming message, Agent Run, tool-call and citation formats are not stable. QA owns conversation/message/citation state, runs the ReAct loop, calls AI Gateway for OpenAI-compatible Function Calling transport, and calls MCP Client for approved tools. |
-| Citation source lookup | Missing public contract. | `qa` or `knowledge`, depending on final citation model. | Placeholder only. The service storing citation references will own lookup. |
-| Report template management | Public entrypoint and auth context propagation. | `document` | Document service owns template metadata, template structure, and template file references. |
-| Report material management | Public entrypoint and auth context propagation. | `document` | Document service owns material metadata and material file references used by report jobs; raw file object storage should reuse file service instead of treating materials as knowledge-base documents. |
-| Report record management | Public entrypoint and auth context propagation. | `document` | Document service owns report drafts, lifecycle state, outlines, sections, and soft deletion rules. |
-| Report outline generation | Public job resource creation and status lookup. | `document` | Long-running outline generation and regeneration are represented as `ReportJob` resources. Document may call AI Gateway for model output but owns job state and outline versions. |
-| Report section generation | Public job or section-version resource creation and status lookup. | `document` | Long-running content generation and section regeneration stay inside document service. Document may call AI Gateway for OpenAI-compatible streaming chunks but owns public event shape. |
-| Report file creation and content | Public file resource creation, metadata lookup, and content stream. | `document` | Document service owns generated file metadata and should use file service for object storage/content access where possible; generated files are not knowledge documents. |
-| Report statistics and operation logs | Public read entrypoint and auth context propagation. | `document` | Document service owns report-specific statistics and audit-friendly operation logs. |
-| Runtime model profile management | Internal configuration API only. | `ai-gateway` | Model profiles, provider base URLs, model names, default parameters, timeout settings and API key write state stay behind `/internal/v1/model-profiles`. Public admin UI, if needed later, must go through gateway. |
-| Provider model invocation | Internal model invocation API only. | `ai-gateway` | Chat and embedding APIs use OpenAI-compatible bodies. Chat also supports OpenAI-compatible Function Calling fields. Rerank is OpenAI-style because OpenAI has no native rerank endpoint. Domain services own prompts, business context, MCP execution and persistence. |
-| Admin overview | Missing public contract. | `gateway` aggregates; each service owns its metric. | Placeholder only. Metrics and aggregation shape are not stable. |
+| 用户和会话创建 | 公开入口、响应归一化、写入 Redis 会话缓存。 | `auth` | 密码校验和会话/令牌签发留在 auth；auth 返回供 gateway 缓存的身份/会话 payload。 |
+| 当前会话删除 | 公开入口、响应归一化、删除 Redis 会话缓存。 | `auth` | 会话/令牌失效留在 auth；gateway 删除匹配的 Redis 缓存条目。 |
+| 当前用户 | 读取 Redis 会话缓存并归一化响应。 | `auth` | Auth 负责用户/会话源数据；gateway 负责运行时缓存查询和下游上下文注入。 |
+| 知识库 CRUD | 公开入口和响应归一化。 | `knowledge` | 已生效的 gateway 契约。Gateway 不得存储知识库业务状态。 |
+| 向知识库上传文档 | 公开文件上传入口。 | `knowledge` | Knowledge 负责创建知识库文档资源、保存内部 file reference 和摄取状态；底层原始文件对象通过内部 file API 保存。Gateway 不得实现解析、索引或直接操作 file。 |
+| 文档处理状态和分块 | 公开读取入口和响应归一化。 | `knowledge` | 文档详情和分块的已生效 gateway 契约。Gateway 不得实现解析、分块、嵌入或 Qdrant 访问。Knowledge 可调用 AI Gateway 生成嵌入，但分块和向量持久化归 knowledge。 |
+| 原始文档内容 | 路由并执行认证上下文约束。 | `knowledge` | Knowledge 拥有 `documents/{documentId}/content` 资源和业务可见性；底层 bytes 可通过内部 file API 读取。 |
+| 前端知识查询 | 公开入口和响应归一化。 | `knowledge` | 已生效的 gateway 契约。查询执行建模为 `knowledge-queries`，不使用动作式 search 路径。检索和 rerank 业务规则留在 knowledge；模型 rerank 调用可经过 AI Gateway。 |
+| QA Agent 答案生成 | 公开入口、SSE 转发、认证上下文透传和响应归一化。 | `qa` | 已生效的 gateway 契约。QA 负责会话/消息/引用状态，运行 ReAct 循环，调用 AI Gateway 获取 OpenAI 兼容的 Function Calling 传输，并调用 MCP Client 使用已批准工具。公开工具调用字段仅为脱敏后的摘要。 |
+| 引用来源查询 | 公开入口和响应归一化。 | `qa` | 已保存引用快照的已生效 gateway 契约。来源知识分块和原始文档内容仍以 knowledge/file 为权威。 |
+| 报告模板管理 | 公开入口和认证上下文透传。 | `document` | Document 服务负责模板元数据、模板结构和模板文件引用。 |
+| 报告材料管理 | 公开入口和认证上下文透传。 | `document` | Document 服务负责报告任务使用的材料元数据和材料文件引用；原始文件对象存储应复用 file 服务，而不是把材料当作知识库文档处理。 |
+| 报告记录管理 | 公开入口和认证上下文透传。 | `document` | Document 服务负责报告草稿、生命周期状态、大纲、章节和软删除规则。 |
+| 报告大纲生成 | 公开任务资源创建和状态查询。 | `document` | 长时间运行的大纲生成和重新生成表示为 `ReportJob` 资源。Document 可调用 AI Gateway 获取模型输出，但任务状态和大纲版本归 document。 |
+| 报告章节生成 | 公开任务或章节版本资源创建和状态查询。 | `document` | 长时间运行的内容生成和章节重新生成留在 document 服务内。Document 可调用 AI Gateway 获取 OpenAI 兼容的流式分块，但公开事件形态归 document。 |
+| 报告文件创建和内容 | 公开文件资源创建、元数据查询和内容流。 | `document` | Document 服务负责生成文件元数据，并应尽可能使用 file 服务进行对象存储/内容访问；生成文件不是知识文档。 |
+| 报告统计和操作日志 | 公开读取入口和认证上下文透传。 | `document` | Document 服务负责报告专属统计数据和便于审计的操作日志。 |
+| 运行时模型 profile 管理 | 公开管理员入口、管理员授权、响应包裹结构、密钥安全归一化。 | `ai-gateway` | 已生效的 gateway 契约：`/api/v1/admin/model-profiles` 和 `/api/v1/admin/model-profiles/{profileId}`。AI Gateway 通过 `/internal/v1/model-profiles` 负责模型 profile、provider base URL、模型名称、默认参数、超时设置和 API key 写入状态；gateway 不得持久化 API key 或直接调用 provider。 |
+| 运行时解析器配置管理 | 公开管理员入口、管理员授权、响应包裹结构、密钥安全归一化。 | `knowledge` | 已生效的 gateway 契约：`/api/v1/admin/parser-configs` 和 `/api/v1/admin/parser-configs/{parserConfigId}`。Knowledge 负责解析器后端校验、并发限制和文档处理行为。Gateway 不得实现解析。 |
+| Provider 模型调用 | 仅内部模型调用 API。 | `ai-gateway` | Chat 和 embedding API 使用 OpenAI 兼容 body。Chat 也支持 OpenAI 兼容的 Function Calling 字段。由于 OpenAI 没有原生 rerank endpoint，rerank 采用 OpenAI 风格。领域服务负责 prompt、业务上下文、MCP 执行和持久化。 |
+| 管理概览和指标聚合 | 缺失公开契约。 | `gateway` 聚合；各服务负责自己的指标。 | 仅占位。指标和聚合形态尚不稳定。不包含运行时模型/解析器配置，因为它们现在已是生效的 gateway 契约。 |
 
-## Missing Contract Register
+## 缺失契约登记
 
-The following downstream frontend/backend interfaces remain intentionally blank in
-`docs/api/gateway.openapi.yaml` until the teams finalize their request and
-response shapes:
+以下下游前端/后端接口在团队最终确定请求和响应结构前，会有意保持
+`docs/services/gateway/api/openapi.yaml` 为空白。QA 会话、消息、SSE、响应运行、引用、配置、
+检索测试和指标路由已不再缺失；它们是已生效的 gateway 契约。
 
-| Area | Placeholder paths | Owner |
+| 领域 | 占位路径 | 归属方 |
 | --- | --- | --- |
-| QA Agent Host and MCP tool calls | `GET/POST /api/v1/qa-sessions`, `GET/DELETE /api/v1/qa-sessions/{sessionId}`, `GET/POST /api/v1/qa-sessions/{sessionId}/messages`, `GET /api/v1/qa-sessions/{sessionId}/events`, future Agent Run/tool-call/config resources | `qa` |
-| Administration aggregation | `GET /api/v1/admin-overview`, `GET /api/v1/admin-metrics` | `gateway` plus domain services |
+| 管理概览和指标聚合 | `GET /api/v1/admin-overview`、`GET /api/v1/admin-metrics` | `gateway` 加领域服务 |
 
-Do not generate frontend API clients or backend handlers for these placeholder
-paths until the corresponding OpenAPI operations are added.
+在对应 OpenAPI operation 添加之前，不要为这些占位路径生成前端 API client 或后端 handler。
+MCP 原始工具 schema、完整工具参数/结果、内部审计细节、prompt、provider 原始错误和存储对象 key
+被有意排除在公开 QA 契约之外，而不是被视为缺失的前端端点。
 
-## Data Ownership Rules
+## 数据归属规则
 
-- A service that owns a database table also owns the API that mutates that data.
-- Gateway may expose caller-friendly public paths for frontend, admin, backend-module, and tool callers, but must delegate business validation to the owner service.
-- AI Gateway may store model provider configuration and encrypted or secret-backed API key material, but it must not own domain prompts, conversations, Agent Runs, MCP tool calls, chunks, citations, reports, or generated files.
-- Cross-service IDs should be strings in public API contracts. Each service can decide internal ID representation.
-- Timestamps in public contracts use RFC 3339 / OpenAPI `date-time`.
-- Delete operations must be owned by the service that owns the resource lifecycle.
+- 拥有数据库表的服务，也拥有修改该数据的 API。
+- Gateway 可以为前端、管理端、后端模块和工具调用方暴露调用方友好的公开路径，但必须把业务校验委托给归属服务。
+- AI Gateway 可以存储模型 provider 配置，以及加密或由密钥系统托管的 API key 材料，但不得负责领域 prompt、会话、Agent Run、MCP 工具调用、分块、引用、报告、生成文件或面向前端的路由。Gateway 暴露管理员模型 profile 路由，并转发密钥写入，不记录或持久化密钥。
+- 跨服务 ID 在公开 API 契约中应使用字符串。各服务可自行决定内部 ID 表示。
+- 公开契约中的时间戳使用 RFC 3339 / OpenAPI `date-time`。
+- 删除操作必须由负责该资源生命周期的服务拥有。
 
-## Boundary Checks For New Endpoints
+## 新端点边界检查
 
-Before adding a gateway endpoint, answer these questions in the endpoint doc or OpenAPI description:
+添加 gateway 端点前，先在端点文档或 OpenAPI 描述中回答以下问题：
 
-1. Which service owns the resource state?
-2. Does the endpoint only route, or does it aggregate multiple services?
-3. If it aggregates, what frontend screen needs this shape?
-4. Which service validates domain rules?
-5. Which error codes can the frontend rely on?
-6. Does the endpoint expose raw object keys, credentials, prompts, vector payloads, or internal URLs? It should not.
-7. Is the path modeled as a resource or collection, with the HTTP method carrying the action?
+1. 哪个服务负责资源状态？
+2. 该端点只是路由转发，还是会聚合多个服务？
+3. 如果会聚合，哪个前端页面需要这种数据形态？
+4. 哪个服务校验领域规则？
+5. 前端可以依赖哪些错误码？
+6. 该端点是否暴露原始 object key、凭证、prompt、向量 payload 或内部 URL？不应暴露。
+7. 该路径是否建模为资源或集合，并由 HTTP method 承载动作？
 
-## Anti-Patterns
+## 错误模式
 
-- Adding SQL, MinIO, Qdrant, or LLM calls directly in gateway handlers.
-- Adding action-style paths such as `/login`, `/logout`, `/download`, `/search`, `/generate`, `/export`, `/retry`, or `/revoke` instead of modeling users, sessions, content, queries, jobs, files, messages, or events as resources.
-- Duplicating permission logic in frontend, gateway, and domain service without a single owner.
-- Letting gateway translate one frontend action into a long business workflow when one domain service should own the workflow.
-- Returning downstream service internals directly to the frontend.
-- Calling OpenAI-compatible, SiliconFlow-compatible, or local model providers directly from `gateway`, `qa`, `knowledge`, or `document` instead of routing model invocations through `ai-gateway`.
-- Letting AI Gateway execute MCP tools or decide tool permissions; QA/MCP Client must own those decisions and records.
-- Exposing AI Gateway `/internal/v1/**`, provider model names, provider base URLs, API key state, prompts, embeddings, rerank payloads, or raw provider errors to frontend contracts.
-- Letting `document` duplicate file-service object storage semantics for report templates, materials, or generated files when a file-service internal resource can model the raw object.
-- Creating shared Go packages before at least three services need the same stable abstraction.
+- 直接在 gateway handler 中加入 SQL、MinIO、Qdrant 或 LLM 调用。
+- 添加 `/login`、`/logout`、`/download`、`/search`、`/generate`、`/export`、`/retry`、`/revoke` 等动作式路径，而不是把用户、会话、内容、查询、任务、文件、消息或事件建模为资源。
+- 在前端、gateway 和领域服务中重复实现权限逻辑，且没有单一归属方。
+- 当某个领域服务应该负责完整工作流时，让 gateway 把一个前端动作翻译成一条很长的业务工作流。
+- 将下游服务内部细节直接返回给前端。
+- 从 `gateway`、`qa`、`knowledge` 或 `document` 直接调用 OpenAI 兼容、SiliconFlow 兼容或本地模型 provider，而不是通过 `ai-gateway` 路由模型调用。
+- 让 AI Gateway 执行 MCP 工具或决定工具权限；QA/MCP Client 必须负责这些决策和记录。
+- 在前端契约中暴露 AI Gateway `/internal/v1/**`、API key 值、prompt、embedding、rerank payload 或 provider 原始错误。经过授权的管理员模型 profile 响应只能通过 gateway 暴露 provider/model/base URL 元数据和 `apiKeyConfigured` 状态。
+- 当 file-service 内部资源可以建模原始对象时，让 `document` 为报告模板、材料或生成文件重复实现 file 服务的对象存储语义。
+- 在至少三个服务需要同一个稳定抽象之前创建共享 Go package。

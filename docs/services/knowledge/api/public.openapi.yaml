@@ -1,0 +1,1077 @@
+openapi: 3.0.3
+info:
+  title: Knowledge Management API
+  version: 0.1.0
+  description: RESTful API contract for knowledge bases, documents, processing jobs, knowledge queries, settings, and stats. All endpoints use opaque Bearer token auth; model calls use an AI gateway with an OpenAI-compatible API. Stable paths must use resource names and HTTP methods instead of action words.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: KnowledgeBases
+  - name: Documents
+  - name: ProcessingJobs
+  - name: KnowledgeQueries
+  - name: SupportMaterials
+  - name: Settings
+  - name: Stats
+paths:
+  /knowledge-bases:
+    get:
+      tags: [KnowledgeBases]
+      summary: List knowledge bases
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: docType
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentType'
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Knowledge base list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseListResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [KnowledgeBases]
+      summary: Create knowledge base
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKnowledgeBaseRequest'
+      responses:
+        '201':
+          description: Created knowledge base
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-bases/{knowledgeBaseId}:
+    parameters:
+      - $ref: '#/components/parameters/KnowledgeBaseId'
+    get:
+      tags: [KnowledgeBases]
+      summary: Get knowledge base
+      responses:
+        '200':
+          description: Knowledge base
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [KnowledgeBases]
+      summary: Update knowledge base
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKnowledgeBaseRequest'
+      responses:
+        '200':
+          description: Updated knowledge base
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [KnowledgeBases]
+      summary: Delete knowledge base
+      responses:
+        '204':
+          description: Deleted
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-base-deletion-jobs:
+    post:
+      tags: [KnowledgeBases]
+      summary: Create knowledge-base deletion job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeletionJobRequest'
+      responses:
+        '202':
+          description: Deletion job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionJobResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-bases/{knowledgeBaseId}/documents:
+    parameters:
+      - $ref: '#/components/parameters/KnowledgeBaseId'
+    get:
+      tags: [Documents]
+      summary: List documents in a knowledge base
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DocumentStatus'
+        - name: q
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [Documents]
+      summary: Upload document into a knowledge base
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateDocumentRequest'
+      responses:
+        '201':
+          description: Created document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /documents/{documentId}:
+    parameters:
+      - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags: [Documents]
+      summary: Get document
+      responses:
+        '200':
+          description: Document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Documents]
+      summary: Update document metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      responses:
+        '200':
+          description: Updated document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [Documents]
+      summary: Delete document
+      responses:
+        '204':
+          description: Deleted
+        default:
+          $ref: '#/components/responses/Error'
+  /document-deletion-jobs:
+    post:
+      tags: [Documents]
+      summary: Create document deletion job
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDeletionJobRequest'
+      responses:
+        '202':
+          description: Deletion job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionJobResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /documents/{documentId}/processing-jobs:
+    post:
+      tags: [ProcessingJobs]
+      summary: Create document processing job
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProcessingJobRequest'
+      responses:
+        '202':
+          description: Processing job accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /documents/{documentId}/chunks:
+    get:
+      tags: [Documents]
+      summary: List document chunks
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Chunk list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentChunkListResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /documents/{documentId}/content:
+    get:
+      tags: [Documents]
+      summary: Get original document content
+      parameters:
+        - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Original file stream
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-processing-jobs/{jobId}:
+    get:
+      tags: [ProcessingJobs]
+      summary: Get processing job
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      responses:
+        '200':
+          description: Processing job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-processing-jobs/{jobId}/attempts:
+    post:
+      tags: [ProcessingJobs]
+      summary: Create processing job attempt
+      parameters:
+        - $ref: '#/components/parameters/JobId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProcessingJobAttemptRequest'
+      responses:
+        '202':
+          description: Processing job attempt accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobAttemptResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-bases/{knowledgeBaseId}/processing-jobs:
+    post:
+      tags: [ProcessingJobs]
+      summary: Create knowledge-base processing jobs
+      parameters:
+        - $ref: '#/components/parameters/KnowledgeBaseId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKnowledgeBaseProcessingJobsRequest'
+      responses:
+        '202':
+          description: Processing jobs accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessingJobListResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-queries:
+    post:
+      tags: [KnowledgeQueries]
+      summary: Create knowledge query
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQueryRequest'
+      responses:
+        '201':
+          description: Knowledge query result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeQueryResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-query-tests:
+    post:
+      tags: [KnowledgeQueries]
+      summary: Create knowledge query test
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQueryTestRequest'
+      responses:
+        '201':
+          description: Knowledge query test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeQueryTestEnvelope'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-support-materials:
+    get:
+      tags: [SupportMaterials]
+      summary: List report support materials
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Material list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMaterialListResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    post:
+      tags: [SupportMaterials]
+      summary: Create support material
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateSupportMaterialRequest'
+      responses:
+        '201':
+          description: Created support material
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMaterialResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-support-materials/{materialId}:
+    parameters:
+      - $ref: '#/components/parameters/MaterialId'
+    patch:
+      tags: [SupportMaterials]
+      summary: Update support material metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSupportMaterialRequest'
+      responses:
+        '200':
+          description: Updated support material
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SupportMaterialResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [SupportMaterials]
+      summary: Delete support material
+      responses:
+        '204':
+          description: Deleted
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-settings:
+    get:
+      tags: [Settings]
+      summary: Get knowledge settings
+      responses:
+        '200':
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeSettingsResponse'
+        default:
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [Settings]
+      summary: Update knowledge settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeSettingsUpdate'
+      responses:
+        '200':
+          description: Updated timestamp
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatedAtResponse'
+        default:
+          $ref: '#/components/responses/Error'
+  /knowledge-statistics/overview:
+    get:
+      tags: [Stats]
+      summary: Get knowledge overview stats
+      responses:
+        '200':
+          description: Overview stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeStatsResponse'
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    KnowledgeBaseId:
+      name: knowledgeBaseId
+      in: path
+      required: true
+      schema:
+        type: string
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+    MaterialId:
+      name: materialId
+      in: path
+      required: true
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    DocumentType:
+      type: string
+      enum: [REGULATION, TECHNICAL_REPORT, TERM, GENERAL, SUPPORT_MATERIAL]
+    DocumentStatus:
+      type: string
+      enum: [uploaded, parsing, chunking, embedding, ready, failed]
+    RetrievalStrategy:
+      type: string
+      enum: [VECTOR, VECTOR_RERANK]
+    SegmentationStrategy:
+      type: string
+      enum: [SEMANTIC_TEXT, HEADING, FIXED_SIZE]
+    KnowledgeBase:
+      type: object
+      required: [id, name, docType, documentCount, chunkCount, createdAt]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        docType: { $ref: '#/components/schemas/DocumentType' }
+        visibility: { type: string, enum: [private, team, public] }
+        chunkStrategy: { $ref: '#/components/schemas/ChunkStrategy' }
+        retrievalStrategy: { $ref: '#/components/schemas/RetrievalConfig' }
+        documentCount: { type: integer }
+        chunkCount: { type: integer }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ChunkStrategy:
+      type: object
+      properties:
+        type: { $ref: '#/components/schemas/SegmentationStrategy' }
+        chunkSize: { type: integer, minimum: 1 }
+        overlap: { type: integer, minimum: 0 }
+        separators:
+          type: array
+          items: { type: string }
+    RetrievalConfig:
+      type: object
+      properties:
+        mode: { $ref: '#/components/schemas/RetrievalStrategy' }
+        topK: { type: integer }
+        scoreThreshold: { type: number }
+        rerankTopN: { type: integer, nullable: true }
+    CreateKnowledgeBaseRequest:
+      allOf:
+        - $ref: '#/components/schemas/KnowledgeBaseWritable'
+    UpdateKnowledgeBaseRequest:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        docType: { $ref: '#/components/schemas/DocumentType' }
+        visibility: { type: string, enum: [private, team, public] }
+        chunkStrategy: { $ref: '#/components/schemas/ChunkStrategy' }
+        retrievalStrategy: { $ref: '#/components/schemas/RetrievalConfig' }
+    KnowledgeBaseWritable:
+      type: object
+      required: [name, docType]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        docType: { $ref: '#/components/schemas/DocumentType' }
+        visibility: { type: string, enum: [private, team, public] }
+        chunkStrategy: { $ref: '#/components/schemas/ChunkStrategy' }
+        retrievalStrategy: { $ref: '#/components/schemas/RetrievalConfig' }
+    KnowledgeBaseResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/KnowledgeBase' }
+    KnowledgeBaseListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PagedEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/KnowledgeBase' }
+    KnowledgeDocument:
+      type: object
+      properties:
+        id: { type: string }
+        knowledgeBaseId: { type: string }
+        name: { type: string }
+        contentType: { type: string, nullable: true }
+        sizeBytes: { type: integer }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        tags:
+          type: array
+          items: { type: string }
+        chunkCount: { type: integer }
+        errorCode: { type: string, nullable: true }
+        errorMessage: { type: string, nullable: true }
+        parserBackend: { type: string, nullable: true }
+        createdBy: { type: string }
+        jobId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateDocumentRequest:
+      type: object
+      required: [file]
+      properties:
+        file:
+          type: string
+          format: binary
+        tags:
+          type: array
+          items: { type: string }
+    UpdateDocumentRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items: { type: string }
+    DocumentResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/KnowledgeDocument' }
+    DocumentListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PagedEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/KnowledgeDocument' }
+    DocumentChunk:
+      type: object
+      properties:
+        id: { type: string }
+        documentId: { type: string }
+        knowledgeBaseId: { type: string }
+        chunkIndex: { type: integer }
+        sectionPath: { type: string }
+        chunkType: { type: string }
+        content: { type: string }
+        tokenCount: { type: integer }
+        qdrantPointId: { type: string, nullable: true }
+        embeddingProvider: { type: string, nullable: true }
+        embeddingDimension: { type: integer, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+    DocumentChunkListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PagedEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/DocumentChunk' }
+    ProcessingJob:
+      type: object
+      properties:
+        id: { type: string }
+        documentId: { type: string }
+        knowledgeBaseId: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
+        stage: { type: string }
+        attemptCount:
+          type: integer
+          description: Current attempt count persisted in PostgreSQL.
+        maxAttempts:
+          type: integer
+          description: Automatic retry limit; fixed to 3 for MVP.
+        progress:
+          type: object
+          properties:
+            current: { type: integer }
+            total: { type: integer }
+        errorMessage: { type: string, nullable: true }
+        attempts:
+          type: array
+          description: Recent attempt summaries, capped at the latest 10 attempts.
+          items: { $ref: '#/components/schemas/ProcessingJobAttempt' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    ProcessingJobResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/ProcessingJob' }
+    CreateProcessingJobRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          enum: [segmentation_changed, retrieval_changed, parser_changed, embedding_model_changed, manual]
+    CreateKnowledgeBaseProcessingJobsRequest:
+      type: object
+      properties:
+        documentIds:
+          type: array
+          items: { type: string }
+        reason:
+          type: string
+          enum: [segmentation_changed, retrieval_changed, parser_changed, embedding_model_changed, manual]
+    ProcessingJobListResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/ProcessingJob' }
+    ProcessingJobAttempt:
+      type: object
+      properties:
+        id: { type: string }
+        processingJobId: { type: string }
+        attempt: { type: integer }
+        stage: { type: string }
+        status: { type: string }
+        errorCode: { type: string, nullable: true }
+        errorMessage: { type: string, nullable: true }
+        startedAt: { type: string, format: date-time }
+        finishedAt: { type: string, format: date-time, nullable: true }
+    ProcessingJobAttemptResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/ProcessingJobAttempt' }
+    CreateProcessingJobAttemptRequest:
+      type: object
+      properties:
+        reason: { type: string }
+    KnowledgeQueryRequest:
+      type: object
+      required: [query]
+      properties:
+        query: { type: string }
+        knowledgeBaseIds:
+          type: array
+          items: { type: string }
+        topK: { type: integer }
+        scoreThreshold: { type: number }
+        tags:
+          type: array
+          items: { type: string }
+        metadataFilter:
+          type: object
+          additionalProperties:
+            type: string
+        rerank: { type: boolean }
+        rerankTopN: { type: integer, nullable: true }
+    KnowledgeQueryResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/KnowledgeQuerySummary' }
+    KnowledgeQuerySummary:
+      type: object
+      properties:
+        id: { type: string }
+        query: { type: string }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/KnowledgeQueryResult' }
+        trace: { $ref: '#/components/schemas/KnowledgeQueryTrace' }
+    KnowledgeQueryTestRequest:
+      allOf:
+        - $ref: '#/components/schemas/KnowledgeQueryRequest'
+        - type: object
+          properties:
+            name: { type: string }
+    KnowledgeQueryTestResponse:
+      type: object
+      properties:
+        id: { type: string }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/KnowledgeQueryResult' }
+        createdAt: { type: string, format: date-time }
+    KnowledgeQueryTestEnvelope:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/KnowledgeQueryTestResponse' }
+    KnowledgeQueryResult:
+      type: object
+      properties:
+        score: { type: number }
+        pointId: { type: string, nullable: true }
+        chunkId: { type: string }
+        documentId: { type: string }
+        knowledgeBaseId: { type: string }
+        documentName: { type: string }
+        sectionPath: { type: string }
+        chunkIndex: { type: integer, nullable: true }
+        contentPreview: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+    KnowledgeQueryTrace:
+      type: object
+      properties:
+        embeddingProvider: { type: string }
+        embeddingModel: { type: string }
+        embeddingDimension: { type: integer }
+        qdrantCollection: { type: string }
+        searchTopK: { type: integer }
+        scoreThreshold: { type: number }
+        hitCount: { type: integer }
+        rerank: { type: boolean }
+        rerankTopN: { type: integer, nullable: true }
+    SupportMaterial:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        materialType: { type: string }
+        filename: { type: string, nullable: true }
+        sizeBytes: { type: integer }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        tags:
+          type: array
+          items: { type: string }
+        jobId: { type: string, nullable: true }
+    CreateSupportMaterialRequest:
+      type: object
+      required: [file, name, materialType]
+      properties:
+        file:
+          type: string
+          format: binary
+        name: { type: string }
+        materialType: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+    UpdateSupportMaterialRequest:
+      type: object
+      properties:
+        name: { type: string }
+        materialType: { type: string }
+        tags:
+          type: array
+          items: { type: string }
+    SupportMaterialResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/SupportMaterial' }
+    SupportMaterialListResponse:
+      allOf:
+        - $ref: '#/components/schemas/PagedEnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data:
+              type: array
+              items: { $ref: '#/components/schemas/SupportMaterial' }
+    KnowledgeSettings:
+      type: object
+      properties:
+        embeddingModel: { $ref: '#/components/schemas/ModelConfigPublic' }
+        rerankModel: { $ref: '#/components/schemas/ModelConfigPublic' }
+        parser:
+          type: object
+          properties:
+            backend:
+              type: string
+              enum: [external_api]
+              description: Fixed to external_api for MVP.
+            baseUrl:
+              type: string
+              description: External HTTP parser/OCR service base URL.
+            timeoutSeconds:
+              type: integer
+              description: Parser request timeout.
+            maxConcurrency:
+              type: integer
+              description: Maximum concurrent parser jobs.
+    KnowledgeSettingsResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/KnowledgeSettings' }
+    KnowledgeSettingsUpdate:
+      type: object
+      properties:
+        embeddingModel: { $ref: '#/components/schemas/ModelConfigWritable' }
+        rerankModel: { $ref: '#/components/schemas/ModelConfigWritable' }
+        parser:
+          type: object
+          properties:
+            backend:
+              type: string
+              enum: [external_api]
+              description: Fixed to external_api for MVP.
+            baseUrl:
+              type: string
+              description: External HTTP parser/OCR service base URL.
+            apiKey:
+              type: string
+              writeOnly: true
+              description: External parser API key or secret reference.
+            timeoutSeconds:
+              type: integer
+              description: Parser request timeout.
+            maxConcurrency:
+              type: integer
+              description: Maximum concurrent parser jobs.
+    ModelConfigPublic:
+      type: object
+      properties:
+        provider:
+          type: string
+          description: Fixed to ai-gateway for MVP.
+          example: ai-gateway
+        profileId:
+          type: string
+          description: AI Gateway model profile id.
+        model: { type: string }
+        dimension: { type: integer }
+        topN: { type: integer }
+    ModelConfigWritable:
+      allOf:
+        - $ref: '#/components/schemas/ModelConfigPublic'
+    KnowledgeStats:
+      type: object
+      properties:
+        knowledgeBaseCount: { type: integer }
+        documentCount: { type: integer }
+        chunkCount: { type: integer }
+        uploadTrend30d:
+          type: array
+          items: { $ref: '#/components/schemas/TrendPoint' }
+    KnowledgeStatsResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/KnowledgeStats' }
+    TrendPoint:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        count: { type: integer }
+    CreateDeletionJobRequest:
+      type: object
+      required: [ids]
+      properties:
+        ids:
+          type: array
+          items: { type: string }
+    DeletionJob:
+      type: object
+      properties:
+        id: { type: string }
+        status: { type: string, enum: [queued, running, succeeded, failed, cancelled] }
+        targetIds:
+          type: array
+          items: { type: string }
+        failed:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              code: { type: string }
+              message: { type: string }
+        createdAt: { type: string, format: date-time }
+    DeletionJobResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/DeletionJob' }
+    UpdatedAt:
+      type: object
+      properties:
+        updatedAt: { type: string, format: date-time }
+    UpdatedAtResponse:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [data]
+          properties:
+            data: { $ref: '#/components/schemas/UpdatedAt' }
+    Page:
+      type: object
+      required: [page, pageSize, total]
+      properties:
+        page: { type: integer }
+        pageSize: { type: integer }
+        total: { type: integer }
+    EnvelopeBase:
+      type: object
+      required: [requestId]
+      properties:
+        requestId: { type: string }
+    PagedEnvelopeBase:
+      allOf:
+        - $ref: '#/components/schemas/EnvelopeBase'
+        - type: object
+          required: [page]
+          properties:
+            page: { $ref: '#/components/schemas/Page' }
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum: [validation_error, unauthorized, forbidden, not_found, conflict, rate_limited, dependency_error, internal_error, unsupported_intent, unsupported_mode, unsupported_numbering_mode]
+            message: { type: string }
+            requestId: { type: string }
+            fields:
+              type: object
+              additionalProperties: { type: string }

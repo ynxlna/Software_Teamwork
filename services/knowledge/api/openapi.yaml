@@ -6,8 +6,8 @@ info:
     Service-local API contract for the Go-based Knowledge service. Public
     frontend contracts remain owned by the gateway OpenAPI. This service
     exposes operational endpoints and service-local /internal/v1 resources for
-    knowledge metadata, document processing state, ingestion jobs, retrieval,
-    runtime config, and statistics.
+    knowledge metadata, document upload, original document content, processing
+    state, retrieval, runtime config, and statistics.
 servers:
   - url: http://localhost:8000
 tags:
@@ -199,30 +199,27 @@ paths:
           $ref: '#/components/responses/Error'
         '404':
           $ref: '#/components/responses/Error'
-  /internal/v1/knowledge-bases/{knowledgeBaseId}/ingestion-jobs:
-    parameters:
-      - name: knowledgeBaseId
-        in: path
-        required: true
-        schema:
-          type: string
     post:
       tags: [knowledge-bases]
-      summary: Create ingestion job from file handoff
-      operationId: createInternalIngestionJob
+      summary: Create knowledge-base document
+      operationId: createInternalKnowledgeBaseDocument
+      description: >
+        Knowledge owns document metadata and the document resource identity.
+        The service may store original bytes through file service internally,
+        but this contract does not expose file service identifiers.
       requestBody:
         required: true
         content:
-          application/json:
+          multipart/form-data:
             schema:
-              $ref: '#/components/schemas/HandoffRequest'
+              $ref: '#/components/schemas/CreateDocumentRequest'
       responses:
         '201':
-          description: Ingestion job accepted.
+          description: Document accepted for processing.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HandoffResponse'
+                $ref: '#/components/schemas/DocumentCreatedResponse'
         '400':
           $ref: '#/components/responses/Error'
         '401':
@@ -281,6 +278,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DocumentResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [knowledge-bases]
+      summary: Update document metadata
+      operationId: updateInternalDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      responses:
+        '200':
+          description: Document metadata updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [knowledge-bases]
+      summary: Delete document
+      operationId: deleteInternalDocument
+      responses:
+        '204':
+          description: Document deleted.
+        '401':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /internal/v1/documents/{documentId}/content:
+    parameters:
+      - name: documentId
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [knowledge-bases]
+      summary: Get original document content
+      operationId: getInternalDocumentContent
+      description: >
+        Streams the original document content for a knowledge document. The
+        document resource remains owned by knowledge; file service is only an
+        internal byte-storage capability.
+      responses:
+        '200':
+          description: Original document stream.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         '401':
           $ref: '#/components/responses/Error'
         '404':
@@ -832,45 +890,51 @@ components:
           $ref: '#/components/schemas/PageInfo'
         requestId:
           type: string
-    HandoffRequest:
+    CreateDocumentRequest:
       type: object
-      required: [fileId, name]
+      required: [file]
       properties:
-        fileId:
+        file:
           type: string
-        name:
-          type: string
-        contentType:
-          type: string
-        sizeBytes:
-          type: integer
-          minimum: 0
+          format: binary
         tags:
-          type: array
-          items:
+          type: object
+          additionalProperties:
             type: string
         createdBy:
           type: string
         idempotencyKey:
           type: string
-    HandoffResult:
+    DocumentCreated:
       type: object
-      required: [documentId, jobId, status]
+      required: [id, knowledgeBaseId, status, processingJobId, createdAt]
       properties:
-        documentId:
+        id:
           type: string
-        jobId:
+        knowledgeBaseId:
           type: string
         status:
           $ref: '#/components/schemas/DocumentStatus'
-    HandoffResponse:
+        processingJobId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    DocumentCreatedResponse:
       type: object
       required: [data, requestId]
       properties:
         data:
-          $ref: '#/components/schemas/HandoffResult'
+          $ref: '#/components/schemas/DocumentCreated'
         requestId:
           type: string
+    UpdateDocumentRequest:
+      type: object
+      properties:
+        tags:
+          type: object
+          additionalProperties:
+            type: string
     ProcessingJob:
       type: object
       required:

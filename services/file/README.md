@@ -1,10 +1,10 @@
 # File Service
 
-`services/file` is the first runnable Go module for file-owned upload, metadata, deletion, and original content lookup. It is a domain service for gateway and other modules to call; it does not own knowledge ingestion, chunks, indexing, QA, or report workflows.
+`services/file` is the first runnable Go module for base file-object upload, metadata, deletion, and original content lookup. It is an internal foundation service for owner services to call; it does not own knowledge ingestion, knowledge document state, chunks, indexing, QA, report templates, report materials, report files, or report workflows.
 
-Public frontend routes remain owned by gateway and are documented in `docs/api/gateway.openapi.yaml`. This service exposes internal RESTful routes under `/internal/v1/**` for gateway and future backend integration.
+Public frontend routes remain owned by gateway and are documented in `docs/services/gateway/api/openapi.yaml`. Frontend callers must not call this service directly. Stable file capability must be reached through gateway `/api/v1/**` resources owned by `knowledge` or `document`, while those owner services reuse this service's internal base file APIs.
 
-The implemented MVP route is still knowledge-document shaped. Report templates, report materials, and generated report files are document-owned business resources; they should use a future generic file-object internal API rather than reusing `/internal/v1/knowledge-bases/{knowledgeBaseId}/documents`.
+The implemented MVP route is still knowledge-document shaped for compatibility. The target internal contract is generic file-object shaped (`/internal/v1/files/**`), and the current knowledge-document routes should not be extended for report templates, report materials, generated report files, or new knowledge business metadata.
 
 ## Current Scope
 
@@ -18,14 +18,21 @@ Implemented now:
 - `DELETE /internal/v1/documents/{documentId}`
 - `GET /internal/v1/documents/{documentId}/content`
 
+Target internal contract:
+
+- `POST /internal/v1/files`
+- `GET /internal/v1/files/{fileId}`
+- `DELETE /internal/v1/files/{fileId}`
+- `GET /internal/v1/files/{fileId}/content`
+
 Out of scope for this MVP:
 
 - Local MinIO setup
 - Production MinIO adapter
 - PostgreSQL repository
-- Knowledge ingestion handoff
-- Generic file-object internal API for report templates, report materials, and generated report files
-- Public knowledge-owned document list/detail/chunks contracts
+- Knowledge ingestion handoff and knowledge document state
+- Report template, report material, and generated report file business state
+- Public knowledge-owned document list/detail/chunks/content contracts
 
 ## Local Run
 
@@ -65,7 +72,7 @@ A future MinIO adapter should be added under `internal/platform/storage/minio` a
 
 ## Metadata Port
 
-File metadata is behind `service.DocumentRepository`. The current memory repository supports handler tests and local smoke testing. A future PostgreSQL implementation should live under `internal/repository` and add real migrations under `migrations/`.
+File metadata is behind the service repository port. The current memory repository supports handler tests and local smoke testing. A future PostgreSQL implementation should live under `internal/repository` and add real migrations under `migrations/`. It must store only base file metadata such as file id, display filename, content type, size, checksum, storage reference, created timestamp, and deleted timestamp. Knowledge-base IDs, report IDs, template IDs, material IDs, business tags, processing status, and ACLs belong to their owner services.
 
 ## Multipart Upload Shape
 
@@ -97,6 +104,6 @@ JSON errors use:
 }
 ```
 
-Internal metadata responses include file-owned fields such as `contentType` and `sizeBytes` for gateway and module integration. They never expose bucket names, object keys, internal storage URLs, or storage credentials.
+Internal metadata responses include base file fields such as `contentType`, `sizeBytes`, and checksum for owner-service integration. They never expose bucket names, object keys, internal storage URLs, or storage credentials.
 
 Content reads return raw bytes on success and the same JSON error envelope on failure.

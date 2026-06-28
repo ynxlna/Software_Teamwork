@@ -1,0 +1,5514 @@
+openapi: 3.0.3
+info:
+  title: Power Knowledge Platform Gateway API
+  version: 0.1.0
+  license:
+    name: Unspecified
+    url: https://github.com/Sakayori-Iroha-168/Software_Teamwork
+  description: |
+    Public caller-facing API contract for the gateway service.
+    All stable public and service-to-service HTTP APIs must use RESTful resource-oriented paths.
+    This revision treats gateway health checks, user/session,
+    knowledge-owned knowledge base, document upload, processing, content, chunk, and retrieval routes,
+    document-owned report generation and report settings routes, qa-owned intelligent question answering
+    routes, and admin-facing runtime model/parser configuration routes as active
+    contracts. Downstream admin overview/metrics aggregation interfaces remain
+    under x-missing-contracts until finalized.
+x-api-style:
+  required: RESTful resource-oriented HTTP APIs
+  appliesTo:
+  - public gateway APIs
+  - service-to-service HTTP APIs
+  rules:
+  - Model stable routes as resources or resource collections.
+  - Use HTTP methods for actions: GET reads, POST creates, PATCH updates, DELETE removes.
+  - Do not put action verbs such as login, logout, register, download, search, generate, export, retry, or revoke in stable paths.
+  - Model long-running work as resources such as jobs, files, sessions, messages, events, or queries.
+  exceptions:
+  - GET /healthz
+  - GET /readyz
+servers:
+- url: /
+  description: Gateway root
+security:
+- bearerAuth: []
+tags:
+- name: health
+  description: Gateway process and readiness checks.
+- name: auth
+  description: User and session APIs owned by auth service.
+- name: knowledge
+  description: Knowledge base, document processing, chunk, and retrieval APIs owned by knowledge service.
+- name: documents
+  description: Knowledge-owned document upload, metadata, deletion, and original content APIs that may reuse file service internally.
+- name: report-generation
+  description: Document-owned report records, templates, jobs, generated files, settings, statistics, and logs.
+- name: admin-runtime-config
+  description: Admin-facing runtime configuration APIs exposed by gateway. Model profiles are backed by ai-gateway; parser configs are backed by knowledge.
+- name: qa-sessions
+  description: QA-owned chat sessions.
+- name: qa-messages
+  description: QA-owned messages, answer generation, SSE streams, and event replay.
+- name: qa-agent-runs
+  description: QA-owned response runs and sanitized tool-call summaries.
+- name: qa-citations
+  description: QA-owned answer citation snapshots and citation details.
+- name: qa-settings
+  description: QA runtime configuration and AI Gateway profile references.
+- name: qa-retrieval-tests
+  description: QA-owned retrieval experience test runs backed by knowledge retrieval.
+- name: qa-metrics
+  description: QA question answering statistics and trends.
+paths:
+  /healthz:
+    get:
+      tags:
+      - health
+      summary: Liveness check
+      operationId: getHealthz
+      security: []
+      responses:
+        '200':
+          description: Gateway process is alive.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '429':
+          $ref: '#/components/responses/Error'
+  /readyz:
+    get:
+      tags:
+      - health
+      summary: Readiness check
+      operationId: getReadyz
+      security: []
+      responses:
+        '200':
+          description: Gateway is ready to serve traffic.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '429':
+          $ref: '#/components/responses/Error'
+        '503':
+          $ref: '#/components/responses/Error'
+  /api/v1/users:
+    post:
+      tags:
+      - auth
+      summary: Create user
+      operationId: createUser
+      security: []
+      x-owner-service: auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User and session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/sessions:
+    post:
+      tags:
+      - auth
+      summary: Create session
+      operationId: createSession
+      security: []
+      x-owner-service: auth
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSessionRequest'
+      responses:
+        '200':
+          description: Session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/sessions/current:
+    delete:
+      tags:
+      - auth
+      summary: Delete current session
+      operationId: deleteCurrentSession
+      x-owner-service: auth
+      responses:
+        '204':
+          description: Current session deleted.
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/users/me:
+    get:
+      tags:
+      - auth
+      summary: Get current user
+      operationId: getCurrentUser
+      x-owner-service: auth
+      responses:
+        '200':
+          description: Current user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+  /api/v1/knowledge-bases:
+    get:
+      tags:
+      - knowledge
+      summary: List knowledge bases
+      operationId: listKnowledgeBases
+      x-owner-service: knowledge
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 20
+      responses:
+        '200':
+          description: Knowledge bases.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - knowledge
+      summary: Create knowledge base
+      operationId: createKnowledgeBase
+      x-owner-service: knowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateKnowledgeBaseRequest'
+      responses:
+        '201':
+          description: Knowledge base created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/knowledge-bases/{knowledgeBaseId}:
+    parameters:
+    - $ref: '#/components/parameters/KnowledgeBaseId'
+    get:
+      tags:
+      - knowledge
+      summary: Get knowledge base
+      operationId: getKnowledgeBase
+      x-owner-service: knowledge
+      responses:
+        '200':
+          description: Knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - knowledge
+      summary: Update knowledge base
+      operationId: updateKnowledgeBase
+      x-owner-service: knowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateKnowledgeBaseRequest'
+      responses:
+        '200':
+          description: Knowledge base updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeBaseResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+      description: Updating chunk or retrieval strategies may require reprocessing documents; reprocessing job behavior is owned by knowledge service.
+    delete:
+      tags:
+      - knowledge
+      summary: Delete knowledge base
+      operationId: deleteKnowledgeBase
+      x-owner-service: knowledge
+      responses:
+        '204':
+          description: Knowledge base deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/knowledge-bases/{knowledgeBaseId}/documents:
+    parameters:
+    - $ref: '#/components/parameters/KnowledgeBaseId'
+    get:
+      tags:
+      - knowledge
+      summary: List knowledge-base documents
+      operationId: listKnowledgeBaseDocuments
+      x-owner-service: knowledge
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 200
+          default: 20
+      - name: status
+        in: query
+        required: false
+        schema:
+          $ref: '#/components/schemas/DocumentStatus'
+      responses:
+        '200':
+          description: Documents in the knowledge base.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - documents
+      summary: Upload a document to a knowledge base
+      operationId: uploadKnowledgeBaseDocument
+      x-owner-service: knowledge
+      description: Gateway exposes the knowledge-base document upload workflow. Knowledge service owns the document resource, knowledge-base association, metadata, ingestion state, chunks, embeddings, and retrieval lifecycle, and may call file service internally for the raw file object. Report templates, report materials, and generated report files are separate document-owned resources and must not be modeled through this path.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                tags:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Document accepted for processing.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/documents/{documentId}:
+    parameters:
+    - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags:
+      - knowledge
+      summary: Get document processing details
+      operationId: getDocument
+      x-owner-service: knowledge
+      responses:
+        '200':
+          description: Document processing details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - documents
+      summary: Update document tags
+      operationId: updateDocument
+      x-owner-service: knowledge
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDocumentRequest'
+      responses:
+        '200':
+          description: Document updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+      description: Update knowledge-owned document metadata only. File service base object metadata and knowledge-owned processing fields are not mutated by this operation.
+    delete:
+      tags:
+      - documents
+      summary: Delete document
+      operationId: deleteDocument
+      x-owner-service: knowledge
+      responses:
+        '204':
+          description: Document deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+      description: Delete the knowledge-owned document resource. Knowledge service coordinates chunk/index cleanup and any underlying file reference cleanup through its document lifecycle.
+  /api/v1/documents/{documentId}/chunks:
+    parameters:
+    - $ref: '#/components/parameters/DocumentId'
+    get:
+      tags:
+      - knowledge
+      summary: List document chunks
+      operationId: listDocumentChunks
+      x-owner-service: knowledge
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          default: 1
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 50
+      responses:
+        '200':
+          description: Document chunks.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentChunkListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/documents/{documentId}/content:
+    get:
+      tags:
+      - documents
+      summary: Get original document content
+      operationId: getDocumentContent
+      x-owner-service: knowledge
+      parameters:
+      - $ref: '#/components/parameters/DocumentId'
+      responses:
+        '200':
+          description: Original file stream.
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/Error'
+      description: Return the original knowledge document content through gateway. Knowledge service owns the document content resource and may read the underlying bytes from file service internally.
+  /api/v1/knowledge-queries:
+    post:
+      tags:
+      - knowledge
+      summary: Create knowledge query
+      operationId: createKnowledgeQuery
+      x-owner-service: knowledge
+      description: Run a resource-mode knowledge retrieval query. Query execution is modeled as creating a knowledge-query resource, not as an action-style search path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KnowledgeQueryRequest'
+      responses:
+        '201':
+          description: Knowledge query result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KnowledgeQueryResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/admin/model-profiles:
+    get:
+      tags:
+      - admin-runtime-config
+      summary: List runtime model profiles
+      operationId: listAdminModelProfiles
+      x-owner-service: ai-gateway
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization. Gateway delegates provider configuration persistence and validation to ai-gateway.
+      parameters:
+      - name: purpose
+        in: query
+        schema:
+          $ref: '#/components/schemas/ModelPurpose'
+      - name: enabled
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Runtime model profiles.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelProfileListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - admin-runtime-config
+      summary: Create runtime model profile
+      operationId: createAdminModelProfile
+      x-owner-service: ai-gateway
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization. Raw API keys are forwarded only to ai-gateway and never returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateModelProfileRequest'
+      responses:
+        '201':
+          description: Runtime model profile created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelProfileResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/admin/model-profiles/{profileId}:
+    parameters:
+    - $ref: '#/components/parameters/ProfileId'
+    get:
+      tags:
+      - admin-runtime-config
+      summary: Get runtime model profile
+      operationId: getAdminModelProfile
+      x-owner-service: ai-gateway
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization.
+      responses:
+        '200':
+          description: Runtime model profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelProfileResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - admin-runtime-config
+      summary: Update runtime model profile
+      operationId: updateAdminModelProfile
+      x-owner-service: ai-gateway
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization. Raw API keys are forwarded only to ai-gateway and never returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateModelProfileRequest'
+      responses:
+        '200':
+          description: Runtime model profile updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ModelProfileResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - admin-runtime-config
+      summary: Delete or disable runtime model profile
+      operationId: deleteAdminModelProfile
+      x-owner-service: ai-gateway
+      x-gateway-role: Public admin entrypoint and admin authorization. Actual delete/disable semantics are enforced by ai-gateway.
+      responses:
+        '204':
+          description: Runtime model profile deleted or disabled.
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/admin/parser-configs:
+    get:
+      tags:
+      - admin-runtime-config
+      summary: List document parser configs
+      operationId: listAdminParserConfigs
+      x-owner-service: knowledge
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization. Knowledge owns parser backend validation and document-processing behavior.
+      parameters:
+      - name: enabled
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Document parser configs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParserConfigListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - admin-runtime-config
+      summary: Create document parser config
+      operationId: createAdminParserConfig
+      x-owner-service: knowledge
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateParserConfigRequest'
+      responses:
+        '201':
+          description: Document parser config created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParserConfigResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/admin/parser-configs/{parserConfigId}:
+    parameters:
+    - $ref: '#/components/parameters/ParserConfigId'
+    get:
+      tags:
+      - admin-runtime-config
+      summary: Get document parser config
+      operationId: getAdminParserConfig
+      x-owner-service: knowledge
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization.
+      responses:
+        '200':
+          description: Document parser config.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParserConfigResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - admin-runtime-config
+      summary: Update document parser config
+      operationId: updateAdminParserConfig
+      x-owner-service: knowledge
+      x-gateway-role: Public admin entrypoint, admin authorization, response envelope, and secret-safe normalization.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateParserConfigRequest'
+      responses:
+        '200':
+          description: Document parser config updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParserConfigResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - admin-runtime-config
+      summary: Delete or disable document parser config
+      operationId: deleteAdminParserConfig
+      x-owner-service: knowledge
+      x-gateway-role: Public admin entrypoint and admin authorization. Actual delete/disable semantics are enforced by knowledge.
+      responses:
+        '204':
+          description: Document parser config deleted or disabled.
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-types:
+    get:
+      tags:
+      - report-generation
+      summary: List report types
+      operationId: listReportTypes
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report types.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTypeListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-templates:
+    get:
+      tags:
+      - report-generation
+      summary: List report templates
+      operationId: listReportTemplates
+      x-owner-service: document
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: reportType
+        in: query
+        schema:
+          type: string
+      - name: enabled
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Report templates.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTemplateListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report template
+      operationId: createReportTemplate
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateReportTemplateRequest'
+      responses:
+        '201':
+          description: Report template created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTemplateResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-templates/{reportTemplateId}:
+    parameters:
+    - $ref: '#/components/parameters/ReportTemplateId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report template
+      operationId: getReportTemplate
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report template.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTemplateResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - report-generation
+      summary: Update report template
+      operationId: updateReportTemplate
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportTemplateRequest'
+      responses:
+        '200':
+          description: Report template updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTemplateResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - report-generation
+      summary: Delete report template
+      operationId: deleteReportTemplate
+      x-owner-service: document
+      description: Prefer disabling or soft deleting templates that have been used by reports.
+      responses:
+        '204':
+          description: Report template deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-templates/{reportTemplateId}/structure:
+    parameters:
+    - $ref: '#/components/parameters/ReportTemplateId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report template structure
+      operationId: getReportTemplateStructure
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report template structure.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTemplateStructureResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - report-generation
+      summary: Update report template structure
+      operationId: updateReportTemplateStructure
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReportTemplateStructureRequest'
+      responses:
+        '200':
+          description: Report template structure updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportTemplateStructureResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-materials:
+    get:
+      tags:
+      - report-generation
+      summary: List report materials
+      operationId: listReportMaterials
+      x-owner-service: document
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: category
+        in: query
+        schema:
+          type: string
+      - name: enabled
+        in: query
+        schema:
+          type: boolean
+      responses:
+        '200':
+          description: Report materials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportMaterialListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report material
+      operationId: createReportMaterial
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateReportMaterialRequest'
+      responses:
+        '201':
+          description: Report material created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportMaterialResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-materials/{materialId}:
+    parameters:
+    - $ref: '#/components/parameters/MaterialId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report material
+      operationId: getReportMaterial
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report material.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportMaterialResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - report-generation
+      summary: Delete report material
+      operationId: deleteReportMaterial
+      x-owner-service: document
+      description: Prefer soft deletion when material has been referenced by generation jobs.
+      responses:
+        '204':
+          description: Report material deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports:
+    get:
+      tags:
+      - report-generation
+      summary: List reports
+      operationId: listReports
+      x-owner-service: document
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: reportType
+        in: query
+        schema:
+          type: string
+      - name: status
+        in: query
+        schema:
+          type: string
+      - name: keyword
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Reports.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report
+      operationId: createReport
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+      responses:
+        '201':
+          description: Report created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report
+      operationId: getReport
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - report-generation
+      summary: Update report
+      operationId: updateReport
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportRequest'
+      responses:
+        '200':
+          description: Report updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - report-generation
+      summary: Delete report
+      operationId: deleteReport
+      x-owner-service: document
+      description: Prefer soft deletion so historical jobs and generated files remain auditable.
+      responses:
+        '204':
+          description: Report deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/outlines:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    get:
+      tags:
+      - report-generation
+      summary: List report outlines
+      operationId: listReportOutlines
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report outlines.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOutlineListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report outline
+      operationId: createReportOutline
+      x-owner-service: document
+      description: Manual outline saves create a new outline version. AI-created outlines are produced by report jobs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportOutlineRequest'
+      responses:
+        '201':
+          description: Report outline created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOutlineResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/outlines/{outlineId}:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    - $ref: '#/components/parameters/OutlineId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report outline
+      operationId: getReportOutline
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report outline.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOutlineResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - report-generation
+      summary: Update report outline
+      operationId: updateReportOutline
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportOutlineRequest'
+      responses:
+        '200':
+          description: Report outline updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOutlineResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/outlines/{outlineId}/sections/{sectionId}:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    - $ref: '#/components/parameters/OutlineId'
+    - $ref: '#/components/parameters/SectionId'
+    delete:
+      tags:
+      - report-generation
+      summary: Delete report outline section
+      operationId: deleteReportOutlineSection
+      x-owner-service: document
+      responses:
+        '204':
+          description: Report outline section deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/sections:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    get:
+      tags:
+      - report-generation
+      summary: List report sections
+      operationId: listReportSections
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report sections.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSectionListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report section
+      operationId: createReportSection
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportSectionRequest'
+      responses:
+        '201':
+          description: Report section created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSectionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/sections/{sectionId}:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    - $ref: '#/components/parameters/SectionId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report section
+      operationId: getReportSection
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report section.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSectionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - report-generation
+      summary: Update report section
+      operationId: updateReportSection
+      x-owner-service: document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportSectionRequest'
+      responses:
+        '200':
+          description: Report section updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSectionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/sections/{sectionId}/versions:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    - $ref: '#/components/parameters/SectionId'
+    get:
+      tags:
+      - report-generation
+      summary: List report section versions
+      operationId: listReportSectionVersions
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report section versions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSectionVersionListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report section version
+      operationId: createReportSectionVersion
+      x-owner-service: document
+      description: Creates a new section content version, including versions produced by AI regeneration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportSectionVersionRequest'
+      responses:
+        '201':
+          description: Report section version created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSectionVersionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/jobs:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    get:
+      tags:
+      - report-generation
+      summary: List report jobs
+      operationId: listReportJobs
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report jobs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report job
+      operationId: createReportJob
+      x-owner-service: document
+      description: Creates long-running work for outline creation, content creation, section regeneration, or report file creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportJobRequest'
+      responses:
+        '202':
+          description: Report job accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-jobs/{jobId}:
+    parameters:
+    - $ref: '#/components/parameters/JobId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report job
+      operationId: getReportJob
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report job.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-jobs/{jobId}/attempts:
+    parameters:
+    - $ref: '#/components/parameters/JobId'
+    get:
+      tags:
+      - report-generation
+      summary: List report job attempts
+      operationId: listReportJobAttempts
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report job attempts.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobAttemptListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report job attempt
+      operationId: createReportJobAttempt
+      x-owner-service: document
+      description: Creates a new attempt for an existing failed or interrupted report job.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportJobAttemptRequest'
+      responses:
+        '202':
+          description: Report job attempt accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportJobAttemptResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/reports/{reportId}/events:
+    parameters:
+    - $ref: '#/components/parameters/ReportId'
+    get:
+      tags:
+      - report-generation
+      summary: List report events
+      operationId: listReportEvents
+      x-owner-service: document
+      description: Returns report workflow events for polling. A future SSE contract must be added explicitly before streaming clients rely on it.
+      responses:
+        '200':
+          description: Report events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportEventListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-files:
+    get:
+      tags:
+      - report-generation
+      summary: List report files
+      operationId: listReportFiles
+      x-owner-service: document
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: reportId
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Report files.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportFileListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - report-generation
+      summary: Create report file
+      operationId: createReportFile
+      x-owner-service: document
+      description: Creates generated report files such as DOCX without exposing storage internals to frontend clients. Document service owns report-file business metadata and should use file service for underlying object storage/content access instead of duplicating public file semantics.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportFileRequest'
+      responses:
+        '202':
+          description: Report file accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportFileResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-files/{reportFileId}:
+    parameters:
+    - $ref: '#/components/parameters/ReportFileId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report file
+      operationId: getReportFile
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report file metadata.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportFileResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-files/{reportFileId}/content:
+    parameters:
+    - $ref: '#/components/parameters/ReportFileId'
+    get:
+      tags:
+      - report-generation
+      summary: Get report file content
+      operationId: getReportFileContent
+      x-owner-service: document
+      description: Returns generated file content. Error responses still use the standard gateway error envelope.
+      responses:
+        '200':
+          description: Generated report file stream.
+          content:
+            application/vnd.openxmlformats-officedocument.wordprocessingml.document:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-statistics/overview:
+    get:
+      tags:
+      - report-generation
+      summary: Get report statistics overview
+      operationId: getReportStatisticsOverview
+      x-owner-service: document
+      responses:
+        '200':
+          description: Report statistics overview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportStatisticsOverviewResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-statistics/daily:
+    get:
+      tags:
+      - report-generation
+      summary: List daily report statistics
+      operationId: listDailyReportStatistics
+      x-owner-service: document
+      parameters:
+      - name: days
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 366
+          default: 30
+      responses:
+        '200':
+          description: Daily report statistics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportDailyStatisticsResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-operation-logs:
+    get:
+      tags:
+      - report-generation
+      summary: List report operation logs
+      operationId: listReportOperationLogs
+      x-owner-service: document
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: targetType
+        in: query
+        schema:
+          type: string
+      - name: targetId
+        in: query
+        schema:
+          type: string
+      - name: operationType
+        in: query
+        schema:
+          type: string
+      - name: requestId
+        in: query
+        schema:
+          type: string
+      - name: requestSource
+        in: query
+        schema:
+          type: string
+      - name: toolName
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Report operation logs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportOperationLogListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/report-settings:
+    get:
+      tags:
+      - report-generation
+      summary: Get report generation settings
+      operationId: getReportSettings
+      x-owner-service: document
+      x-gateway-role: Public admin entrypoint and admin authorization. Document service owns report generation settings; AI Gateway owns model profile credentials.
+      description: Returns admin-visible report generation settings. Provider base URLs and API keys remain owned by AI Gateway model profiles and are never returned here.
+      responses:
+        '200':
+          description: Report generation settings.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSettingsResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - report-generation
+      summary: Update report generation settings
+      operationId: updateReportSettings
+      x-owner-service: document
+      x-gateway-role: Public admin entrypoint and admin authorization. Document service validates referenced templates and AI Gateway model profile ids.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportSettingsRequest'
+      responses:
+        '200':
+          description: Report generation settings updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportSettingsUpdateResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '401':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-sessions:
+    get:
+      tags:
+      - qa-sessions
+      summary: List QA sessions
+      operationId: listQASessions
+      x-owner-service: qa
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/PageSize'
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum:
+          - active
+          - archived
+          default: active
+      - name: q
+        in: query
+        schema:
+          type: string
+      - name: sort
+        in: query
+        schema:
+          type: string
+          default: -updatedAt
+      responses:
+        '200':
+          description: QA sessions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QASessionListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - qa-sessions
+      summary: Create QA session
+      operationId: createQASession
+      x-owner-service: qa
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQASessionRequest'
+      responses:
+        '201':
+          description: QA session created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QASessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-sessions/{sessionId}:
+    parameters:
+    - $ref: '#/components/parameters/SessionId'
+    get:
+      tags:
+      - qa-sessions
+      summary: Get QA session
+      operationId: getQASession
+      x-owner-service: qa
+      responses:
+        '200':
+          description: QA session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QASessionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - qa-sessions
+      summary: Update QA session
+      operationId: updateQASession
+      x-owner-service: qa
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateQASessionRequest'
+      responses:
+        '200':
+          description: QA session updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QASessionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags:
+      - qa-sessions
+      summary: Delete QA session
+      operationId: deleteQASession
+      x-owner-service: qa
+      description: Soft-deletes the QA session owned by the current user.
+      responses:
+        '204':
+          description: QA session deleted.
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-sessions/{sessionId}/messages:
+    parameters:
+    - $ref: '#/components/parameters/SessionId'
+    get:
+      tags:
+      - qa-messages
+      summary: List QA session messages
+      operationId: listQAMessages
+      x-owner-service: qa
+      parameters:
+      - $ref: '#/components/parameters/Page'
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: includeThinking
+        in: query
+        schema:
+          type: boolean
+          default: true
+      - name: includeCitations
+        in: query
+        schema:
+          type: boolean
+          default: true
+      responses:
+        '200':
+          description: QA messages.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAMessageListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    post:
+      tags:
+      - qa-messages
+      summary: Create QA message and answer
+      operationId: createQAMessage
+      x-owner-service: qa
+      description: |
+        Creates a user message and runs the QA Agent Host. JSON clients receive
+        the completed answer payload; clients that send `Accept: text/event-stream`
+        receive the same run as an SSE stream. QA owns the ReAct loop, calls AI
+        Gateway for OpenAI-compatible function-calling transport, and calls
+        approved MCP tools through QA/MCP Client.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQAMessageRequest'
+      responses:
+        '200':
+          description: QA answer or SSE stream.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAAnswerResponse'
+            text/event-stream:
+              schema:
+                type: string
+                description: Server-Sent Events with event types `message.created`, `agent.iteration.started`, `reasoning.step`, `tool.started`, `tool.completed`, `tool.failed`, `answer.delta`, `citation.delta`, `answer.completed`, `error`, and optional `heartbeat`.
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-sessions/{sessionId}/events:
+    parameters:
+    - $ref: '#/components/parameters/SessionId'
+    get:
+      tags:
+      - qa-messages
+      summary: List QA response stream events
+      operationId: listQAStreamEvents
+      x-owner-service: qa
+      description: Returns short-lived persisted SSE events for reconnect recovery or debugging. This endpoint is a polling/replay resource and does not itself open an SSE stream.
+      parameters:
+      - name: responseRunId
+        in: query
+        required: true
+        schema:
+          type: string
+      - name: afterEventSeq
+        in: query
+        schema:
+          type: integer
+          minimum: 0
+      responses:
+        '200':
+          description: QA stream events.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QASseEventListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/response-runs/{responseRunId}:
+    parameters:
+    - $ref: '#/components/parameters/ResponseRunId'
+    get:
+      tags:
+      - qa-agent-runs
+      summary: Get QA response run
+      operationId: getQAResponseRun
+      x-owner-service: qa
+      responses:
+        '200':
+          description: QA response run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAResponseRunResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags:
+      - qa-agent-runs
+      summary: Update QA response run
+      operationId: updateQAResponseRun
+      x-owner-service: qa
+      description: The stable public mutation is cancellation by setting `status` to `cancelled`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateQAResponseRunRequest'
+      responses:
+        '200':
+          description: QA response run updated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAResponseRunResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+        '409':
+          $ref: '#/components/responses/Error'
+  /api/v1/response-runs/{responseRunId}/tool-calls:
+    parameters:
+    - $ref: '#/components/parameters/ResponseRunId'
+    get:
+      tags:
+      - qa-agent-runs
+      summary: List QA response run tool calls
+      operationId: listQAResponseRunToolCalls
+      x-owner-service: qa
+      description: Returns sanitized tool-call summaries only. Raw MCP schemas, full arguments, raw tool results, prompts, internal URLs, object keys, and provider errors are not part of the public contract.
+      responses:
+        '200':
+          description: QA tool call summaries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAAgentToolCallListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/messages/{messageId}/citations:
+    parameters:
+    - $ref: '#/components/parameters/MessageId'
+    get:
+      tags:
+      - qa-citations
+      summary: List QA message citations
+      operationId: listQAMessageCitations
+      x-owner-service: qa
+      responses:
+        '200':
+          description: QA citations.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QACitationListResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/citations/{citationId}:
+    parameters:
+    - $ref: '#/components/parameters/CitationId'
+    get:
+      tags:
+      - qa-citations
+      summary: Get QA citation detail
+      operationId: getQACitation
+      x-owner-service: qa
+      responses:
+        '200':
+          description: QA citation detail.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QACitationResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/citation-lookups:
+    post:
+      tags:
+      - qa-citations
+      summary: Create QA citation lookup
+      operationId: createQACitationLookup
+      x-owner-service: qa
+      description: Creates a batch lookup for saved citation details. QA owns the saved citation snapshots and may call knowledge or file internally to enrich source availability, while gateway keeps the public response envelope stable.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQACitationLookupRequest'
+      responses:
+        '200':
+          description: QA citation lookup result.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QACitationLookupResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-config-versions/current:
+    get:
+      tags:
+      - qa-settings
+      summary: Get current QA config version
+      operationId: getCurrentQAConfigVersion
+      x-owner-service: qa
+      responses:
+        '200':
+          description: Current QA config version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAConfigVersionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-config-versions:
+    post:
+      tags:
+      - qa-settings
+      summary: Create QA config version
+      operationId: createQAConfigVersion
+      x-owner-service: qa
+      description: Creates a versioned QA runtime configuration so historical answers remain traceable to the retrieval and Agent settings used at generation time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQAConfigVersionRequest'
+      responses:
+        '201':
+          description: QA config version created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAConfigVersionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /api/v1/llm-config-versions/current:
+    get:
+      tags:
+      - qa-settings
+      summary: Get current QA LLM config version
+      operationId: getCurrentQALLMConfigVersion
+      x-owner-service: qa
+      description: Returns the active QA LLM settings. Provider base URLs and API keys remain owned by AI Gateway model profiles and are never returned here.
+      responses:
+        '200':
+          description: Current QA LLM config version.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QALLMConfigVersionResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/llm-config-versions:
+    post:
+      tags:
+      - qa-settings
+      summary: Create QA LLM config version
+      operationId: createQALLMConfigVersion
+      x-owner-service: qa
+      description: Stores a QA-owned reference to an AI Gateway model profile plus model and generation defaults. It does not store provider credentials.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQALLMConfigVersionRequest'
+      responses:
+        '201':
+          description: QA LLM config version created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QALLMConfigVersionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+  /api/v1/llm-connection-tests:
+    post:
+      tags:
+      - qa-settings
+      summary: Create QA LLM connection test
+      operationId: createQALLMConnectionTest
+      x-owner-service: qa
+      description: Tests a QA LLM configuration through AI Gateway. Responses must not include prompts, provider raw errors, provider credentials, or internal URLs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQALLMConnectionTestRequest'
+      responses:
+        '201':
+          description: QA LLM connection test created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QALLMConnectionTestResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+  /api/v1/retrieval-test-runs:
+    post:
+      tags:
+      - qa-retrieval-tests
+      summary: Create QA retrieval test run
+      operationId: createQARetrievalTestRun
+      x-owner-service: qa
+      description: Creates an administrator retrieval experience test for QA settings. Knowledge retrieval remains owned by the knowledge service; QA stores the test run and sanitized result snapshot.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQARetrievalTestRunRequest'
+      responses:
+        '201':
+          description: QA retrieval test run created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QARetrievalTestRunResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '502':
+          $ref: '#/components/responses/Error'
+  /api/v1/retrieval-test-runs/{testRunId}:
+    parameters:
+    - $ref: '#/components/parameters/TestRunId'
+    get:
+      tags:
+      - qa-retrieval-tests
+      summary: Get QA retrieval test run
+      operationId: getQARetrievalTestRun
+      x-owner-service: qa
+      responses:
+        '200':
+          description: QA retrieval test run.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QARetrievalTestRunResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-metrics/overview:
+    get:
+      tags:
+      - qa-metrics
+      summary: Get QA metrics overview
+      operationId: getQAMetricsOverview
+      x-owner-service: qa
+      parameters:
+      - name: days
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 366
+          default: 1
+      responses:
+        '200':
+          description: QA metrics overview.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAMetricsOverviewResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-metrics/trend:
+    get:
+      tags:
+      - qa-metrics
+      summary: Get QA metrics trend
+      operationId: getQAMetricsTrend
+      x-owner-service: qa
+      parameters:
+      - name: days
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 366
+          default: 30
+      responses:
+        '200':
+          description: QA metrics trend.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAMetricsTrendResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-metrics/top-queries:
+    get:
+      tags:
+      - qa-metrics
+      summary: List QA top queries
+      operationId: listQATopQueries
+      x-owner-service: qa
+      parameters:
+      - name: days
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 366
+          default: 7
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+      responses:
+        '200':
+          description: QA top queries.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QATopQueryListResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+  /api/v1/qa-metrics/intent-distribution:
+    get:
+      tags:
+      - qa-metrics
+      summary: List QA intent distribution
+      operationId: listQAIntentDistribution
+      x-owner-service: qa
+      parameters:
+      - name: days
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 366
+          default: 7
+      responses:
+        '200':
+          description: QA intent distribution.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QAIntentDistributionResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: Opaque bearer access token issued by auth and cached by gateway through a token hash; callers must not treat it as a JWT.
+  parameters:
+    KnowledgeBaseId:
+      name: knowledgeBaseId
+      in: path
+      required: true
+      schema:
+        type: string
+    DocumentId:
+      name: documentId
+      in: path
+      required: true
+      schema:
+        type: string
+    ReportId:
+      name: reportId
+      in: path
+      required: true
+      schema:
+        type: string
+    ReportTemplateId:
+      name: reportTemplateId
+      in: path
+      required: true
+      schema:
+        type: string
+    MaterialId:
+      name: materialId
+      in: path
+      required: true
+      schema:
+        type: string
+    OutlineId:
+      name: outlineId
+      in: path
+      required: true
+      schema:
+        type: string
+    SectionId:
+      name: sectionId
+      in: path
+      required: true
+      schema:
+        type: string
+    JobId:
+      name: jobId
+      in: path
+      required: true
+      schema:
+        type: string
+    ReportFileId:
+      name: reportFileId
+      in: path
+      required: true
+      schema:
+        type: string
+    ProfileId:
+      name: profileId
+      in: path
+      required: true
+      schema:
+        type: string
+    ParserConfigId:
+      name: parserConfigId
+      in: path
+      required: true
+      schema:
+        type: string
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema:
+        type: string
+    MessageId:
+      name: messageId
+      in: path
+      required: true
+      schema:
+        type: string
+    ResponseRunId:
+      name: responseRunId
+      in: path
+      required: true
+      schema:
+        type: string
+    CitationId:
+      name: citationId
+      in: path
+      required: true
+      schema:
+        type: string
+    TestRunId:
+      name: testRunId
+      in: path
+      required: true
+      schema:
+        type: string
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    Error:
+      description: Error response.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - status
+          properties:
+            status:
+              type: string
+              example: ok
+        requestId:
+          type: string
+    ErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      required:
+      - code
+      - message
+      - requestId
+      properties:
+        code:
+          type: string
+          enum:
+          - validation_error
+          - unauthorized
+          - forbidden
+          - not_found
+          - conflict
+          - rate_limited
+          - dependency_error
+          - internal_error
+          - unsupported_intent
+          - unsupported_mode
+        message:
+          type: string
+        requestId:
+          type: string
+        fields:
+          type: object
+          additionalProperties:
+            type: string
+    CreateUserRequest:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    CreateSessionRequest:
+      type: object
+      required:
+      - username
+      - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    UserSummary:
+      type: object
+      required:
+      - id
+      - username
+      - roles
+      - permissions
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+    SessionSummary:
+      type: object
+      required:
+      - sessionId
+      - accessToken
+      - tokenType
+      - expiresAt
+      properties:
+        sessionId:
+          type: string
+        accessToken:
+          type: string
+          description: Opaque bearer credential sent by the frontend on later requests. This token is not a JWT and must not be parsed for claims.
+          example: tok_8Ywq7T2n4pQ9mR3xV6sL
+        tokenType:
+          type: string
+          enum:
+          - Bearer
+          default: Bearer
+        expiresAt:
+          type: string
+          format: date-time
+    SessionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - user
+          - session
+          properties:
+            user:
+              $ref: '#/components/schemas/UserSummary'
+            session:
+              $ref: '#/components/schemas/SessionSummary'
+        requestId:
+          type: string
+    UserResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/UserSummary'
+        requestId:
+          type: string
+    PageInfo:
+      type: object
+      required:
+      - page
+      - pageSize
+      - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    JsonObject:
+      type: object
+      additionalProperties: true
+    ChunkStrategy:
+      type: object
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          example: SEMANTIC_TEXT
+        chunkSize:
+          type: integer
+          minimum: 1
+          example: 1600
+        overlap:
+          type: integer
+          minimum: 0
+          example: 200
+        separators:
+          type: array
+          items:
+            type: string
+    RetrievalStrategy:
+      type: object
+      additionalProperties: true
+      properties:
+        mode:
+          type: string
+          example: VECTOR
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 10
+        scoreThreshold:
+          type: number
+          minimum: 0
+          example: 0.35
+        rerankTopN:
+          type: integer
+          minimum: 1
+          nullable: true
+    CreateKnowledgeBaseRequest:
+      type: object
+      required:
+      - name
+      properties:
+        id:
+          type: string
+          description: Optional client-supplied ID for import or local integration workflows. Gateway implementations may ignore this field and generate an ID.
+        name:
+          type: string
+        description:
+          type: string
+          default: ''
+        docType:
+          type: string
+          example: GENERAL
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+    UpdateKnowledgeBaseRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+          example: GENERAL
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+    KnowledgeBaseSummary:
+      type: object
+      required:
+      - id
+      - name
+      - description
+      - docType
+      - chunkStrategy
+      - retrievalStrategy
+      - documentCount
+      - chunkCount
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        docType:
+          type: string
+        chunkStrategy:
+          $ref: '#/components/schemas/ChunkStrategy'
+        retrievalStrategy:
+          $ref: '#/components/schemas/RetrievalStrategy'
+        documentCount:
+          type: integer
+          minimum: 0
+        chunkCount:
+          type: integer
+          minimum: 0
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    KnowledgeBaseResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeBaseSummary'
+        requestId:
+          type: string
+    KnowledgeBaseListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeBaseSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    DocumentStatus:
+      type: string
+      enum:
+      - uploaded
+      - parsing
+      - chunking
+      - embedding
+      - ready
+      - failed
+    DocumentSummary:
+      type: object
+      required:
+      - id
+      - knowledgeBaseId
+      - name
+      - status
+      - chunkCount
+      - createdAt
+      properties:
+        id:
+          type: string
+        knowledgeBaseId:
+          type: string
+          description: Target knowledge base context for this document.
+        name:
+          type: string
+        contentType:
+          type: string
+          nullable: true
+        sizeBytes:
+          type: integer
+          minimum: 0
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        errorCode:
+          type: string
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+          description: Processing failure summary. Must not include object keys, internal paths, SQL details, MinIO errors, or stack traces.
+        chunkCount:
+          type: integer
+          minimum: 0
+        tags:
+          type: array
+          items:
+            type: string
+        parserBackend:
+          type: string
+          nullable: true
+        createdBy:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+        jobId:
+          type: string
+          nullable: true
+          description: Ingestion job ID when a request starts or observes a processing job.
+    UpdateDocumentRequest:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+    DocumentResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/DocumentSummary'
+        requestId:
+          type: string
+    DocumentListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    DocumentChunk:
+      type: object
+      required:
+      - id
+      - knowledgeBaseId
+      - documentId
+      - chunkIndex
+      - content
+      - tokenCount
+      - createdAt
+      properties:
+        id:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        chunkIndex:
+          type: integer
+          minimum: 0
+        sectionPath:
+          type: string
+          nullable: true
+        content:
+          type: string
+        tokenCount:
+          type: integer
+          minimum: 0
+        chunkType:
+          type: string
+          nullable: true
+        qdrantPointId:
+          type: string
+          nullable: true
+        embeddingProvider:
+          type: string
+          nullable: true
+        embeddingDimension:
+          type: integer
+          minimum: 1
+          nullable: true
+        embeddingPreview:
+          type: array
+          nullable: true
+          items:
+            type: number
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+        createdAt:
+          type: string
+          format: date-time
+    DocumentChunkListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentChunk'
+        page:
+          $ref: '#/components/schemas/PageInfo'
+        requestId:
+          type: string
+    KnowledgeQueryRequest:
+      type: object
+      required:
+      - query
+      properties:
+        query:
+          type: string
+        knowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        scoreThreshold:
+          type: number
+          minimum: 0
+          default: 0
+        tags:
+          type: array
+          items:
+            type: string
+        metadataFilter:
+          type: object
+          additionalProperties:
+            type: string
+        rerank:
+          type: boolean
+          default: false
+        rerankTopN:
+          type: integer
+          minimum: 1
+          nullable: true
+    KnowledgeQueryResult:
+      type: object
+      required:
+      - score
+      - knowledgeBaseId
+      - documentId
+      - chunkId
+      - documentName
+      - contentPreview
+      properties:
+        score:
+          type: number
+        pointId:
+          type: string
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        chunkId:
+          type: string
+        documentName:
+          type: string
+        sectionPath:
+          type: string
+          nullable: true
+        chunkIndex:
+          type: integer
+          minimum: 0
+          nullable: true
+        contentPreview:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    KnowledgeQueryTrace:
+      type: object
+      required:
+      - embeddingProvider
+      - embeddingModel
+      - embeddingDimension
+      - qdrantCollection
+      - searchTopK
+      - scoreThreshold
+      - hitCount
+      - rerank
+      properties:
+        embeddingProvider:
+          type: string
+        embeddingModel:
+          type: string
+        embeddingDimension:
+          type: integer
+          minimum: 1
+        qdrantCollection:
+          type: string
+        searchTopK:
+          type: integer
+          minimum: 1
+        scoreThreshold:
+          type: number
+          minimum: 0
+        hitCount:
+          type: integer
+          minimum: 0
+        rerank:
+          type: boolean
+        rerankTopN:
+          type: integer
+          nullable: true
+          minimum: 1
+    KnowledgeQuerySummary:
+      type: object
+      required:
+      - id
+      - query
+      - results
+      - trace
+      properties:
+        id:
+          type: string
+        query:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeQueryResult'
+        trace:
+          $ref: '#/components/schemas/KnowledgeQueryTrace'
+    KnowledgeQueryResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/KnowledgeQuerySummary'
+        requestId:
+          type: string
+    ModelPurpose:
+      type: string
+      enum:
+      - chat
+      - embedding
+      - rerank
+    ModelProvider:
+      type: string
+      enum:
+      - openai_compatible
+      - siliconflow
+      - local_compatible
+    ModelProfile:
+      type: object
+      required:
+      - id
+      - name
+      - purpose
+      - provider
+      - baseUrl
+      - model
+      - enabled
+      - isDefault
+      - timeoutMs
+      - apiKeyConfigured
+      - supportsStreaming
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        purpose:
+          $ref: '#/components/schemas/ModelPurpose'
+        provider:
+          $ref: '#/components/schemas/ModelProvider'
+        baseUrl:
+          type: string
+          format: uri
+          description: Provider base URL returned only to authorized admin callers.
+        model:
+          type: string
+        enabled:
+          type: boolean
+        isDefault:
+          type: boolean
+        timeoutMs:
+          type: integer
+          minimum: 1000
+        apiKeyConfigured:
+          type: boolean
+          description: True when a provider credential exists. Raw API keys are never returned.
+        supportsStreaming:
+          type: boolean
+        dimensions:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Embedding vector dimension for embedding profiles.
+        topN:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Default rerank result count for rerank profiles.
+        defaultParameters:
+          type: object
+          additionalProperties: true
+          description: Purpose-specific provider parameters such as temperature, top_p, max_tokens, or provider extensions not modeled as first-class fields.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateModelProfileRequest:
+      type: object
+      required:
+      - name
+      - purpose
+      - provider
+      - baseUrl
+      - model
+      - apiKey
+      properties:
+        name:
+          type: string
+        purpose:
+          $ref: '#/components/schemas/ModelPurpose'
+        provider:
+          $ref: '#/components/schemas/ModelProvider'
+        baseUrl:
+          type: string
+          format: uri
+        model:
+          type: string
+        apiKey:
+          type: string
+          format: password
+          writeOnly: true
+          description: Write-only provider credential forwarded to ai-gateway. Gateway must never log or return this value.
+        enabled:
+          type: boolean
+          default: true
+        isDefault:
+          type: boolean
+          default: false
+        timeoutMs:
+          type: integer
+          minimum: 1000
+          default: 60000
+        supportsStreaming:
+          type: boolean
+          default: false
+        dimensions:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Required by implementations that need an explicit embedding vector dimension.
+        topN:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Default rerank result count for rerank profiles.
+        defaultParameters:
+          type: object
+          additionalProperties: true
+    UpdateModelProfileRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        provider:
+          $ref: '#/components/schemas/ModelProvider'
+        baseUrl:
+          type: string
+          format: uri
+        model:
+          type: string
+        apiKey:
+          type: string
+          format: password
+          writeOnly: true
+          description: Write-only provider credential for key rotation. Null or empty string does not mean clear key.
+        enabled:
+          type: boolean
+        isDefault:
+          type: boolean
+        timeoutMs:
+          type: integer
+          minimum: 1000
+        supportsStreaming:
+          type: boolean
+        dimensions:
+          type: integer
+          minimum: 1
+          nullable: true
+        topN:
+          type: integer
+          minimum: 1
+          nullable: true
+        defaultParameters:
+          type: object
+          additionalProperties: true
+    ModelProfileResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ModelProfile'
+        requestId:
+          type: string
+    ModelProfileListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ModelProfile'
+        requestId:
+          type: string
+    ParserBackend:
+      type: string
+      enum:
+      - builtin
+      - tika
+      - unstructured
+      - local_ocr
+      - remote_compatible
+    ParserConfig:
+      type: object
+      required:
+      - id
+      - name
+      - backend
+      - enabled
+      - isDefault
+      - concurrency
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        backend:
+          $ref: '#/components/schemas/ParserBackend'
+        enabled:
+          type: boolean
+        isDefault:
+          type: boolean
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 128
+          description: Maximum concurrent parser workers for this config.
+        supportedContentTypes:
+          type: array
+          items:
+            type: string
+        endpointUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: Optional internal endpoint for remote-compatible parser backends. Must not contain credentials.
+        defaultParameters:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateParserConfigRequest:
+      type: object
+      required:
+      - name
+      - backend
+      - concurrency
+      properties:
+        name:
+          type: string
+        backend:
+          $ref: '#/components/schemas/ParserBackend'
+        enabled:
+          type: boolean
+          default: true
+        isDefault:
+          type: boolean
+          default: false
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 128
+        supportedContentTypes:
+          type: array
+          items:
+            type: string
+        endpointUrl:
+          type: string
+          format: uri
+          nullable: true
+        defaultParameters:
+          type: object
+          additionalProperties: true
+    UpdateParserConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        backend:
+          $ref: '#/components/schemas/ParserBackend'
+        enabled:
+          type: boolean
+        isDefault:
+          type: boolean
+        concurrency:
+          type: integer
+          minimum: 1
+          maximum: 128
+        supportedContentTypes:
+          type: array
+          items:
+            type: string
+        endpointUrl:
+          type: string
+          format: uri
+          nullable: true
+        defaultParameters:
+          type: object
+          additionalProperties: true
+    ParserConfigResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ParserConfig'
+        requestId:
+          type: string
+    ParserConfigListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParserConfig'
+        requestId:
+          type: string
+    PageMeta:
+      type: object
+      required:
+      - page
+      - pageSize
+      - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    ReportType:
+      type: object
+      required:
+      - code
+      - name
+      - enabled
+      properties:
+        code:
+          type: string
+          example: summer_peak_inspection
+        name:
+          type: string
+          example: 迎峰度夏检查报告
+        description:
+          type: string
+        enabled:
+          type: boolean
+        defaultTemplateId:
+          type: string
+    ReportTypeListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportType'
+        requestId:
+          type: string
+    CreateReportTemplateRequest:
+      type: object
+      required:
+      - file
+      - templateName
+      - reportType
+      properties:
+        file:
+          type: string
+          format: binary
+        templateName:
+          type: string
+        reportType:
+          type: string
+        description:
+          type: string
+    UpdateReportTemplateRequest:
+      type: object
+      properties:
+        templateName:
+          type: string
+        description:
+          type: string
+        enabled:
+          type: boolean
+    ReportTemplate:
+      type: object
+      required:
+      - id
+      - templateName
+      - reportType
+      - version
+      - enabled
+      - createdAt
+      properties:
+        id:
+          type: string
+        templateName:
+          type: string
+        reportType:
+          type: string
+        version:
+          type: integer
+        description:
+          type: string
+        enabled:
+          type: boolean
+        filename:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReportTemplateResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportTemplate'
+        requestId:
+          type: string
+    ReportTemplateListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportTemplate'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    ReportTemplateStructure:
+      type: object
+      properties:
+        outlineSchema:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOutlineNode'
+        styleConfig:
+          type: object
+          additionalProperties: true
+    ReportTemplateStructureRequest:
+      $ref: '#/components/schemas/ReportTemplateStructure'
+    ReportTemplateStructureResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportTemplateStructure'
+        requestId:
+          type: string
+    CreateReportMaterialRequest:
+      type: object
+      required:
+      - file
+      - materialName
+      - materialType
+      properties:
+        file:
+          type: string
+          format: binary
+        materialName:
+          type: string
+        materialType:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+    ReportMaterial:
+      type: object
+      required:
+      - id
+      - materialName
+      - enabled
+      - createdAt
+      properties:
+        id:
+          type: string
+        materialName:
+          type: string
+        materialType:
+          type: string
+        category:
+          type: string
+        description:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        enabled:
+          type: boolean
+        filename:
+          type: string
+        fileSize:
+          type: integer
+          format: int64
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReportMaterialResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportMaterial'
+        requestId:
+          type: string
+    ReportMaterialListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportMaterial'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    ReportStatus:
+      type: string
+      enum:
+      - draft
+      - outline_generating
+      - outline_generated
+      - content_generating
+      - generated
+      - exporting
+      - exported
+      - failed
+      - deleted
+    CreateReportRequest:
+      type: object
+      required:
+      - name
+      - reportType
+      - templateId
+      - topic
+      properties:
+        name:
+          type: string
+        reportType:
+          type: string
+        templateId:
+          type: string
+        topic:
+          type: string
+        specialty:
+          type: string
+        businessObject:
+          type: string
+        year:
+          type: integer
+        extraContext:
+          type: object
+          additionalProperties: true
+        source:
+          type: string
+          enum:
+          - frontend
+          - admin
+          - mcp
+          - backend
+    UpdateReportRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        templateId:
+          type: string
+        topic:
+          type: string
+        specialty:
+          type: string
+        businessObject:
+          type: string
+        year:
+          type: integer
+        extraContext:
+          type: object
+          additionalProperties: true
+    Report:
+      type: object
+      required:
+      - id
+      - name
+      - reportType
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        reportType:
+          type: string
+        templateId:
+          type: string
+        topic:
+          type: string
+        specialty:
+          type: string
+        businessObject:
+          type: string
+        year:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ReportStatus'
+        extraContext:
+          type: object
+          additionalProperties: true
+        creatorId:
+          type: string
+        creatorName:
+          type: string
+        source:
+          type: string
+        latestJobId:
+          type: string
+        latestReportFileId:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        exportedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReportResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/Report'
+        requestId:
+          type: string
+    ReportListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Report'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    ReportOutlineNode:
+      type: object
+      required:
+      - title
+      - level
+      properties:
+        id:
+          type: string
+        clientSectionId:
+          type: string
+        title:
+          type: string
+        level:
+          type: integer
+        numbering:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOutlineNode'
+    CreateReportOutlineRequest:
+      type: object
+      required:
+      - source
+      - sections
+      properties:
+        source:
+          type: string
+          enum:
+          - manual
+          - ai
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOutlineNode'
+    UpdateReportOutlineRequest:
+      type: object
+      properties:
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOutlineNode'
+        manualEdited:
+          type: boolean
+    ReportOutline:
+      type: object
+      required:
+      - id
+      - reportId
+      - version
+      - sections
+      - createdAt
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        version:
+          type: integer
+        sections:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOutlineNode'
+        sourceJobId:
+          type: string
+        manualEdited:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReportOutlineResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportOutline'
+        requestId:
+          type: string
+    ReportOutlineListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOutline'
+        requestId:
+          type: string
+    CreateReportSectionRequest:
+      type: object
+      required:
+      - title
+      properties:
+        outlineNodeId:
+          type: string
+        parentId:
+          type: string
+        title:
+          type: string
+        level:
+          type: integer
+        numbering:
+          type: string
+        content:
+          type: string
+        tables:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+    UpdateReportSectionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        tables:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        manualEdited:
+          type: boolean
+    ReportSection:
+      type: object
+      required:
+      - id
+      - reportId
+      - title
+      - level
+      - generationStatus
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        parentId:
+          type: string
+        outlineNodeId:
+          type: string
+        title:
+          type: string
+        level:
+          type: integer
+        sortOrder:
+          type: integer
+        numbering:
+          type: string
+        sectionType:
+          type: string
+          enum:
+          - text
+          - table
+          - image
+          - mixed
+        content:
+          type: string
+        tables:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        generationStatus:
+          $ref: '#/components/schemas/ReportJobStatus'
+        contentSource:
+          type: string
+          enum:
+          - ai
+          - manual
+          - mixed
+        manualEdited:
+          type: boolean
+        version:
+          type: integer
+        lastJobId:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ReportSectionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportSection'
+        requestId:
+          type: string
+    ReportSectionListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportSection'
+        requestId:
+          type: string
+    CreateReportSectionVersionRequest:
+      type: object
+      required:
+      - source
+      properties:
+        source:
+          type: string
+          enum:
+          - manual
+          - ai
+        requirements:
+          type: string
+        materialIds:
+          type: array
+          items:
+            type: string
+        preserveManualEdits:
+          type: boolean
+    ReportSectionVersion:
+      type: object
+      required:
+      - id
+      - reportId
+      - sectionId
+      - version
+      - source
+      - createdAt
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        sectionId:
+          type: string
+        version:
+          type: integer
+        source:
+          type: string
+          enum:
+          - manual
+          - ai
+        content:
+          type: string
+        tables:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        jobId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ReportSectionVersionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportSectionVersion'
+        requestId:
+          type: string
+    ReportSectionVersionListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportSectionVersion'
+        requestId:
+          type: string
+    ReportJobStatus:
+      type: string
+      enum:
+      - pending
+      - running
+      - succeeded
+      - partial_succeeded
+      - failed
+      - canceled
+    ReportJobType:
+      type: string
+      enum:
+      - outline_generation
+      - outline_regeneration
+      - content_generation
+      - content_regeneration
+      - section_regeneration
+      - report_file_creation
+    CreateReportJobRequest:
+      type: object
+      required:
+      - jobType
+      properties:
+        jobType:
+          $ref: '#/components/schemas/ReportJobType'
+        target:
+          type: object
+          properties:
+            scope:
+              type: string
+              enum:
+              - report
+              - outline
+              - section
+              - file
+            sectionId:
+              type: string
+        requirements:
+          type: string
+        materialIds:
+          type: array
+          items:
+            type: string
+        options:
+          type: object
+          additionalProperties: true
+    ReportJob:
+      type: object
+      required:
+      - id
+      - reportId
+      - jobType
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        templateId:
+          type: string
+        jobType:
+          $ref: '#/components/schemas/ReportJobType'
+        targetType:
+          type: string
+        targetId:
+          type: string
+        status:
+          $ref: '#/components/schemas/ReportJobStatus'
+        progress:
+          type: object
+          additionalProperties: true
+        resultSummary:
+          type: string
+        error:
+          $ref: '#/components/schemas/ReportJobError'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    ReportJobError:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+    ReportJobResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportJob'
+        requestId:
+          type: string
+    ReportJobListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportJob'
+        requestId:
+          type: string
+    CreateReportJobAttemptRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+        options:
+          type: object
+          additionalProperties: true
+    ReportJobAttempt:
+      type: object
+      required:
+      - id
+      - jobId
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        jobId:
+          type: string
+        attemptNumber:
+          type: integer
+        status:
+          $ref: '#/components/schemas/ReportJobStatus'
+        error:
+          $ref: '#/components/schemas/ReportJobError'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    ReportJobAttemptResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportJobAttempt'
+        requestId:
+          type: string
+    ReportJobAttemptListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportJobAttempt'
+        requestId:
+          type: string
+    ReportEvent:
+      type: object
+      required:
+      - id
+      - reportId
+      - eventType
+      - createdAt
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        jobId:
+          type: string
+        eventType:
+          type: string
+        message:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    ReportEventListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportEvent'
+        requestId:
+          type: string
+    CreateReportFileRequest:
+      type: object
+      required:
+      - reportId
+      - format
+      properties:
+        reportId:
+          type: string
+        format:
+          type: string
+          enum:
+          - docx
+        templateId:
+          type: string
+        styleOptions:
+          type: object
+          additionalProperties: true
+    ReportFile:
+      type: object
+      required:
+      - id
+      - reportId
+      - format
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        reportId:
+          type: string
+        jobId:
+          type: string
+        filename:
+          type: string
+        format:
+          type: string
+          enum:
+          - docx
+        fileSize:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/ReportJobStatus'
+        contentPath:
+          type: string
+          example: /api/v1/report-files/rf_123/content
+        createdBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ReportFileResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportFile'
+        requestId:
+          type: string
+    ReportFileListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportFile'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    ReportStatisticsOverview:
+      type: object
+      required:
+      - reportCount
+      - templateCount
+      - materialCount
+      properties:
+        reportCount:
+          type: integer
+          minimum: 0
+        templateCount:
+          type: integer
+          minimum: 0
+        materialCount:
+          type: integer
+          minimum: 0
+        jobStatusCounts:
+          type: object
+          additionalProperties:
+            type: integer
+        recentDays:
+          type: integer
+    ReportStatisticsOverviewResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportStatisticsOverview'
+        requestId:
+          type: string
+    ReportDailyStatistic:
+      type: object
+      required:
+      - date
+      - createdCount
+      - generatedCount
+      - failedCount
+      - exportedCount
+      properties:
+        date:
+          type: string
+          format: date
+        reportType:
+          type: string
+        createdCount:
+          type: integer
+          minimum: 0
+        generatedCount:
+          type: integer
+          minimum: 0
+        failedCount:
+          type: integer
+          minimum: 0
+        exportedCount:
+          type: integer
+          minimum: 0
+    ReportDailyStatisticsResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportDailyStatistic'
+        requestId:
+          type: string
+    ReportOperationLog:
+      type: object
+      required:
+      - id
+      - operationType
+      - targetType
+      - targetId
+      - operationResult
+      - createdAt
+      properties:
+        id:
+          type: string
+        operatorId:
+          type: string
+        operatorName:
+          type: string
+        operationType:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+        requestId:
+          type: string
+        requestSource:
+          type: string
+        toolName:
+          type: string
+        parameterSummary:
+          type: object
+          additionalProperties: true
+          description: Sanitized parameter summary for MCP or API calls. Must not contain secrets, prompts, MinIO object keys, or full document content.
+        operationResult:
+          type: string
+        errorMessage:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Sanitized audit metadata for troubleshooting and filtering.
+        createdAt:
+          type: string
+          format: date-time
+    ReportOperationLogListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportOperationLog'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    ReportSettingsModelConfig:
+      type: object
+      description: Report-generation model profile reference. Provider credentials and base URLs remain owned by AI Gateway model profiles.
+      properties:
+        provider:
+          type: string
+          description: Fixed to ai-gateway for the current gateway contract.
+          example: ai-gateway
+        profileId:
+          type: string
+          description: AI Gateway model profile id used for report generation.
+        model:
+          type: string
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+    ReportSettingsFileDefaults:
+      type: object
+      properties:
+        defaultFormat:
+          type: string
+          enum:
+          - docx
+        defaultNumberingMode:
+          type: string
+          enum:
+          - global
+          - by_chapter
+          description: global is supported for the MVP.
+        defaultStyleProfileId:
+          type: string
+      additionalProperties: true
+    ReportSettings:
+      type: object
+      properties:
+        llm:
+          $ref: '#/components/schemas/ReportSettingsModelConfig'
+        defaultTemplates:
+          type: object
+          additionalProperties:
+            type: string
+          description: Map of reportType to default reportTemplateId.
+        file:
+          $ref: '#/components/schemas/ReportSettingsFileDefaults'
+    UpdateReportSettingsRequest:
+      $ref: '#/components/schemas/ReportSettings'
+    ReportSettingsResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/ReportSettings'
+        requestId:
+          type: string
+    ReportSettingsUpdateResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - updatedAt
+          properties:
+            updatedAt:
+              type: string
+              format: date-time
+        requestId:
+          type: string
+    QASessionStatus:
+      type: string
+      enum:
+      - active
+      - archived
+    QASession:
+      type: object
+      required:
+      - id
+      - status
+      - createdAt
+      - updatedAt
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/QASessionStatus'
+        messageCount:
+          type: integer
+          minimum: 0
+        lastMessagePreview:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateQASessionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+    UpdateQASessionRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        status:
+          $ref: '#/components/schemas/QASessionStatus'
+    QASessionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QASession'
+        requestId:
+          type: string
+    QASessionListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QASession'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    QAMessageRole:
+      type: string
+      enum:
+      - user
+      - assistant
+      - system
+    QAMessageStatus:
+      type: string
+      enum:
+      - queued
+      - streaming
+      - completed
+      - stopped
+      - failed
+      - cancelled
+    QAIntent:
+      type: string
+      description: "`data_analysis` is reserved; MVP implementations should return `unsupported_intent` instead of executing a data-analysis workflow."
+      enum:
+      - knowledge_qa
+      - general_chat
+      - report_generation
+      - data_analysis
+      - unknown
+    QAMessage:
+      type: object
+      required:
+      - id
+      - sessionId
+      - role
+      - status
+      - content
+      - createdAt
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        role:
+          $ref: '#/components/schemas/QAMessageRole'
+        sequenceNo:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/QAMessageStatus'
+        intent:
+          $ref: '#/components/schemas/QAIntent'
+        content:
+          type: string
+        thinking:
+          type: array
+          description: User-visible process summaries only. Must not contain private chain-of-thought, full prompts, full tool arguments, raw tool results, internal URLs, or storage object keys.
+          items:
+            $ref: '#/components/schemas/QAThinkingStep'
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/QACitation'
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    QAMessageListResponse:
+      type: object
+      required:
+      - data
+      - page
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QAMessage'
+        page:
+          $ref: '#/components/schemas/PageMeta'
+        requestId:
+          type: string
+    QAThinkingStep:
+      type: object
+      required:
+      - type
+      - status
+      properties:
+        type:
+          type: string
+          enum:
+          - agent_iteration
+          - tool_call
+          - tool_result
+          - generation
+          - citation
+          - verify
+        label:
+          type: string
+        status:
+          type: string
+          enum:
+          - pending
+          - running
+          - done
+          - failed
+        detail:
+          type: string
+          description: Sanitized user-visible detail.
+    CreateQAMessageRequest:
+      type: object
+      required:
+      - message
+      properties:
+        message:
+          type: string
+        mode:
+          $ref: '#/components/schemas/QAIntent'
+        knowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        retrieval:
+          $ref: '#/components/schemas/QARetrievalOptions'
+        params:
+          allOf:
+          - $ref: '#/components/schemas/QARetrievalOptions'
+          deprecated: true
+          description: Backward-compatible alias for `retrieval`; new clients should use `retrieval`.
+        agent:
+          $ref: '#/components/schemas/QAAgentOptions'
+    QARetrievalOptions:
+      type: object
+      properties:
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 100
+        scoreThreshold:
+          type: number
+          minimum: 0
+        similarityThreshold:
+          type: number
+          minimum: 0
+          deprecated: true
+          description: Backward-compatible alias for `scoreThreshold`.
+        enableRerank:
+          type: boolean
+        useRerank:
+          type: boolean
+          deprecated: true
+          description: Backward-compatible alias for `enableRerank`.
+        rerankThreshold:
+          type: number
+          minimum: 0
+        rerankTopN:
+          type: integer
+          minimum: 1
+        tagFilters:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+    QAAgentOptions:
+      type: object
+      properties:
+        enabledToolNames:
+          type: array
+          items:
+            type: string
+        maxIterations:
+          type: integer
+          minimum: 1
+          maximum: 10
+    QAAnswerResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: object
+          required:
+          - userMessage
+          - assistantMessage
+          - responseRun
+          properties:
+            userMessage:
+              $ref: '#/components/schemas/QAMessage'
+            assistantMessage:
+              $ref: '#/components/schemas/QAMessage'
+            responseRun:
+              $ref: '#/components/schemas/QAResponseRun'
+            citations:
+              type: array
+              items:
+                $ref: '#/components/schemas/QACitation'
+            reasoningSteps:
+              type: array
+              items:
+                $ref: '#/components/schemas/QAThinkingStep'
+            errorCode:
+              type: string
+              nullable: true
+              description: For reserved unsupported intents, returns `unsupported_intent`.
+        requestId:
+          type: string
+    QAResponseRunStatus:
+      type: string
+      enum:
+      - queued
+      - running
+      - streaming
+      - completed
+      - failed
+      - cancelled
+    QAResponseRun:
+      type: object
+      required:
+      - id
+      - sessionId
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        sessionId:
+          type: string
+        userMessageId:
+          type: string
+        assistantMessageId:
+          type: string
+        status:
+          $ref: '#/components/schemas/QAResponseRunStatus'
+        currentIteration:
+          type: integer
+          minimum: 0
+        maxIterations:
+          type: integer
+          minimum: 1
+        terminationReason:
+          type: string
+          nullable: true
+          enum:
+          - completed
+          - max_iterations
+          - timeout
+          - cancelled
+          - tool_error
+          - model_error
+          - policy_denied
+        totalTokens:
+          type: integer
+          minimum: 0
+        latencyMs:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+    QAResponseRunResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QAResponseRun'
+        requestId:
+          type: string
+    UpdateQAResponseRunRequest:
+      type: object
+      required:
+      - status
+      properties:
+        status:
+          type: string
+          enum:
+          - cancelled
+    QAAgentToolCall:
+      type: object
+      required:
+      - id
+      - responseRunId
+      - toolCallId
+      - toolName
+      - status
+      properties:
+        id:
+          type: string
+        responseRunId:
+          type: string
+        modelInvocationId:
+          type: string
+        iterationNo:
+          type: integer
+          minimum: 1
+        toolCallId:
+          type: string
+        toolName:
+          type: string
+        argumentsSummary:
+          $ref: '#/components/schemas/JsonObject'
+        resultSummary:
+          $ref: '#/components/schemas/JsonObject'
+        status:
+          type: string
+          enum:
+          - running
+          - completed
+          - failed
+          - cancelled
+        latencyMs:
+          type: integer
+          minimum: 0
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+    QAAgentToolCallListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QAAgentToolCall'
+        requestId:
+          type: string
+    QASseEventType:
+      type: string
+      enum:
+      - message.created
+      - agent.iteration.started
+      - reasoning.step
+      - tool.started
+      - tool.completed
+      - tool.failed
+      - answer.delta
+      - citation.delta
+      - answer.completed
+      - error
+      - heartbeat
+    QASseEvent:
+      type: object
+      required:
+      - eventSeq
+      - eventType
+      - payload
+      - createdAt
+      properties:
+        eventSeq:
+          type: integer
+          minimum: 0
+        eventType:
+          $ref: '#/components/schemas/QASseEventType'
+        payload:
+          $ref: '#/components/schemas/JsonObject'
+        createdAt:
+          type: string
+          format: date-time
+    QASseEventListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QASseEvent'
+        requestId:
+          type: string
+    QACitation:
+      type: object
+      required:
+      - id
+      - messageId
+      properties:
+        id:
+          type: string
+        messageId:
+          type: string
+        citationNo:
+          type: integer
+          minimum: 1
+        documentId:
+          type: string
+        docId:
+          type: string
+          deprecated: true
+          description: Backward-compatible alias for `documentId`.
+        documentName:
+          type: string
+        docName:
+          type: string
+          deprecated: true
+          description: Backward-compatible alias for `documentName`.
+        knowledgeBaseId:
+          type: string
+        chunkId:
+          type: string
+        sectionPath:
+          type: string
+        text:
+          type: string
+          description: Citation quote preview or saved quote text.
+        contentPreview:
+          type: string
+        context:
+          type: string
+        pageNumber:
+          type: integer
+          minimum: 1
+        score:
+          type: number
+        rerankScore:
+          type: number
+          nullable: true
+        chunkType:
+          type: string
+        isSourceAvailable:
+          type: boolean
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+    QACitationDetail:
+      allOf:
+      - $ref: '#/components/schemas/QACitation'
+      - type: object
+        properties:
+          content:
+            type: string
+            description: Saved citation snapshot or source excerpt available to the current user.
+          source:
+            type: object
+            properties:
+              available:
+                type: boolean
+              reason:
+                type: string
+              downloadEndpoint:
+                type: string
+                description: Gateway document content endpoint when the original source is available.
+    QACitationListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QACitation'
+        requestId:
+          type: string
+    QACitationResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QACitationDetail'
+        requestId:
+          type: string
+    CreateQACitationLookupRequest:
+      type: object
+      required:
+      - citationIds
+      properties:
+        citationIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+    QACitationLookupResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QACitationDetail'
+        requestId:
+          type: string
+    QAConfigKnowledgeBase:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        displayName:
+          type: string
+        sortOrder:
+          type: integer
+          minimum: 0
+    QAConfigVersion:
+      type: object
+      required:
+      - id
+      - versionNo
+      - isActive
+      - createdAt
+      properties:
+        id:
+          type: string
+        versionNo:
+          type: integer
+          minimum: 1
+        defaultKnowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        knowledgeBases:
+          type: array
+          items:
+            $ref: '#/components/schemas/QAConfigKnowledgeBase'
+        retrieval:
+          $ref: '#/components/schemas/QARetrievalOptions'
+        maxIterations:
+          type: integer
+          minimum: 1
+        toolTimeoutSeconds:
+          type: integer
+          minimum: 1
+        modelTimeoutSeconds:
+          type: integer
+          minimum: 1
+        overallTimeoutSeconds:
+          type: integer
+          minimum: 1
+        enabledToolNames:
+          type: array
+          items:
+            type: string
+        llm:
+          $ref: '#/components/schemas/QALLMConfigVersion'
+        agent:
+          $ref: '#/components/schemas/QAAgentConfig'
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    QAAgentConfig:
+      type: object
+      properties:
+        maxIterations:
+          type: integer
+          minimum: 1
+          default: 5
+        toolTimeoutSeconds:
+          type: integer
+          minimum: 1
+          default: 10
+        modelTimeoutSeconds:
+          type: integer
+          minimum: 1
+          default: 60
+        overallTimeoutSeconds:
+          type: integer
+          minimum: 1
+          default: 120
+        enabledToolNames:
+          type: array
+          items:
+            type: string
+    CreateQAConfigVersionRequest:
+      type: object
+      properties:
+        defaultKnowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        knowledgeBases:
+          type: array
+          items:
+            $ref: '#/components/schemas/QAConfigKnowledgeBase'
+        retrieval:
+          $ref: '#/components/schemas/QARetrievalOptions'
+        maxIterations:
+          type: integer
+          minimum: 1
+        toolTimeoutSeconds:
+          type: integer
+          minimum: 1
+        modelTimeoutSeconds:
+          type: integer
+          minimum: 1
+        overallTimeoutSeconds:
+          type: integer
+          minimum: 1
+        enabledToolNames:
+          type: array
+          items:
+            type: string
+        llm:
+          $ref: '#/components/schemas/CreateQALLMConfigVersionRequest'
+        agent:
+          $ref: '#/components/schemas/QAAgentConfig'
+        activate:
+          type: boolean
+          default: true
+    QAConfigVersionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QAConfigVersion'
+        requestId:
+          type: string
+    QALLMConfigVersion:
+      type: object
+      required:
+      - id
+      - versionNo
+      - provider
+      - profileId
+      - modelName
+      - isActive
+      - createdAt
+      properties:
+        id:
+          type: string
+        versionNo:
+          type: integer
+          minimum: 1
+        provider:
+          type: string
+          enum:
+          - ai-gateway
+        profileId:
+          type: string
+          description: AI Gateway chat model profile id.
+        modelName:
+          type: string
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+        temperature:
+          type: number
+        maxTokens:
+          type: integer
+          minimum: 1
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    CreateQALLMConfigVersionRequest:
+      type: object
+      required:
+      - provider
+      - profileId
+      - modelName
+      properties:
+        provider:
+          type: string
+          enum:
+          - ai-gateway
+        profileId:
+          type: string
+        modelName:
+          type: string
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+        temperature:
+          type: number
+        maxTokens:
+          type: integer
+          minimum: 1
+        activate:
+          type: boolean
+          default: true
+    QALLMConfigVersionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QALLMConfigVersion'
+        requestId:
+          type: string
+    CreateQALLMConnectionTestRequest:
+      type: object
+      required:
+      - provider
+      - profileId
+      - modelName
+      properties:
+        provider:
+          type: string
+          enum:
+          - ai-gateway
+        profileId:
+          type: string
+        modelName:
+          type: string
+        timeoutSeconds:
+          type: integer
+          minimum: 1
+    QALLMConnectionTest:
+      type: object
+      required:
+      - id
+      - success
+      - testedAt
+      properties:
+        id:
+          type: string
+        success:
+          type: boolean
+        latencyMs:
+          type: integer
+          minimum: 0
+        modelName:
+          type: string
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+          description: Sanitized failure summary only.
+        testedAt:
+          type: string
+          format: date-time
+    QALLMConnectionTestResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QALLMConnectionTest'
+        requestId:
+          type: string
+    CreateQARetrievalTestRunRequest:
+      type: object
+      required:
+      - question
+      properties:
+        question:
+          type: string
+        query:
+          type: string
+          deprecated: true
+          description: Backward-compatible alias for `question`.
+        knowledgeBaseIds:
+          type: array
+          items:
+            type: string
+        retrieval:
+          $ref: '#/components/schemas/QARetrievalOptions'
+        overrides:
+          allOf:
+          - $ref: '#/components/schemas/QARetrievalOptions'
+          deprecated: true
+          description: Backward-compatible alias for `retrieval`.
+    QARetrievalTestResult:
+      type: object
+      required:
+      - rankNo
+      properties:
+        rankNo:
+          type: integer
+          minimum: 1
+        knowledgeBaseId:
+          type: string
+        documentId:
+          type: string
+        docId:
+          type: string
+          deprecated: true
+        documentName:
+          type: string
+        docName:
+          type: string
+          deprecated: true
+        chunkId:
+          type: string
+        sectionPath:
+          type: string
+        score:
+          type: number
+        vectorScore:
+          type: number
+        rerankScore:
+          type: number
+        contentPreview:
+          type: string
+        text:
+          type: string
+          deprecated: true
+          description: Backward-compatible alias for `contentPreview`.
+        metadata:
+          $ref: '#/components/schemas/JsonObject'
+    QARetrievalTestRun:
+      type: object
+      required:
+      - id
+      - status
+      - createdAt
+      properties:
+        id:
+          type: string
+        question:
+          type: string
+        query:
+          type: string
+          deprecated: true
+        status:
+          type: string
+          enum:
+          - running
+          - completed
+          - failed
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/QARetrievalTestResult'
+        createdAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+    QARetrievalTestRunResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QARetrievalTestRun'
+        requestId:
+          type: string
+    QAMetricsOverview:
+      type: object
+      properties:
+        totalQaCount:
+          type: integer
+          minimum: 0
+        todayQaCount:
+          type: integer
+          minimum: 0
+        totalQuestionCount:
+          type: integer
+          minimum: 0
+        conversationCount:
+          type: integer
+          minimum: 0
+        avgLatencyMs:
+          type: integer
+          minimum: 0
+        activeUsersToday:
+          type: integer
+          minimum: 0
+        knowledgeBaseCount:
+          type: integer
+          minimum: 0
+        documentCount:
+          type: integer
+          minimum: 0
+    QAMetricsOverviewResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QAMetricsOverview'
+        requestId:
+          type: string
+    QAMetricsTrendPoint:
+      type: object
+      required:
+      - date
+      properties:
+        date:
+          type: string
+          format: date
+        count:
+          type: integer
+          minimum: 0
+        questionCount:
+          type: integer
+          minimum: 0
+    QAMetricsTrend:
+      type: object
+      required:
+      - days
+      - points
+      properties:
+        days:
+          type: integer
+          minimum: 1
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/QAMetricsTrendPoint'
+        trend30d:
+          type: array
+          deprecated: true
+          items:
+            $ref: '#/components/schemas/QAMetricsTrendPoint'
+    QAMetricsTrendResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          $ref: '#/components/schemas/QAMetricsTrend'
+        requestId:
+          type: string
+    QATopQuery:
+      type: object
+      required:
+      - query
+      - count
+      properties:
+        query:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        avgLatencyMs:
+          type: integer
+          minimum: 0
+        lastAskedAt:
+          type: string
+          format: date-time
+    QATopQueryListResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QATopQuery'
+        requestId:
+          type: string
+    QAIntentDistributionItem:
+      type: object
+      required:
+      - intent
+      - count
+      properties:
+        intent:
+          $ref: '#/components/schemas/QAIntent'
+        label:
+          type: string
+        count:
+          type: integer
+          minimum: 0
+        percent:
+          type: number
+          minimum: 0
+          maximum: 100
+    QAIntentDistributionResponse:
+      type: object
+      required:
+      - data
+      - requestId
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/QAIntentDistributionItem'
+        requestId:
+          type: string
+x-missing-contracts:
+- service: admin
+  status: missing
+  reason: Administration overview and metrics aggregation contract is not finalized yet. Runtime model/parser configuration is an active gateway contract.
+  placeholderOperations:
+  - GET /api/v1/admin-overview
+  - GET /api/v1/admin-metrics

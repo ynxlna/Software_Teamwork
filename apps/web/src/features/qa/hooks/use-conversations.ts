@@ -1,5 +1,5 @@
 /**
- * React Query hooks for conversation CRUD.
+ * React Query hooks for session CRUD.
  *
  * Server state managed by TanStack Query; UI cache synchronised via
  * the Zustand chat store on mutation success.
@@ -8,71 +8,104 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import {
-  createConversation,
-  deleteConversation,
-  getConversation,
-  listConversations,
+  createSession,
+  deleteSession,
+  getSession,
+  getSessionMessages,
+  listSessions,
+  renameSession,
 } from '@/api/conversations'
 
 // ── Query keys ──
 
-export const conversationKeys = {
-  all: ['conversations'] as const,
-  lists: () => [...conversationKeys.all, 'list'] as const,
+export const sessionKeys = {
+  all: ['sessions'] as const,
+  lists: () => [...sessionKeys.all, 'list'] as const,
   list: (page: number, pageSize: number) =>
-    [...conversationKeys.lists(), { page, pageSize }] as const,
-  details: () => [...conversationKeys.all, 'detail'] as const,
-  detail: (id: string) => [...conversationKeys.details(), id] as const,
+    [...sessionKeys.lists(), { page, pageSize }] as const,
+  details: () => [...sessionKeys.all, 'detail'] as const,
+  detail: (id: string) => [...sessionKeys.details(), id] as const,
+  messages: (id: string) => [...sessionKeys.details(), id, 'messages'] as const,
 }
 
 // ── Queries ──
 
-/** Paginated conversation list. */
-export function useConversations(page = 1, pageSize = 20) {
+/** Paginated session list. */
+export function useSessions(page = 1, pageSize = 20) {
   return useQuery({
-    queryKey: conversationKeys.list(page, pageSize),
-    queryFn: () => listConversations(page, pageSize),
+    queryKey: sessionKeys.list(page, pageSize),
+    queryFn: () => listSessions(page, pageSize),
     placeholderData: (prev) => prev,
   })
 }
 
-/** Single conversation detail (includes messages). */
-export function useConversation(id: string) {
+/** Single session detail (includes messages). */
+export function useSession(id: string) {
   return useQuery({
-    queryKey: conversationKeys.detail(id),
-    queryFn: () => getConversation(id),
+    queryKey: sessionKeys.detail(id),
+    queryFn: () => getSession(id),
     enabled: id.length > 0,
+  })
+}
+
+/** Messages for a specific session (standalone endpoint). */
+export function useSessionMessages(sessionId: string) {
+  return useQuery({
+    queryKey: sessionKeys.messages(sessionId),
+    queryFn: () => getSessionMessages(sessionId),
+    enabled: sessionId.length > 0,
   })
 }
 
 // ── Mutations ──
 
-/** Create a new conversation. */
-export function useCreateConversation() {
+/** Create a new session. */
+export function useCreateSession() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (title?: string) => createConversation(title),
+    mutationFn: (title?: string) => createSession(title),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: conversationKeys.lists(),
+        queryKey: sessionKeys.lists(),
       })
     },
   })
 }
 
-/** Delete a conversation. */
-export function useDeleteConversation() {
+/** Delete a session. */
+export function useDeleteSession() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (id: string) => deleteConversation(id),
+    mutationFn: (id: string) => deleteSession(id),
     onSuccess: (_data, id) => {
       void queryClient.invalidateQueries({
-        queryKey: conversationKeys.lists(),
+        queryKey: sessionKeys.lists(),
       })
       queryClient.removeQueries({
-        queryKey: conversationKeys.detail(id),
+        queryKey: sessionKeys.detail(id),
+      })
+      queryClient.removeQueries({
+        queryKey: sessionKeys.messages(id),
+      })
+    },
+  })
+}
+
+/** Rename a session. */
+export function useRenameSession() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ sessionId, title }: { sessionId: string; title: string }) =>
+      renameSession(sessionId, title),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({
+        queryKey: sessionKeys.lists(),
+      })
+      void queryClient.invalidateQueries({
+        queryKey: sessionKeys.detail(variables.sessionId),
       })
     },
   })

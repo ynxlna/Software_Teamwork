@@ -36,6 +36,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
+  status?: 'streaming' | 'completed' | 'stopped' | 'failed'
   thinking?: ThinkingStep[]
   citations?: Citation[]
 }
@@ -189,19 +190,23 @@ export interface SSEIntentStatusData {
   label: string
   intent?: IntentType
   confidence?: number
+  seq: number
 }
 
 export interface SSEThinkingStepData {
   step: ThinkingStep
+  seq: number
 }
 
 export interface SSETokenData {
   text: string
   index: number
+  seq: number
 }
 
 export interface SSECitationData {
   citation: Citation
+  seq: number
 }
 
 export interface SSEDoneData {
@@ -210,12 +215,14 @@ export interface SSEDoneData {
   prompt_tokens: number
   completion_tokens: number
   latency_ms: number
+  seq: number
 }
 
 export interface SSEErrorData {
   code: number
   message: string
   fatal: boolean
+  seq: number
 }
 
 // ============ UI 类型 ============

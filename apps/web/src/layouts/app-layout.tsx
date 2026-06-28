@@ -9,7 +9,8 @@ const pathLabels: Record<string, string> = {
 export function AppLayout({ children }: PropsWithChildren) {
   const routerState = useRouterState()
   const pathname = routerState.location.pathname
-  const currentLabel = pathLabels[pathname] ?? '首页'
+  const currentLabel =
+    Object.entries(pathLabels).find(([key]) => pathname.startsWith(key))?.[1] ?? '首页'
 
   return (
     <div className="flex h-full flex-col bg-background text-foreground">

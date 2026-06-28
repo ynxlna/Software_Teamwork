@@ -4,7 +4,7 @@ import { type KeyboardEvent, useCallback, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
-interface ChatInputProps {
+type ChatInputProps = {
   onSend: (text: string) => void
   disabled: boolean
   value: string

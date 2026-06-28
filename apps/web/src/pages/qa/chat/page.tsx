@@ -1,44 +1,41 @@
 import { Settings } from 'lucide-react'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { streamChat } from '@/api/chat'
-import { createConversation, deleteConversation as deleteConvApi } from '@/api/conversations'
 import { ChatInput, ChatMessages, ChatSidebar } from '@/components/chat'
-import type { Citation, Conversation, ConversationListItem, Message, ThinkingStep } from '@/lib/types'
+import {
+  useCreateSession,
+  useDeleteSession,
+  useRenameSession,
+  useSession,
+  useSessions,
+} from '@/features/qa'
+import type {
+  Citation,
+  Conversation,
+  ConversationListItem,
+  Message,
+  ThinkingStep,
+} from '@/lib/types'
+import { useChatStore } from '@/stores/chat-store'
 
 // ══════════════════════════════════════════════════════════════════════════════
 // Helpers
 // ══════════════════════════════════════════════════════════════════════════════
 
-const STORAGE_KEY = 'qa-chat-conversations'
-
-function loadLocalIds(): string[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as string[]
-  } catch {
-    /* ignore corrupt data */
-  }
-  return []
-}
-
-function saveLocalIds(ids: string[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ids))
-}
-
 function nextId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-function toConversationListItem(c: Conversation): ConversationListItem {
-  const last = c.messages[c.messages.length - 1]
+function toSessionListItem(s: Conversation): ConversationListItem {
+  const last = s.messages[s.messages.length - 1]
   return {
-    id: c.id,
-    title: c.title,
-    message_count: c.messages.length,
+    id: s.id,
+    title: s.title,
+    message_count: s.messages.length,
     last_message_preview: last ? last.content.slice(0, 50) : '',
-    created_at: c.created_at,
-    updated_at: c.updated_at,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
   }
 }
 
@@ -53,99 +50,203 @@ const SUGGESTED_PROMPTS = [
 // ══════════════════════════════════════════════════════════════════════════════
 
 export function ChatPage() {
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [activeId, setActiveId] = useState<string>('')
-  const [streaming, setStreaming] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [lastFailedMsg, setLastFailedMsg] = useState<string | null>(null)
-  const [inputText, setInputText] = useState('')
+  // ── React Query: sessions list ──
+  const {
+    data: sessionsData,
+    isLoading: sessionsLoading,
+    isError: sessionsError,
+    refetch: refetchSessions,
+  } = useSessions()
 
-  // Refs so SSE callbacks always read latest state
-  const setConvsRef = useRef(setConversations)
-  setConvsRef.current = setConversations
-  const activeIdRef = useRef(activeId)
-  activeIdRef.current = activeId
-  const streamingRef = useRef(streaming)
-  streamingRef.current = streaming
+  // ── Zustand store ──
+  const sessions = useChatStore((s) => s.sessions)
+  const setSessions = useChatStore((s) => s.setSessions)
+  const activeId = useChatStore((s) => s.activeId)
+  const setActiveId = useChatStore((s) => s.setActiveId)
+  const streaming = useChatStore((s) => s.streaming)
+  const setStreaming = useChatStore((s) => s.setStreaming)
+  const error = useChatStore((s) => s.error)
+  const setError = useChatStore((s) => s.setError)
+  const lastFailedMsg = useChatStore((s) => s.lastFailedMsg)
+  const setLastFailedMsg = useChatStore((s) => s.setLastFailedMsg)
+  const clearError = useChatStore((s) => s.clearError)
+  const addSession = useChatStore((s) => s.addSession)
+  const removeSession = useChatStore((s) => s.removeSession)
+  const updateSessionMessages = useChatStore((s) => s.updateSessionMessages)
 
-  const [localIds, setLocalIds] = useState<string[]>(loadLocalIds)
-  const localIdsRef = useRef(localIds)
-  localIdsRef.current = localIds
-
-  const persistLocalIds = useCallback((ids: string[]) => {
-    setLocalIds(ids)
-    saveLocalIds(ids)
-  }, [])
-
-  // ── Derive sidebar items ──
-  const sidebarItems: ConversationListItem[] = useMemo(
-    () => conversations.map(toConversationListItem),
-    [conversations],
+  // ── React Query: active session detail ──
+  const { data: sessionDetail, isError: sessionDetailError } = useSession(
+    activeId ?? '',
   )
 
-  // ── Create conversation ──
+  // ── Local input text ──
+  const [inputText, setInputText] = useState('')
+
+  // ── Mutations ──
+  const createSessionMut = useCreateSession()
+  const deleteSessionMut = useDeleteSession()
+  const renameSessionMut = useRenameSession()
+
+  // ── SSE cleanup ref ──
+  const abortRef = useRef<(() => void) | null>(null)
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Refresh recovery: sync server list into store
+  // ══════════════════════════════════════════════════════════════════════════
+
+  useEffect(() => {
+    if (sessionsData?.items) {
+      const currentSessions = useChatStore.getState().sessions
+      const merged: Conversation[] = sessionsData.items.map((item) => {
+        const existing = currentSessions.find((s) => s.id === item.id)
+        if (existing) {
+          // Preserve in-memory messages; update metadata from server
+          return { ...existing, title: item.title, updated_at: item.updated_at }
+        }
+        return {
+          id: item.id,
+          title: item.title,
+          messages: [] as Message[],
+          created_at: item.created_at,
+          updated_at: item.updated_at,
+        }
+      })
+      setSessions(merged)
+    }
+  }, [sessionsData, setSessions])
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Fetch active session messages from server (for refresh recovery)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  useEffect(() => {
+    if (sessionDetail && activeId) {
+      const current = useChatStore
+        .getState()
+        .sessions.find((s) => s.id === activeId)
+      // Only overwrite if local messages are empty (don't clobber streaming data)
+      if (current && current.messages.length === 0 && sessionDetail.messages.length > 0) {
+        updateSessionMessages(activeId, sessionDetail.messages)
+      }
+    }
+  }, [sessionDetail, activeId, updateSessionMessages])
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Surface session detail fetch error when local messages are empty
+  // ══════════════════════════════════════════════════════════════════════════
+
+  useEffect(() => {
+    if (sessionDetailError && activeId) {
+      const local = useChatStore
+        .getState()
+        .sessions.find((s) => s.id === activeId)
+      if (!local || local.messages.length === 0) {
+        setError('加载会话消息失败，请检查网络连接')
+      }
+    }
+  }, [sessionDetailError, activeId, setError])
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Cleanup SSE on unmount
+  // ══════════════════════════════════════════════════════════════════════════
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.()
+    }
+  }, [])
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Derive sidebar items
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const sidebarItems: ConversationListItem[] = useMemo(
+    () => sessions.map(toSessionListItem),
+    [sessions],
+  )
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Create session
+  // ══════════════════════════════════════════════════════════════════════════
+
   const handleCreate = useCallback(async () => {
     try {
-      const c = await createConversation('新对话')
-      setConversations((p) => [c, ...p])
-      setActiveId(c.id)
-      persistLocalIds([c.id, ...localIdsRef.current])
+      const newSession = await createSessionMut.mutateAsync('新对话')
+      addSession(newSession)
+      setActiveId(newSession.id)
     } catch {
       setError('创建会话失败，请检查网络连接')
     }
-  }, [persistLocalIds])
+  }, [createSessionMut, addSession, setActiveId, setError])
 
-  // ── Delete conversation ──
+  // ══════════════════════════════════════════════════════════════════════════
+  // Delete session (only remove from UI on API success)
+  // ══════════════════════════════════════════════════════════════════════════
+
   const handleDelete = useCallback(
     async (id: string) => {
       try {
-        await deleteConvApi(id)
+        await deleteSessionMut.mutateAsync(id)
+        removeSession(id)
       } catch {
-        /* best-effort deletion */
+        setError('删除会话失败，请检查网络连接')
       }
-      setConversations((p) => p.filter((c) => c.id !== id))
-      if (activeIdRef.current === id) {
-        const remaining = conversations.filter((c) => c.id !== id)
-        setActiveId(remaining.length > 0 ? remaining[0]!.id : '')
-      }
-      persistLocalIds(localIdsRef.current.filter((lid) => lid !== id))
     },
-    [conversations, persistLocalIds],
+    [deleteSessionMut, removeSession, setError],
   )
 
-  // ── Send message (SSE streaming) ──
+  // ══════════════════════════════════════════════════════════════════════════
+  // Rename session
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const handleRename = useCallback(
+    async (sessionId: string, newTitle: string) => {
+      try {
+        await renameSessionMut.mutateAsync({ sessionId, title: newTitle })
+        const current = useChatStore.getState().sessions
+        setSessions(
+          current.map((s) =>
+            s.id === sessionId ? { ...s, title: newTitle } : s,
+          ),
+        )
+      } catch {
+        setError('重命名会话失败')
+      }
+    },
+    [renameSessionMut, setSessions, setError],
+  )
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // Send message (SSE streaming)
+  // ══════════════════════════════════════════════════════════════════════════
+
   const sendMessage = useCallback(
     async (text: string) => {
       const trimmed = text.trim()
-      if (!trimmed || streamingRef.current) return
+      if (!trimmed || useChatStore.getState().streaming) return
 
-      setError(null)
-      setLastFailedMsg(null)
+      clearError()
 
-      let targetId = activeIdRef.current
+      let targetId: string | null = useChatStore.getState().activeId
 
-      // ① Auto-create conversation if none active
+      // ① Auto-create session if none active
       if (!targetId) {
         try {
           const title =
             trimmed.slice(0, 30) + (trimmed.length > 30 ? '…' : '')
-          const c = await createConversation(title)
-          setConvsRef.current((p) => {
-            if (p.some((x) => x.id === c.id)) return p
-            return [c, ...p]
-          })
-          targetId = c.id
-          setActiveId(c.id)
-          persistLocalIds([c.id, ...localIdsRef.current])
+          const newSession = await createSessionMut.mutateAsync(title)
+          addSession(newSession)
+          targetId = newSession.id
+          setActiveId(targetId)
         } catch {
           setError('创建会话失败，请检查网络连接')
           return
         }
       }
 
-      const uid = targetId
+      const uid: string = targetId
 
-      // ② Push user message + empty assistant message
+      // ② Push user message + empty assistant message into store
       const userMsg: Message = {
         id: nextId(),
         role: 'user',
@@ -157,24 +258,25 @@ export function ChatPage() {
         role: 'assistant',
         content: '',
         timestamp: new Date().toISOString(),
+        status: 'streaming',
         thinking: [],
         citations: [],
       }
 
-      setConvsRef.current((prev) =>
-        prev.map((c) => {
-          if (c.id !== uid) return c
-          const isFirst = c.messages.length === 0
+      useChatStore.setState((state) => ({
+        sessions: state.sessions.map((s) => {
+          if (s.id !== uid) return s
+          const isFirst = s.messages.length === 0
           return {
-            ...c,
+            ...s,
             title: isFirst
               ? trimmed.slice(0, 30) + (trimmed.length > 30 ? '…' : '')
-              : c.title,
-            messages: [...c.messages, userMsg, asstMsg],
+              : s.title,
+            messages: [...s.messages, userMsg, asstMsg],
             updated_at: new Date().toISOString(),
           }
         }),
-      )
+      }))
 
       setStreaming(true)
 
@@ -184,32 +286,50 @@ export function ChatPage() {
       const cites: Citation[] = []
 
       /**
-       * Patch the last assistant message in the active conversation.
-       * Uses array spread to avoid noUncheckedIndexedAccess issues.
+       * Patch the last assistant message in the active session.
+       * Uses Zustand setState with functional updater for latest state.
        */
       const patchAssistant = (patch: {
         content?: string
         thinking?: ThinkingStep[]
         citations?: Citation[]
+        status?: Message['status']
       }) => {
-        setConvsRef.current((prev) =>
-          prev.map((c) => {
-            if (c.id !== uid) return c
-            const msgs = [...c.messages]
+        useChatStore.setState((state) => ({
+          sessions: state.sessions.map((s) => {
+            if (s.id !== uid) return s
+            const msgs = [...s.messages]
             const lastIdx = msgs.length - 1
             const last = msgs[lastIdx]
-            if (!last || last.role !== 'assistant') return c
+            if (!last || last.role !== 'assistant') return s
             msgs[lastIdx] = { ...last, ...patch }
-            return { ...c, messages: msgs }
+            return { ...s, messages: msgs }
           }),
-        )
+        }))
       }
+
+      // Seq verification helper
+      let lastSeq = -1
+      const verifySeq = (seq: number): boolean => {
+        if (seq <= lastSeq) {
+          console.warn(
+            `[SSE] Out-of-order event: received seq=${seq}, last=${lastSeq}`,
+          )
+          return false
+        }
+        lastSeq = seq
+        return true
+      }
+
+      // Track whether we've received the first token
+      let firstToken = false
 
       // ③ Initiate SSE stream
       const { abort } = streamChat(
         { conversation_id: uid, message: trimmed },
         {
           onIntentStatus(data) {
+            if (!verifySeq(data.seq)) return
             const ex = steps.find((s) => s.type === 'intent')
             if (data.status === 'started' && !ex) {
               steps.push({
@@ -224,6 +344,7 @@ export function ChatPage() {
             patchAssistant({ thinking: [...steps] })
           },
           onThinkingStep(data) {
+            if (!verifySeq(data.seq)) return
             const idx = steps.findIndex((s) => s.type === data.step.type)
             if (idx >= 0) {
               steps[idx] = data.step
@@ -233,51 +354,87 @@ export function ChatPage() {
             patchAssistant({ thinking: [...steps] })
           },
           onToken(data) {
+            if (!verifySeq(data.seq)) return
+            if (!firstToken) {
+              firstToken = true
+              patchAssistant({ status: 'streaming' })
+            }
             content += data.text
             patchAssistant({ content })
           },
           onCitation(data) {
+            if (!verifySeq(data.seq)) return
             cites.push(data.citation)
             patchAssistant({ citations: [...cites] })
           },
           onDone() {
             setStreaming(false)
+            abortRef.current = null
             patchAssistant({
               content,
               thinking: [...steps],
               citations: [...cites],
+              status: 'completed',
             })
           },
           onError(sseErr) {
+            if (!verifySeq(sseErr.seq)) return
             if (sseErr.fatal) {
               setStreaming(false)
+              abortRef.current = null
               setError(sseErr.message || '请求失败')
               setLastFailedMsg(trimmed)
               patchAssistant({
                 content,
                 thinking: [...steps],
                 citations: [...cites],
+                status: 'failed',
               })
               abort()
             }
           },
+          onAbort() {
+            setStreaming(false)
+            abortRef.current = null
+            patchAssistant({
+              content,
+              thinking: [...steps],
+              citations: [...cites],
+              status: 'stopped',
+            })
+          },
         },
       )
+
+      abortRef.current = abort
     },
-    [persistLocalIds],
+    [
+      addSession,
+      clearError,
+      createSessionMut,
+      setActiveId,
+      setError,
+      setLastFailedMsg,
+      setStreaming,
+    ],
   )
 
-  // ── Retry on error ──
+  // ══════════════════════════════════════════════════════════════════════════
+  // Retry on error
+  // ══════════════════════════════════════════════════════════════════════════
+
   const handleRetry = useCallback(() => {
     if (lastFailedMsg) {
       const msg = lastFailedMsg
-      setError(null)
-      setLastFailedMsg(null)
+      clearError()
       sendMessage(msg)
     }
-  }, [lastFailedMsg, sendMessage])
+  }, [lastFailedMsg, clearError, sendMessage])
 
-  // ── Suggested prompt click ──
+  // ══════════════════════════════════════════════════════════════════════════
+  // Suggested prompt click
+  // ══════════════════════════════════════════════════════════════════════════
+
   const handleSuggested = useCallback(
     (prompt: string) => {
       setInputText(prompt)
@@ -290,8 +447,11 @@ export function ChatPage() {
     [sendMessage],
   )
 
-  // ── Active conversation ──
-  const activeConv = conversations.find((c) => c.id === activeId)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Active session
+  // ══════════════════════════════════════════════════════════════════════════
+
+  const activeSession = sessions.find((s) => s.id === activeId)
 
   // ══════════════════════════════════════════════════════════════════════════
   // Render
@@ -299,13 +459,21 @@ export function ChatPage() {
 
   return (
     <div className="flex h-full">
-      {/* Left: conversation sidebar */}
+      {/* Left: session sidebar */}
       <ChatSidebar
-        conversations={sidebarItems}
-        activeId={activeId}
+        sessions={sidebarItems}
+        activeId={activeId ?? ''}
+        isLoading={sessionsLoading}
+        fetchError={
+          sessionsError
+            ? '加载会话列表失败，请检查网络连接'
+            : null
+        }
+        onRetryFetch={() => refetchSessions()}
         onSelect={setActiveId}
         onCreate={handleCreate}
         onDelete={handleDelete}
+        onRename={handleRename}
       />
 
       {/* Right: main chat area */}
@@ -313,7 +481,7 @@ export function ChatPage() {
         {/* Header */}
         <header className="flex shrink-0 items-center justify-between border-b border-border bg-muted/30 px-6 py-3">
           <h1 className="text-lg font-semibold text-foreground">
-            {activeConv?.title ?? '智能问答'}
+            {activeSession?.title ?? '智能问答'}
           </h1>
           <a
             href="/admin"
@@ -327,7 +495,7 @@ export function ChatPage() {
 
         {/* Messages area */}
         <ChatMessages
-          messages={activeConv?.messages ?? []}
+          messages={activeSession?.messages ?? []}
           streaming={streaming}
           error={error}
           suggestedPrompts={SUGGESTED_PROMPTS}

@@ -163,6 +163,27 @@ const markdownComponents = {
   ),
 }
 
+/* ── Status label for assistant messages ── */
+function StatusLabel({ status }: { status: Message['status'] }) {
+  if (!status || status === 'completed') return null
+  if (status === 'streaming') return null
+  if (status === 'stopped') {
+    return (
+      <span className="ml-2 text-xs text-muted-foreground" aria-label="回复已停止">
+        已停止
+      </span>
+    )
+  }
+  if (status === 'failed') {
+    return (
+      <span className="ml-2 text-xs text-destructive" aria-label="发送失败">
+        发送失败
+      </span>
+    )
+  }
+  return null
+}
+
 /* ── Single message bubble ── */
 function MessageBubble({
   msg,
@@ -174,6 +195,17 @@ function MessageBubble({
   const isUser = msg.role === 'user'
   const hasThinking = msg.thinking && msg.thinking.length > 0
   const hasCitations = msg.citations && msg.citations.length > 0
+
+  // Determine effective streaming state (support both old and new data)
+  const effectiveStreaming =
+    msg.status === 'streaming' || (!msg.status && isStreaming)
+
+  // Determine thinking done state
+  const thinkingDone =
+    msg.status === 'completed' ||
+    msg.status === 'stopped' ||
+    msg.status === 'failed' ||
+    (!msg.status && !isStreaming)
 
   return (
     <div
@@ -205,7 +237,7 @@ function MessageBubble({
         {/* Thinking steps (assistant only) */}
         {hasThinking && (
           <div className="mb-2">
-            <ThinkPanel steps={msg.thinking!} done={!isStreaming} />
+            <ThinkPanel steps={msg.thinking!} done={thinkingDone} />
           </div>
         )}
 
@@ -214,13 +246,24 @@ function MessageBubble({
           {isUser ? (
             <p className="whitespace-pre-wrap">{msg.content}</p>
           ) : msg.content ? (
-            // @ts-expect-error react-markdown Components type mismatch with React 19
-            <ReactMarkdown components={markdownComponents}>
-              {msg.content}
-            </ReactMarkdown>
-          ) : isStreaming ? (
-            <span className="animate-pulse text-primary" aria-label="AI 正在回复中">
-              ▊
+            <span>
+              {/* @ts-expect-error react-markdown Components type mismatch with React 19 */}
+              <ReactMarkdown components={markdownComponents}>
+                {msg.content}
+              </ReactMarkdown>
+              <StatusLabel status={msg.status} />
+            </span>
+          ) : effectiveStreaming ? (
+            <span>
+              <span className="animate-pulse text-primary" aria-label="AI 正在回复中">
+                ▊
+              </span>
+              <StatusLabel status={msg.status} />
+            </span>
+          ) : msg.status === 'stopped' || msg.status === 'failed' ? (
+            <span>
+              <span className="italic text-muted-foreground">（无内容）</span>
+              <StatusLabel status={msg.status} />
             </span>
           ) : (
             <span className="italic text-muted-foreground">（无内容）</span>
@@ -270,7 +313,7 @@ function ErrorBanner({
 // Main component
 // ══════════════════════════════════════════════════════════════════════════════
 
-interface ChatMessagesProps {
+type ChatMessagesProps = {
   messages: Message[]
   streaming: boolean
   error: string | null

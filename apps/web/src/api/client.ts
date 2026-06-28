@@ -17,7 +17,7 @@ export class ApiError extends Error {
 
 /** Resolved at build time by Vite; falls back to same-origin `/api`. */
 export const apiClient = {
-  baseUrl: import.meta.env?.VITE_API_BASE_URL ?? '/api',
+  baseUrl: import.meta.env?.VITE_API_BASE_URL ?? '/api/v1',
 }
 
 interface ApiEnvelope<T> {

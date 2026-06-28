@@ -30,6 +30,7 @@ export interface SSEHandlers {
   onCitation?: (data: SSECitationData) => void
   onDone?: (data: SSEDoneData) => void
   onError?: (data: SSEErrorData) => void
+  onAbort?: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +97,10 @@ export function streamChat(
     ? anyAbort(signal, controller.signal)
     : controller.signal
 
+  // Shared across then/catch so connection-level errors can compute a seq
+  // that passes the consumer-side monotonic-seq check.
+  let eventSeq = 0
+
   // Build request body — only include optional params when explicitly set
   const body: Record<string, unknown> = {
     conversation_id: params.conversation_id,
@@ -119,12 +124,18 @@ export function streamChat(
     if (Object.keys(p).length) body.params = p
   }
 
-  fetch(`${apiClient.baseUrl}/chat/stream`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: combinedSignal,
-  })
+  fetch(
+    `${apiClient.baseUrl}/qa-sessions/${params.conversation_id}/messages`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+      body: JSON.stringify(body),
+      signal: combinedSignal,
+    },
+  )
     .then(async (res) => {
       if (!res.ok) {
         const text = await res.text().catch(() => '')
@@ -132,6 +143,7 @@ export function streamChat(
           code: res.status,
           message: text || '请求失败',
           fatal: true,
+          seq: 0,
         })
         return
       }
@@ -142,27 +154,50 @@ export function streamChat(
           code: 50000,
           message: '无法读取响应流',
           fatal: true,
+          seq: 0,
         })
         return
       }
 
       const decoder = new TextDecoder()
       let buffer = ''
+      // currentEvent persists across read-loop iterations so that when an
+      // SSE event is split across network chunks the data: line in the
+      // later chunk still sees the event type from the earlier chunk.
+      let currentEvent: string | null = null
 
-      const processLines = (chunk: string[]) => {
-        let currentEvent: string | null = null
-        for (const line of chunk) {
-          if (line.startsWith('event: ')) {
-            currentEvent = line.slice(7).trim()
-          } else if (line.startsWith('data: ') && currentEvent) {
-            try {
-              const data: unknown = JSON.parse(line.slice(6))
-              dispatch(currentEvent as SSEEventType, data, handlers)
-            } catch {
-              // ignore unparseable data lines
-            }
-            currentEvent = null
+      const flushEvent = () => {
+        if (!currentEvent || currentData === null) return
+        eventSeq++
+        try {
+          const raw: Record<string, unknown> = JSON.parse(currentData)
+          const data = { seq: eventSeq, ...raw } as unknown
+          dispatch(currentEvent as SSEEventType, data, handlers)
+        } catch {
+          // ignore unparseable data lines
+        }
+        currentEvent = null
+        currentData = null
+      }
+
+      let currentData: string | null = null
+
+      const processLines = (lines: string[]) => {
+        for (const line of lines) {
+          // Strip trailing CR for cross-platform compatibility
+          const trimmed = line.endsWith('\r') ? line.slice(0, -1) : line
+
+          if (trimmed === '') {
+            // Blank line — SSE event boundary
+            flushEvent()
+          } else if (trimmed.startsWith('event: ')) {
+            // New event type — flush previous event (if any), then capture
+            flushEvent()
+            currentEvent = trimmed.slice(7).trim()
+          } else if (trimmed.startsWith('data: ')) {
+            currentData = trimmed.slice(6)
           }
+          // Lines starting with ':' are SSE comments — silently ignored
         }
       }
 
@@ -172,6 +207,7 @@ export function streamChat(
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
+        // Last element may be a partial line; save it for the next read
         buffer = lines.pop() || ''
 
         processLines(lines)
@@ -182,13 +218,22 @@ export function streamChat(
       if (buffer.trim()) {
         processLines(buffer.split('\n'))
       }
+      // Flush any event that was fully received before stream end
+      flushEvent()
     })
     .catch((err) => {
-      if (err instanceof DOMException && err.name === 'AbortError') return
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        handlers.onAbort?.()
+        return
+      }
+      // Connection-level errors use seq = eventSeq + 1 so they always pass
+      // the consumer-side monotonic-seq check, even when events have already
+      // been dispatched.
       handlers.onError?.({
         code: 0,
         message: err instanceof Error ? err.message : '网络异常，请检查连接',
         fatal: true,
+        seq: eventSeq + 1,
       })
     })
 

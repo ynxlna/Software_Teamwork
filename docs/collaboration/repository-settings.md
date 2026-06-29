@@ -22,6 +22,7 @@ service:file
 service:qa
 service:knowledge
 service:document
+service:ai-gateway
 ```
 
 检查现有 label：
@@ -100,10 +101,18 @@ check 名称补入 `contexts`。
     {
       "paths": ["apps/web/**"],
       "labels": ["frontend"]
+    },
+    {
+      "paths": ["services/knowledge/**", "docs/services/knowledge/**"],
+      "labels": ["service:knowledge"]
     }
   ]
 }
 ```
+
+服务实现目录和对应服务文档目录应使用同一个 `service:<name>` label。例如，
+`services/knowledge/**` 和 `docs/services/knowledge/**` 都会添加
+`service:knowledge`。
 
 workflow 只添加仓库中已经存在的 label。新增小组或领域 label 后，需要先在
 GitHub 仓库创建 label，再更新 `.github/labeler.json`。

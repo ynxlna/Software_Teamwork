@@ -67,7 +67,8 @@
     },
     {
       "paths": [
-        "services/gateway/**"
+        "services/gateway/**",
+        "docs/services/gateway/**"
       ],
       "labels": [
         "service:gateway"
@@ -75,7 +76,8 @@
     },
     {
       "paths": [
-        "services/auth/**"
+        "services/auth/**",
+        "docs/services/auth/**"
       ],
       "labels": [
         "service:auth"
@@ -83,7 +85,8 @@
     },
     {
       "paths": [
-        "services/file/**"
+        "services/file/**",
+        "docs/services/file/**"
       ],
       "labels": [
         "service:file"
@@ -91,7 +94,8 @@
     },
     {
       "paths": [
-        "services/qa/**"
+        "services/qa/**",
+        "docs/services/qa/**"
       ],
       "labels": [
         "service:qa"
@@ -99,7 +103,8 @@
     },
     {
       "paths": [
-        "services/knowledge/**"
+        "services/knowledge/**",
+        "docs/services/knowledge/**"
       ],
       "labels": [
         "service:knowledge"
@@ -107,10 +112,20 @@
     },
     {
       "paths": [
-        "services/document/**"
+        "services/document/**",
+        "docs/services/document/**"
       ],
       "labels": [
         "service:document"
+      ]
+    },
+    {
+      "paths": [
+        "services/ai-gateway/**",
+        "docs/services/ai-gateway/**"
+      ],
+      "labels": [
+        "service:ai-gateway"
       ]
     },
     {

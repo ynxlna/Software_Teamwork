@@ -40,6 +40,85 @@ Do not weaken collaboration checks when adding product CI.
 
 ---
 
+## Auto Label Service Path Contract
+
+### 1. Scope / Trigger
+
+Update this contract when changing `.github/labeler.json` service labels,
+service directory layout, or service documentation layout.
+
+### 2. Signatures
+
+- Workflow file: `.github/workflows/auto-label.yml`
+- Config file: `.github/labeler.json`
+- Rule section: `pathLabels[]`
+- Rule shape: `{ "paths": string[], "labels": string[] }`
+
+### 3. Contracts
+
+Each service label must cover both implementation and documentation paths:
+
+| Label | Required paths |
+|-------|----------------|
+| `service:gateway` | `services/gateway/**`, `docs/services/gateway/**` |
+| `service:auth` | `services/auth/**`, `docs/services/auth/**` |
+| `service:file` | `services/file/**`, `docs/services/file/**` |
+| `service:qa` | `services/qa/**`, `docs/services/qa/**` |
+| `service:knowledge` | `services/knowledge/**`, `docs/services/knowledge/**` |
+| `service:document` | `services/document/**`, `docs/services/document/**` |
+| `service:ai-gateway` | `services/ai-gateway/**`, `docs/services/ai-gateway/**` |
+
+All labels referenced by `.github/labeler.json` must exist in the GitHub
+repository. The workflow skips missing labels rather than failing the PR, so
+local changes must verify remote label existence when adding a new label name.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required handling |
+|-----------|-------------------|
+| `.github/labeler.json` is invalid JSON | Fix before commit; Auto Label would fail at runtime. |
+| Referenced label does not exist remotely | Create the label or remove the rule before PR. |
+| Service implementation path changes | Update the matching docs path rule in the same PR. |
+| Service documentation path changes | Update the matching implementation path rule in the same PR. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: `docs/services/knowledge/README.md` matches `documentation` and
+  `service:knowledge`.
+- Base: `services/knowledge/internal/service/service.go` matches `backend` and
+  `service:knowledge`.
+- Bad: `docs/services/knowledge/README.md` matches only `documentation`.
+
+### 6. Tests Required
+
+- Parse `.github/labeler.json` as JSON.
+- Run a local matcher using the same glob conversion as `auto-label.yml` for at
+  least one implementation path and one docs path per service label.
+- Check all configured labels exist with `gh label list` before adding a new
+  label reference.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```json
+{
+  "paths": ["services/knowledge/**"],
+  "labels": ["service:knowledge"]
+}
+```
+
+#### Correct
+
+```json
+{
+  "paths": ["services/knowledge/**", "docs/services/knowledge/**"],
+  "labels": ["service:knowledge"]
+}
+```
+
+---
+
 ## Required Product Workflows
 
 Recommended workflow files:

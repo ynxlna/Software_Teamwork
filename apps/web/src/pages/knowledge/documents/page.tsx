@@ -257,7 +257,11 @@ export function KnowledgeDocumentsPage({
   // ── Fetch KB name ──
 
   useEffect(() => {
-    if (!knowledgeBaseId || KB_NAME_CACHE[knowledgeBaseId]) return
+    if (!knowledgeBaseId) return
+    if (KB_NAME_CACHE[knowledgeBaseId]) {
+      setKbName(KB_NAME_CACHE[knowledgeBaseId])
+      return
+    }
     let cancelled = false
     getKnowledgeBase(knowledgeBaseId).then((kb) => {
       if (!cancelled) {

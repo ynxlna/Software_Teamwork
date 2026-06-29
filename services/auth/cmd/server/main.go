@@ -46,6 +46,7 @@ func main() {
 			service.WithTokenHashKeyVersion(cfg.TokenKeyVersion),
 			service.WithSessionTTL(cfg.SessionTTL),
 			service.WithDefaultRoleCode(cfg.DefaultRoleCode),
+			service.WithLogger(logger),
 		)
 	}
 

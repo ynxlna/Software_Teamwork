@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 )
@@ -36,6 +37,7 @@ type Service struct {
 	tokenHashKeyVersion string
 	sessionTTL          time.Duration
 	defaultRoleCode     string
+	logger              *slog.Logger
 }
 
 func New(repo Repository, opts ...Option) *Service {
@@ -50,6 +52,7 @@ func New(repo Repository, opts ...Option) *Service {
 		tokenHashKeyVersion: TokenHashKeyVersionV1,
 		sessionTTL:          defaultSessionTTL,
 		defaultRoleCode:     DefaultRoleCode,
+		logger:              slog.Default(),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -111,6 +114,14 @@ func WithDefaultRoleCode(roleCode string) Option {
 	}
 }
 
+func WithLogger(logger *slog.Logger) Option {
+	return func(s *Service) {
+		if logger != nil {
+			s.logger = logger
+		}
+	}
+}
+
 func (s *Service) CreateUser(ctx context.Context, reqCtx RequestContext, input CreateUserInput) (SessionResponse, error) {
 	if err := s.validateReady(); err != nil {
 		return SessionResponse{}, err
@@ -149,25 +160,21 @@ func (s *Service) CreateUser(ctx context.Context, reqCtx RequestContext, input C
 	}
 
 	userSummary := summaryFromRecord(user)
-	if err := s.recordSecurityEvent(ctx, reqCtx, SecurityEventParams{
+	s.recordSecurityEventBestEffort(ctx, reqCtx, SecurityEventParams{
 		EventType:        SecurityEventUserCreated,
 		UserID:           stringPtr(userSummary.ID),
 		UsernameSnapshot: stringPtr(userSummary.Username),
 		Status:           SecurityEventStatusSuccess,
-	}); err != nil {
-		return SessionResponse{}, err
-	}
+	})
 	if s.defaultRoleCode != "" {
-		if err := s.recordSecurityEvent(ctx, reqCtx, SecurityEventParams{
+		s.recordSecurityEventBestEffort(ctx, reqCtx, SecurityEventParams{
 			EventType:        SecurityEventRoleAssigned,
 			UserID:           stringPtr(userSummary.ID),
 			UsernameSnapshot: stringPtr(userSummary.Username),
 			Status:           SecurityEventStatusSuccess,
 			ReasonCode:       stringPtr(reasonDefaultRole),
 			MetadataJSON:     fmt.Sprintf(`{"role":%q}`, s.defaultRoleCode),
-		}); err != nil {
-			return SessionResponse{}, err
-		}
+		})
 	}
 
 	session, err := s.createSessionForUser(ctx, reqCtx, userSummary)
@@ -335,7 +342,7 @@ func (s *Service) RevokeSession(ctx context.Context, reqCtx RequestContext, sess
 	if err != nil {
 		return mapRepositoryError(err, "session not found")
 	}
-	return s.recordSecurityEvent(ctx, reqCtx, SecurityEventParams{
+	s.recordSecurityEventBestEffort(ctx, reqCtx, SecurityEventParams{
 		EventType:    SecurityEventSessionRevoked,
 		UserID:       stringPtr(session.UserID),
 		SessionID:    stringPtr(session.ID),
@@ -343,6 +350,7 @@ func (s *Service) RevokeSession(ctx context.Context, reqCtx RequestContext, sess
 		ReasonCode:   stringPtr(reason),
 		MetadataJSON: "{}",
 	})
+	return nil
 }
 
 func (s *Service) createSessionForUser(ctx context.Context, reqCtx RequestContext, user UserSummary) (SessionSummary, error) {
@@ -370,15 +378,13 @@ func (s *Service) createSessionForUser(ctx context.Context, reqCtx RequestContex
 	if err != nil {
 		return SessionSummary{}, mapRepositoryError(err, "session not found")
 	}
-	if err := s.recordSecurityEvent(ctx, reqCtx, SecurityEventParams{
+	s.recordSecurityEventBestEffort(ctx, reqCtx, SecurityEventParams{
 		EventType:        SecurityEventSessionCreated,
 		UserID:           stringPtr(user.ID),
 		SessionID:        stringPtr(identity.Session.ID),
 		UsernameSnapshot: stringPtr(user.Username),
 		Status:           SecurityEventStatusSuccess,
-	}); err != nil {
-		return SessionSummary{}, err
-	}
+	})
 	return SessionSummary{
 		SessionID:   identity.Session.ID,
 		AccessToken: accessToken,
@@ -415,6 +421,27 @@ func (s *Service) recordSecurityEvent(ctx context.Context, reqCtx RequestContext
 		return DependencyError("security event write failed", err)
 	}
 	return nil
+}
+
+func (s *Service) recordSecurityEventBestEffort(ctx context.Context, reqCtx RequestContext, params SecurityEventParams) {
+	eventType := params.EventType
+	if err := s.recordSecurityEvent(ctx, reqCtx, params); err != nil {
+		s.logSecurityEventFailure(ctx, reqCtx, eventType, err)
+	}
+}
+
+func (s *Service) logSecurityEventFailure(ctx context.Context, reqCtx RequestContext, eventType string, err error) {
+	if s == nil || s.logger == nil {
+		return
+	}
+	s.logger.WarnContext(ctx, "security event write failed",
+		"service", "auth",
+		"request_id", strings.TrimSpace(reqCtx.RequestID),
+		"operation", "record_security_event",
+		"event_type", strings.TrimSpace(eventType),
+		"status", "failed",
+		"error", err,
+	)
 }
 
 func (s *Service) validateReady() error {

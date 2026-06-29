@@ -858,6 +858,10 @@ gateway injects cached user, roles, and permissions into downstream headers
   - `DELETE /internal/v1/sessions/{sessionId}`
 - Required caller context: `X-Service-Token` and `X-Caller-Service`; propagate
   `X-Request-Id` when present.
+- In OpenAPI, model service-token authentication as an API key header:
+  `type: apiKey`, `in: header`, `name: X-Service-Token`. Do not model
+  project service tokens as `Authorization: Bearer` unless the implementation
+  actually accepts the `Authorization` header.
 - Environment keys:
   - `AUTH_DATABASE_URL`
   - `AUTH_INTERNAL_SERVICE_TOKEN` required when `AUTH_DATABASE_URL` is set
@@ -888,6 +892,11 @@ gateway injects cached user, roles, and permissions into downstream headers
   `super_admin` system roles.
 - Security events must cover user creation, session creation failure, session
   creation success, default role assignment, and session revocation.
+- Security events that are part of the same durable transaction may fail the
+  operation and roll back the business write. Security events written after a
+  durable user/session/revocation write has already committed are best-effort:
+  log a structured warning, but do not return a failed response for business
+  state that is already effective.
 
 ### 4. Validation & Error Matrix
 
@@ -902,12 +911,15 @@ gateway injects cached user, roles, and permissions into downstream headers
 | Missing user/session source record | `404 not_found` for internal reads/deletes |
 | Missing database or token hash secret at runtime | `502 dependency_error` |
 | Repository or migration-dependent write fails | `502 dependency_error` |
+| Post-commit security event write fails after successful durable write | success response is preserved; log `warn` with `operation=record_security_event` |
 
 ### 5. Good/Base/Bad Cases
 
 - Good: handler decodes JSON and maps path values; service validates
   credentials and generates password/token material; repository writes SQL
-  records and maps rows back to domain structs; response exposes only safe DTOs.
+  records and maps rows back to domain structs; post-commit security-event
+  failures are logged without making successful user/session writes look
+  failed; response exposes only safe DTOs.
 - Base: gateway calls auth once for user/session creation, stores the returned
   session identity in Redis, and later uses auth source reads only for cache
   repair or revocation workflows.
@@ -917,7 +929,8 @@ gateway injects cached user, roles, and permissions into downstream headers
 ### 6. Tests Required
 
 - Service tests for duplicate username, wrong password, token hash generation,
-  session creation, security-event recording, and revoked token lookup failure.
+  session creation, security-event recording, post-commit security-event
+  failure semantics, and revoked token lookup failure.
 - HTTP tests for success envelopes, request id propagation, validation errors,
   missing caller context, and no token/hash leakage from session read responses.
 - Repository tests for explicit-column queries, user roles/permissions mapping,
@@ -932,6 +945,8 @@ gateway injects cached user, roles, and permissions into downstream headers
 ```text
 POST /internal/v1/sessions -> handler verifies password -> DB stores accessToken
 GET /internal/v1/sessions/{id} -> returns accessTokenHash to gateway/frontend
+OpenAPI serviceTokenAuth -> Authorization: Bearer, while handler reads X-Service-Token
+POST /internal/v1/users commits user -> post-commit event fails -> handler returns 502
 ```
 
 #### Correct
@@ -939,4 +954,6 @@ GET /internal/v1/sessions/{id} -> returns accessTokenHash to gateway/frontend
 ```text
 POST /internal/v1/sessions -> service verifies argon2id password -> DB stores hmac token hash
 GET /internal/v1/sessions/{id} -> returns session identity without raw token/hash
+OpenAPI serviceTokenAuth -> apiKey header X-Service-Token, matching handler auth
+POST /internal/v1/users commits user -> post-commit event fails -> warn log + 201 response
 ```

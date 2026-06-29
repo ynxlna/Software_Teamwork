@@ -3,6 +3,8 @@ package service
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"strconv"
 	"strings"
 	"testing"
@@ -119,6 +121,49 @@ func TestCreateUserReturnsTokenButPersistsOnlyHash(t *testing.T) {
 	}
 }
 
+func TestCreateUserReturnsSuccessWhenSecurityEventWriteFails(t *testing.T) {
+	repo := newFakeRepository(t)
+	repo.eventErr = errors.New("security event store unavailable")
+	svc := newTestService(repo, "atk_v1_created")
+
+	result, err := svc.CreateUser(context.Background(), testRequestContext(), CreateUserInput{
+		Username: "bob",
+		Password: "bob-password",
+	})
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v", err)
+	}
+	if result.User.ID == "" || result.Session.SessionID == "" || result.Session.AccessToken != "atk_v1_created" {
+		t.Fatalf("result = %+v", result)
+	}
+	if _, ok := repo.usersByUsername["bob"]; !ok {
+		t.Fatalf("user was not persisted")
+	}
+	if _, ok := repo.sessions[result.Session.SessionID]; !ok {
+		t.Fatalf("session was not persisted")
+	}
+}
+
+func TestCreateSessionReturnsSuccessWhenSecurityEventWriteFails(t *testing.T) {
+	repo := newFakeRepository(t)
+	repo.eventErr = errors.New("security event store unavailable")
+	svc := newTestService(repo, "atk_v1_created")
+
+	result, err := svc.CreateSession(context.Background(), testRequestContext(), CreateSessionInput{
+		Username: "alice",
+		Password: "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	if result.Session.SessionID == "" || result.Session.AccessToken != "atk_v1_created" {
+		t.Fatalf("session = %+v", result.Session)
+	}
+	if _, ok := repo.sessions[result.Session.SessionID]; !ok {
+		t.Fatalf("session was not persisted")
+	}
+}
+
 func TestRevokedTokenNoLongerReturnsActiveSession(t *testing.T) {
 	repo := newFakeRepository(t)
 	svc := newTestService(repo, "atk_v1_revoked")
@@ -145,6 +190,27 @@ func TestRevokedTokenNoLongerReturnsActiveSession(t *testing.T) {
 	}
 }
 
+func TestRevokeSessionReturnsSuccessWhenSecurityEventWriteFails(t *testing.T) {
+	repo := newFakeRepository(t)
+	svc := newTestService(repo, "atk_v1_revoked")
+
+	result, err := svc.CreateSession(context.Background(), testRequestContext(), CreateSessionInput{
+		Username: "alice",
+		Password: "correct-password",
+	})
+	if err != nil {
+		t.Fatalf("CreateSession() error = %v", err)
+	}
+	repo.eventErr = errors.New("security event store unavailable")
+
+	if err := svc.RevokeSession(context.Background(), testRequestContext(), result.Session.SessionID, "user_logout"); err != nil {
+		t.Fatalf("RevokeSession() error = %v", err)
+	}
+	if got := repo.sessions[result.Session.SessionID].Status; got != SessionStatusRevoked {
+		t.Fatalf("session status = %q", got)
+	}
+}
+
 func newTestService(repo *fakeRepository, token string) *Service {
 	now := time.Date(2026, 6, 29, 8, 0, 0, 0, time.UTC)
 	counter := map[string]int{}
@@ -152,6 +218,7 @@ func newTestService(repo *fakeRepository, token string) *Service {
 		WithClock(func() time.Time { return now }),
 		WithTokenGenerator(func() (string, error) { return token, nil }),
 		WithTokenHashSecret([]byte("test-token-hash-secret")),
+		WithLogger(slog.New(slog.NewTextHandler(io.Discard, nil))),
 		WithIDGenerator(func(prefix string) string {
 			counter[prefix]++
 			return prefix + "_" + strconv.Itoa(counter[prefix])
@@ -225,6 +292,7 @@ type fakeRepository struct {
 	sessions        map[string]Session
 	activeByHash    map[string]string
 	events          []SecurityEventParams
+	eventErr        error
 }
 
 func (r *fakeRepository) FindUserByID(_ context.Context, id string) (UserRecord, error) {
@@ -346,6 +414,9 @@ func (r *fakeRepository) RevokeSession(_ context.Context, params RevokeSessionPa
 
 func (r *fakeRepository) RecordSecurityEvent(_ context.Context, params SecurityEventParams) error {
 	r.events = append(r.events, params)
+	if r.eventErr != nil {
+		return r.eventErr
+	}
 	return nil
 }
 

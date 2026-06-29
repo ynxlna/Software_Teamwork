@@ -1,0 +1,15 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend verification checklist."}
+{"file": ".trellis/spec/backend/api-contracts.md", "reason": "Verify envelope, request id, public/internal route, and error contract alignment."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "Verify SQL, migration, transaction, and persistence constraints."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Verify 400/401/403/404/409/502 mappings and no raw infrastructure errors."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Verify Go tests, build, and handler/service coverage."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Verify data survives HTTP-service-repository round trips."}
+{"file": "docs/services/qa/README.md", "reason": "Verify QA behavior and endpoint scope."}
+{"file": "docs/services/qa/docs/data-models.md", "reason": "Verify message sequence/status/content block model."}
+{"file": "docs/services/gateway/api/openapi.yaml", "reason": "Verify schema and query parameter alignment."}
+{"command": "D:\\Go\\bin\\gofmt.exe -w services/qa/internal/service/qa.go services/qa/internal/http/server.go services/qa/internal/http/server_test.go services/qa/internal/service/qa_test.go services/qa/internal/repository/postgres.go services/qa/internal/repository/message_enrichment.go services/qa/internal/repository/resources_postgres_integration_test.go", "result": "passed"}
+{"command": "$env:GOFLAGS='-buildvcs=false'; D:\\Go\\bin\\go.exe test ./...", "workdir": "services/qa", "result": "passed with elevated permissions because Windows sandbox blocked localtools symlink resolution"}
+{"command": "D:\\Go\\bin\\go.exe build -buildvcs=false ./cmd/server", "workdir": "services/qa", "result": "passed"}
+{"command": "git rebase upstream/develop", "result": "passed; branch now includes gateway #74/#75 active route and auth context changes"}
+{"command": "$env:GOFLAGS='-buildvcs=false'; D:\\Go\\bin\\go.exe test ./...", "workdir": "services/qa", "result": "passed after rebasing onto latest upstream/develop"}
+{"command": "D:\\Go\\bin\\go.exe build -buildvcs=false ./cmd/server", "workdir": "services/qa", "result": "passed after rebasing onto latest upstream/develop"}

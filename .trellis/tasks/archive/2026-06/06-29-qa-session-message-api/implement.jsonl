@@ -1,0 +1,19 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "Backend service pre-development checklist and QA service boundaries."}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "QA service module layout and layer responsibilities."}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "PostgreSQL/sqlc/goose rules for message and session persistence."}
+{"file": ".trellis/spec/backend/api-contracts.md", "reason": "Gateway-facing and internal service envelope, error, and route contract rules."}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "Classified app errors and stable HTTP error envelopes."}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "Required Go checks and test expectations."}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "Request logging and sensitive data constraints."}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "Data flow across HTTP, service, repository, migrations, and OpenAPI."}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "Search and extend existing QA framework patterns before adding code."}
+{"file": "docs/services/qa/README.md", "reason": "Authoritative QA session/message behavior and endpoint documentation."}
+{"file": "docs/services/qa/docs/data-models.md", "reason": "Authoritative QA persistence model and sequence/status/content block rules."}
+{"file": "docs/services/gateway/api/openapi.yaml", "reason": "Authoritative public API schema and active path definitions."}
+{"file": "docs/architecture/service-boundaries.md", "reason": "QA, gateway, auth, and AI Gateway ownership boundaries."}
+{"file": "docs/architecture/technology-decisions.md", "reason": "Go, net/http, pgx, sqlc, goose, and slog implementation baseline."}
+{"file": "services/qa/internal/http/server.go", "reason": "Parsed documented QA message list query options, including includeThinking/includeCitations defaults and validation."}
+{"file": "services/qa/internal/service/qa.go", "reason": "Added MessageListOptions, message thinking/citation response fields, message-list validation, and documented streaming status for assistant messages."}
+{"file": "services/qa/internal/repository/postgres.go", "reason": "Passed message list options to repository queries, preserved user/session isolation, and returned forbidden for cross-user message append attempts."}
+{"file": "services/qa/internal/repository/message_enrichment.go", "reason": "Loaded user-visible response_process_steps and citations for listed messages when requested by documented include flags."}
+{"file": "services/qa/migrations/0005_align_message_status_contract.sql", "reason": "Aligned message and content-block status constraints with documented queued/streaming/completed/stopped/failed/cancelled enum while migrating legacy generating values."}

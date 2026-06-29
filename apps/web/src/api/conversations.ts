@@ -16,7 +16,7 @@ import { buildQuery, gatewayPageRequest, gatewayRequest } from './client'
 export async function createSession(title?: string): Promise<QASession> {
   return gatewayRequest<QASession>('/qa-sessions', {
     method: 'POST',
-    body: JSON.stringify({ title }),
+    body: { title },
   })
 }
 
@@ -61,7 +61,33 @@ export async function renameSession(sessionId: string, title: string): Promise<Q
     method: 'PATCH',
     body: { title },
   })
-  return toConversation(session)
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /qa-sessions/{sessionId} — update title and/or status
+// ---------------------------------------------------------------------------
+
+export interface UpdateSessionParams {
+  title?: string
+  status?: QASessionStatus
+}
+
+export async function updateSession(
+  sessionId: string,
+  params: UpdateSessionParams,
+): Promise<QASession> {
+  return gatewayRequest<QASession>(`/qa-sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PATCH',
+    body: params,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Convenience: archive a session (PATCH status=archived)
+// ---------------------------------------------------------------------------
+
+export async function archiveSession(sessionId: string): Promise<QASession> {
+  return updateSession(sessionId, { status: 'archived' })
 }
 
 // ---------------------------------------------------------------------------

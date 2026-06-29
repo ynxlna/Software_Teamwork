@@ -7,22 +7,41 @@
  * - Error    : { error: { code: string, message: string, requestId: string, fields?: Record<string,string> } }
  *
  * Auth       : Authorization: Bearer <token> on every business call.
- * Health     : GET /healthz and GET /readyz — no auth required.
  */
+
+// ---------------------------------------------------------------------------
+// Imports
+// ---------------------------------------------------------------------------
+
+import type { GatewayPath } from './active-paths'
+import { activeGatewayPathSet } from './active-paths'
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+const DEFAULT_GATEWAY_BASE_URL = '/api/v1'
+const JSON_CONTENT_TYPE = 'application/json'
+const SSE_CONTENT_TYPE = 'text/event-stream'
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export interface PageInfo {
-  page: number
-  pageSize: number
-  total: number
+type GatewayMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
+
+interface GatewaySuccessEnvelope<T> {
+  data: T
+  requestId: string
 }
 
-export interface ListResponse<T> {
-  items: T[]
-  page: PageInfo
+interface GatewayErrorEnvelope {
+  error: {
+    code: string
+    message: string
+    requestId?: string
+    fields?: Record<string, string>
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -31,240 +50,47 @@ export interface ListResponse<T> {
 
 export class ApiError extends Error {
   code: string
-  requestId: string
+  status: number
+  requestId?: string
   fields?: Record<string, string>
 
-  constructor(code: string, message: string, requestId: string, fields?: Record<string, string>) {
-    super(message)
-    this.name = 'ApiError'
-    this.code = code
-    this.requestId = requestId
-    this.fields = fields
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Envelope shapes (internal)
-// ---------------------------------------------------------------------------
-
-interface SuccessEnvelope<T> {
-  data: T
-  requestId: string
-}
-
-interface ListEnvelope<T> {
-  data: T[]
-  page: PageInfo
-  requestId: string
-}
-
-interface ErrorEnvelope {
-  error: {
+  constructor(params: {
     code: string
     message: string
-    requestId: string
+    status?: number
+    requestId?: string
     fields?: Record<string, string>
+  }) {
+    super(params.message)
+    this.name = 'ApiError'
+    this.code = params.code
+    this.status = params.status ?? 0
+    this.requestId = params.requestId
+    this.fields = params.fields
   }
 }
 
 // ---------------------------------------------------------------------------
-// Client
+// Token management (module-level)
 // ---------------------------------------------------------------------------
 
 const AUTH_TOKEN_KEY = 'auth_token'
+let _token: string | null = null
 
-class ApiClientImpl {
-  baseUrl: string
-  private token: string | null = null
-
-  constructor() {
-    this.baseUrl =
-      ((import.meta as Record<string, unknown>).env?.VITE_API_BASE_URL as string | undefined) ??
-      '/api/v1'
-
-    // Restore token from localStorage on init
-    try {
-      const stored = localStorage.getItem(AUTH_TOKEN_KEY)
-      if (stored) this.token = stored
-    } catch {
-      // localStorage may be unavailable (SSR, test env)
-    }
+function loadToken(): string | null {
+  if (_token) return _token
+  try {
+    const stored = localStorage.getItem(AUTH_TOKEN_KEY)
+    if (stored) _token = stored
+  } catch {
+    // localStorage may be unavailable (SSR, test env)
   }
-
-  // ── Token management ──
-
-  getToken(): string | null {
-    return this.token
-  }
-
-  setToken(token: string | null): void {
-    this.token = token
-    if (token) {
-      try {
-        localStorage.setItem(AUTH_TOKEN_KEY, token)
-      } catch {
-        // noop
-      }
-    } else {
-      try {
-        localStorage.removeItem(AUTH_TOKEN_KEY)
-      } catch {
-        // noop
-      }
-    }
-  }
-
-  // ── Request helpers ──
-
-  /**
-   * Single-resource request.
-   * Parses `{ data, requestId }` on 2xx → returns `data`.
-   * Parses `{ error }` on non-2xx → throws `ApiError`.
-   * Clears token on 401.
-   * @deprecated Use `gatewayRequest` instead. This class-based method is kept for
-   * backward compatibility with existing API modules during migration.
-   */
-  async doRequest<T>(path: string, options?: RequestInit): Promise<T> {
-    const res = await this.fetchWithAuth(path, options)
-
-    if (res.status === 401) {
-      this.setToken(null)
-    }
-
-    if (!res.ok) {
-      throw await this.parseError(res)
-    }
-
-    // 204 No Content
-    if (res.status === 204) {
-      return undefined as T
-    }
-
-    const json: SuccessEnvelope<T> = (await res.json()) as SuccessEnvelope<T>
-    return json.data
-  }
-
-  /**
-   * Paginated-list request.
-   * Parses `{ data, page, requestId }` on 2xx.
-   * @deprecated Use `gatewayPageRequest` instead. This class-based method is kept for
-   * backward compatibility with existing API modules during migration.
-   */
-  async listRequest<T>(path: string, options?: RequestInit): Promise<ListResponse<T>> {
-    const res = await this.fetchWithAuth(path, options)
-
-    if (res.status === 401) {
-      this.setToken(null)
-    }
-
-    if (!res.ok) {
-      throw await this.parseError(res)
-    }
-
-    const json: ListEnvelope<T> = (await res.json()) as ListEnvelope<T>
-    return {
-      items: json.data,
-      page: json.page,
-    }
-  }
-
-  /**
-   * Raw fetch that returns the Response object for binary downloads, etc.
-   * Does NOT parse the envelope — caller is responsible for reading body.
-   */
-  async rawRequest(path: string, options?: RequestInit): Promise<Response> {
-    const res = await this.fetchWithAuth(path, options)
-
-    if (res.status === 401) {
-      this.setToken(null)
-    }
-
-    if (!res.ok) {
-      throw await this.parseError(res)
-    }
-
-    return res
-  }
-
-  // ── Health (no auth) ──
-
-  async healthz(): Promise<{ status: string }> {
-    const res = await fetch(`${this.baseUrl}/healthz`)
-    if (!res.ok) {
-      throw new ApiError('health_check_failed', 'Health check failed', '')
-    }
-    const json = (await res.json()) as SuccessEnvelope<{ status: string }>
-    return json.data
-  }
-
-  async readyz(): Promise<{ status: string }> {
-    const res = await fetch(`${this.baseUrl}/readyz`)
-    if (!res.ok) {
-      throw new ApiError('readiness_check_failed', 'Readiness check failed', '')
-    }
-    const json = (await res.json()) as SuccessEnvelope<{ status: string }>
-    return json.data
-  }
-
-  // ── Internals ──
-
-  private async fetchWithAuth(path: string, options?: RequestInit): Promise<Response> {
-    const headers = new Headers(options?.headers)
-
-    // Ensure Content-Type for requests with a body (unless it's FormData)
-    const hasBody = options?.body != null && !(options.body instanceof FormData)
-    if (hasBody && !headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json')
-    }
-
-    // Attach auth token for business API calls
-    if (this.token) {
-      headers.set('Authorization', `Bearer ${this.token}`)
-    }
-
-    return fetch(`${this.baseUrl}${path}`, {
-      ...options,
-      headers,
-    })
-  }
-
-  private async parseError(res: Response): Promise<ApiError> {
-    try {
-      const json: ErrorEnvelope = (await res.json()) as ErrorEnvelope
-      return new ApiError(
-        json.error.code,
-        json.error.message,
-        json.error.requestId,
-        json.error.fields,
-      )
-    } catch {
-      return new ApiError('http_error', `HTTP ${res.status}: ${res.statusText}`, '')
-    }
-  }
+  return _token
 }
-
-/** Singleton API client instance. */
-export const apiClient = new ApiClientImpl()
 
 // ---------------------------------------------------------------------------
-// Standalone function exports — convenience wrappers for API module imports.
-// Usage: import { doRequest, listRequest } from './client'
+// Exported gateway types
 // ---------------------------------------------------------------------------
-
-/**
- * Single-resource request via the singleton API client.
- * @see ApiClientImpl.doRequest
- * @deprecated Use `gatewayRequest` instead. This wrapper is kept for backward
- * compatibility with existing API modules during migration.
- */
-export function doRequest<T>(path: string, options?: RequestInit): Promise<T> {
-  return apiClient.doRequest<T>(path, options)
-}
-
-interface GatewayEnvelope<T> {
-  data: T
-  requestId: string
-}
 
 export type GatewayPaginatedEnvelope<T> = GatewaySuccessEnvelope<T[]> & {
   page: {
@@ -274,32 +100,9 @@ export type GatewayPaginatedEnvelope<T> = GatewaySuccessEnvelope<T[]> & {
   }
 }
 
-/**
- * Paginated-list request via the singleton API client.
- * @see ApiClientImpl.listRequest
- * @deprecated Use `gatewayPageRequest` instead. This wrapper is kept for backward
- * compatibility with existing API modules during migration.
- */
-export function listRequest<T>(path: string, options?: RequestInit): Promise<ListResponse<T>> {
-  return apiClient.listRequest<T>(path, options)
-}
-
-function getAccessToken(): string | null {
-  // Primary: unified apiClient-managed token
-  const clientToken = apiClient.getToken()
-  if (clientToken) return clientToken
-
-  // Fallback: legacy token storage keys (for migration / different auth flows)
-  return (
-    window.localStorage.getItem('accessToken') ??
-    window.localStorage.getItem('qa-access-token') ??
-    window.localStorage.getItem('auth.accessToken')
-  )
-}
+export type GatewayPage = GatewayPaginatedEnvelope<unknown>['page']
 
 type RequestBody = BodyInit | Record<string, unknown> | unknown[] | null
-
-export type GatewayPage = GatewayPaginatedEnvelope<unknown>['page']
 
 export type GatewayRequestOptions = Omit<RequestInit, 'body' | 'method'> & {
   body?: RequestBody
@@ -329,13 +132,40 @@ type MockRoute = {
   handler: MockHandler
 }
 
+// ---------------------------------------------------------------------------
+// Module-level state for providers and mocks
+// ---------------------------------------------------------------------------
+
 let accessTokenProvider: (() => string | null | undefined) | undefined
 let requestIdProvider: (() => string | undefined) | undefined
 let mockRoutes: MockRoute[] = []
 
+// ---------------------------------------------------------------------------
+// Singleton API client object
+// ---------------------------------------------------------------------------
+
 export const apiClient = {
   get baseUrl() {
     return getGatewayBaseUrl()
+  },
+  getToken(): string | null {
+    return loadToken()
+  },
+  setToken(token: string | null): void {
+    _token = token
+    if (token) {
+      try {
+        localStorage.setItem(AUTH_TOKEN_KEY, token)
+      } catch {
+        // noop
+      }
+    } else {
+      try {
+        localStorage.removeItem(AUTH_TOKEN_KEY)
+      } catch {
+        // noop
+      }
+    }
   },
   setAccessTokenProvider(provider: typeof accessTokenProvider) {
     accessTokenProvider = provider
@@ -354,6 +184,10 @@ export const apiClient = {
   },
 }
 
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
 function getGatewayBaseUrl(): string {
   const configured = import.meta.env?.VITE_API_BASE_URL as string | undefined
   return stripTrailingSlash(configured || DEFAULT_GATEWAY_BASE_URL)
@@ -361,17 +195,6 @@ function getGatewayBaseUrl(): string {
 
 function stripTrailingSlash(value: string): string {
   return value.endsWith('/') ? value.slice(0, -1) : value
-}
-
-function joinUrl(
-  path: string,
-  query?: URLSearchParams | Record<string, string | number | boolean | null | undefined>,
-): string {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`
-  const url = `${getGatewayBaseUrl()}${normalizedPath}`
-  const params = query instanceof URLSearchParams ? query : toSearchParams(query)
-  const queryString = params?.toString()
-  return queryString ? `${url}?${queryString}` : url
 }
 
 function toSearchParams(
@@ -386,9 +209,20 @@ function toSearchParams(
   return params
 }
 
+function joinUrl(
+  path: string,
+  query?: URLSearchParams | Record<string, string | number | boolean | null | undefined>,
+): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  const url = `${getGatewayBaseUrl()}${normalizedPath}`
+  const params = query instanceof URLSearchParams ? query : toSearchParams(query)
+  const queryString = params?.toString()
+  return queryString ? `${url}?${queryString}` : url
+}
+
 function buildHeaders(options: GatewayRequestOptions, hasJsonBody: boolean): Headers {
   const headers = new Headers(options.headers)
-  const token = options.token ?? accessTokenProvider?.()
+  const token = options.token ?? accessTokenProvider?.() ?? loadToken()
   const requestId = options.requestId ?? requestIdProvider?.()
 
   if (hasJsonBody && !headers.has('Content-Type')) {
@@ -424,10 +258,10 @@ function prepareBody(body: RequestBody | undefined): { body?: BodyInit; hasJsonB
 function isGatewayErrorEnvelope(value: unknown): value is GatewayErrorEnvelope {
   return Boolean(
     value &&
-    typeof value === 'object' &&
-    'error' in value &&
-    (value as { error?: unknown }).error &&
-    typeof (value as { error: { message?: unknown } }).error.message === 'string',
+      typeof value === 'object' &&
+      'error' in value &&
+      (value as { error?: unknown }).error &&
+      typeof (value as { error: { message?: unknown } }).error.message === 'string',
   )
 }
 
@@ -488,6 +322,98 @@ async function fetchGateway(path: string, options: GatewayRequestOptions = {}): 
   return fetch(request)
 }
 
+function withJsonHeaders(options?: GatewayRequestOptions): GatewayRequestOptions {
+  return {
+    ...options,
+    headers: {
+      Accept: JSON_CONTENT_TYPE,
+      ...options?.headers,
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SSE stream reader
+// ---------------------------------------------------------------------------
+
+async function readSseStream(
+  body: ReadableStream<Uint8Array>,
+  onEvent: (event: SseEvent) => void,
+  signal?: AbortSignal,
+): Promise<void> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let currentEvent = ''
+  let currentData = ''
+  let currentId: string | undefined
+  let currentRetry: number | undefined
+
+  const flush = () => {
+    if (currentEvent || currentData) {
+      onEvent({
+        event: currentEvent || 'message',
+        data: currentData,
+        id: currentId,
+        retry: currentRetry,
+      })
+      currentEvent = ''
+      currentData = ''
+      currentId = undefined
+      currentRetry = undefined
+    }
+  }
+
+  const processLine = (line: string) => {
+    const trimmed = line.endsWith('\r') ? line.slice(0, -1) : line
+
+    if (trimmed === '') {
+      flush()
+    } else if (trimmed.startsWith('event:')) {
+      currentEvent = trimmed.slice(6).trimStart()
+    } else if (trimmed.startsWith('data:')) {
+      currentData = trimmed.slice(5).trimStart()
+    } else if (trimmed.startsWith('id:')) {
+      currentId = trimmed.slice(3).trimStart() || undefined
+    } else if (trimmed.startsWith('retry:')) {
+      const val = parseInt(trimmed.slice(6).trimStart(), 10)
+      if (!isNaN(val)) currentRetry = val
+    }
+    // Lines starting with ':' are SSE comments — silently ignored
+  }
+
+  try {
+    for (;;) {
+      if (signal?.aborted) break
+      const { done, value } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        processLine(line)
+      }
+    }
+
+    // Flush decoder remainder
+    buffer += decoder.decode()
+    if (buffer.trim()) {
+      for (const line of buffer.split('\n')) {
+        processLine(line)
+      }
+      flush()
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Core request primitives
+// ---------------------------------------------------------------------------
+
 export async function requestEnvelope<T>(
   path: string,
   options?: GatewayRequestOptions,
@@ -528,6 +454,14 @@ export async function requestBinary(path: string, options?: GatewayRequestOption
   return response.blob()
 }
 
+// ---------------------------------------------------------------------------
+// Public convenience API
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a URL query string from a params object.
+ * Returns an empty string if no params are provided, otherwise `?key=value&...`.
+ */
 export function buildQuery(
   params: Record<string, string | number | boolean | undefined | null>,
 ): string {
@@ -542,28 +476,18 @@ export function buildQuery(
   return query ? `?${query}` : ''
 }
 
-async function readGatewayError(res: Response): Promise<ApiError> {
-  const fallbackMessage = `HTTP ${res.status}: ${res.statusText}`
-
-  try {
-    const json = (await res.json()) as GatewayErrorEnvelope
-    const error = json.error
-    return new ApiError(
-      String(error?.code ?? res.status),
-      error?.message ?? fallbackMessage,
-      error?.requestId ?? '',
-      error?.fields,
-    )
-  } catch {
-    return new ApiError(String(res.status), fallbackMessage, '')
-  }
-  return { ...options, headers }
-}
-
+/**
+ * Single-resource JSON request.
+ * Unwraps the gateway success envelope and returns the `data` payload.
+ */
 export function gatewayRequest<T>(path: string, options?: GatewayRequestOptions): Promise<T> {
   return requestJson<T>(path, withJsonHeaders(options))
 }
 
+/**
+ * Paginated-list JSON request.
+ * Unwraps the gateway paginated envelope and returns `{ items, page }`.
+ */
 export async function gatewayPageRequest<T>(
   path: string,
   options?: GatewayRequestOptions,
@@ -572,6 +496,10 @@ export async function gatewayPageRequest<T>(
   return { items: envelope.data, page: envelope.page }
 }
 
+/**
+ * Binary file download request.
+ * Returns the response body as a Blob.
+ */
 export function gatewayFileRequest(path: string, options?: GatewayRequestOptions): Promise<Blob> {
   return requestBinary(path, {
     ...options,
@@ -583,6 +511,37 @@ export function gatewayFileRequest(path: string, options?: GatewayRequestOptions
   })
 }
 
+/**
+ * Streaming request — returns raw Response for SSE / event-stream consumption.
+ *
+ * Attaches auth and request-id headers but does NOT parse the response body.
+ * The caller is responsible for reading the stream and handling errors.
+ */
+export async function gatewayStreamRequest(
+  path: string,
+  options?: GatewayRequestOptions,
+): Promise<Response> {
+  const response = await fetchGateway(path, {
+    ...options,
+    headers: {
+      Accept: SSE_CONTENT_TYPE,
+      ...options?.headers,
+    },
+  })
+
+  if (!response.ok) {
+    throw await toApiError(response)
+  }
+
+  return response
+}
+
+/**
+ * Managed SSE streaming — reads the response body and dispatches parsed
+ * SSE events to the provided callbacks.
+ *
+ * Returns an `abort` function and the active `AbortSignal`.
+ */
 export function streamGateway(
   path: string,
   options: GatewayStreamOptions,
@@ -657,38 +616,4 @@ function mergeAbortSignals(primary: AbortSignal, secondary?: AbortSignal | null)
   primary.addEventListener('abort', () => abort(primary), { once: true })
   secondary.addEventListener('abort', () => abort(secondary), { once: true })
   return controller.signal
-}
-
-/**
- * Streaming request — returns raw Response for SSE / event-stream consumption.
- *
- * Attaches auth and request-id headers but does NOT parse the response body.
- * The caller is responsible for reading the stream and handling errors.
- *
- * @example
- *   const res = await gatewayStreamRequest(`/qa-sessions/${id}/messages`, {
- *     method: 'POST',
- *     body: JSON.stringify({ message: 'hello' }),
- *   })
- *   // res.body is a ReadableStream for SSE parsing
- */
-export async function gatewayStreamRequest(
-  path: string,
-  options?: RequestInit,
-): Promise<Response> {
-  const body = options?.body ?? null
-  const res = await fetch(`${apiClient.baseUrl}${path}`, {
-    ...options,
-    headers: {
-      ...gatewayHeaders(body),
-      Accept: 'text/event-stream',
-      ...options?.headers,
-    },
-  })
-
-  if (!res.ok) {
-    throw await readGatewayError(res)
-  }
-
-  return res
 }

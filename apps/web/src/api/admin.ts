@@ -53,18 +53,8 @@ export async function testLLMConnection(
 ): Promise<QALLMConnectionTest> {
   return gatewayRequest<QALLMConnectionTest>('/llm-connection-tests', {
     method: 'POST',
-    body: {
-      provider: 'ai-gateway',
-      profileId,
-      modelName: config.model_name ?? current.model_name,
-      timeoutSeconds: config.timeout ?? current.timeout,
-      temperature: config.temperature ?? current.temperature,
-      maxTokens: config.max_tokens ?? current.max_tokens,
-      activate: true,
-    } satisfies components['schemas']['CreateQALLMConfigVersionRequest'],
+    body: params,
   })
-
-  return toLLMConfig(next, await getDefaultChatProfile().catch(() => undefined))
 }
 
 // =========================================================================
@@ -96,19 +86,8 @@ export async function runRetrievalTest(
 ): Promise<QARetrievalTestRun> {
   return gatewayRequest<QARetrievalTestRun>('/retrieval-test-runs', {
     method: 'POST',
-    body: {
-      defaultKnowledgeBaseIds: defaults.knowledge_bases,
-      retrieval: {
-        topK: defaults.top_k,
-        scoreThreshold: defaults.similarity_threshold,
-        enableRerank: defaults.use_rerank,
-        useRerank: defaults.use_rerank,
-        rerankTopN: defaults.rerank_top_n,
-      },
-      activate: true,
-    } satisfies components['schemas']['CreateQAConfigVersionRequest'],
+    body: params,
   })
-  return getKnowledgeConfig()
 }
 
 // =========================================================================
@@ -172,7 +151,6 @@ export async function createKnowledgeBase(
       description: params.description ?? '',
     },
   })
-  return toKnowledgeBaseConfig(kb)
 }
 
 /** DELETE /knowledge-bases/{knowledgeBaseId} */

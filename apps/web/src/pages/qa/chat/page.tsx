@@ -1,4 +1,3 @@
-import { Settings } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { streamChat } from '@/api/chat'
@@ -552,14 +551,6 @@ export function ChatPage() {
           <h1 className="text-lg font-semibold text-foreground">
             {activeSession?.title ?? '智能问答'}
           </h1>
-          <a
-            href="/admin"
-            className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            title="管理面板"
-            aria-label="管理面板"
-          >
-            <Settings className="size-5" />
-          </a>
         </header>
 
         {/* Messages area */}

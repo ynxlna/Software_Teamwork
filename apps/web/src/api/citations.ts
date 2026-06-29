@@ -31,9 +31,6 @@ export async function getCitation(citationId: string): Promise<QACitationDetail>
 export async function lookupCitations(citationIds: string[]): Promise<QACitationDetail[]> {
   return gatewayRequest<QACitationDetail[]>('/citation-lookups', {
     method: 'POST',
-    body: JSON.stringify({ citationIds }),
+    body: { citationIds },
   })
-  return citations.map(toCitationDetail)
 }
-
-export type { BatchCitationsRequest }

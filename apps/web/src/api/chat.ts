@@ -269,6 +269,6 @@ export async function queryKnowledge(
 ): Promise<KnowledgeQuerySummary> {
   return gatewayRequest<KnowledgeQuerySummary>('/knowledge-queries', {
     method: 'POST',
-    body: JSON.stringify(params),
+    body: params,
   })
 }

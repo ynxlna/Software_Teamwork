@@ -1,0 +1,283 @@
+name: Task Claim
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  repository-projects: write
+
+jobs:
+  claim:
+    if: ${{ !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign claimant
+        uses: actions/github-script@v7
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        with:
+          script: |
+            const projectOwner = 'Sakayori-Iroha-168';
+            const projectNumber = 1;
+            const projectName = 'Software Teamwork';
+            const projectGraphql = process.env.PROJECTS_TOKEN
+              ? github.graphql.defaults({
+                  headers: {
+                    authorization: `bearer ${process.env.PROJECTS_TOKEN}`,
+                  },
+                })
+              : github.graphql;
+            const comment = context.payload.comment;
+            const issue = context.payload.issue;
+            const match = comment.body.trim().match(/^认领\s*[:：]\s*@?([A-Za-z0-9-]+)\s*$/u);
+
+            if (!match) {
+              core.info('Comment is not a task claim; skipping.');
+              return;
+            }
+
+            if (!/^\[[SABCF]-(?:\d{8}-)?\d{2}\]\s+.+$/u.test(issue.title || '')) {
+              core.info('Issue title does not look like a managed task issue; skipping.');
+              return;
+            }
+
+            const requestedLogin = match[1];
+            const commenterLogin = comment.user.login;
+            const titleMatch = issue.title.match(/^\[([SABCF]-(?:\d{8}-)?\d{2})\]\s+.+$/u);
+            const taskCode = titleMatch[1];
+            const prefix = taskCode[0];
+            const defaultGroupByPrefix = {
+              A: 'L1nggTeam',
+              B: 'JerryTeam',
+              C: 'PrimeTeam',
+              F: 'Frontend',
+              S: 'Special',
+            };
+            const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const cleanValue = (value) => value
+              .trim()
+              .replace(/^`|`$/g, '')
+              .replace(/`/g, '')
+              .trim();
+            const readField = (label) => {
+              const pattern = new RegExp(`^-\\s*${escapeRegExp(label)}\\s*[:：]\\s*(.+)$`, 'imu');
+              const fieldMatch = (issue.body || '').match(pattern);
+              return fieldMatch ? cleanValue(fieldMatch[1]) : '';
+            };
+            const normalizeDependency = (value) => {
+              const normalized = cleanValue(value || '');
+              if (!normalized || normalized === '无') {
+                return '无';
+              }
+              return normalized
+                .split(/[，,、]/u)
+                .map((item) => cleanValue(item))
+                .filter(Boolean)
+                .join(', ') || '无';
+            };
+            const group = readField('主责小组') || defaultGroupByPrefix[prefix];
+            const priority = readField('优先级') || 'P1';
+            const batch = readField('批次') || 'Batch 4';
+            const moduleName = readField('模块') || 'ci';
+            const dependency = normalizeDependency(readField('依赖任务'));
+            const taskStatus = readField('状态') || 'Draft';
+
+            const createComment = async (body) => {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body,
+              });
+            };
+
+            if (['Blocked', 'Review', 'Done'].includes(taskStatus)) {
+              await createComment(`认领失败：当前任务状态为 \`${taskStatus}\`，请先由协调人改为 \`Draft\` 或 \`Ready\` 后再认领。`);
+              core.info(`Claim rejected because issue status is ${taskStatus}.`);
+              return;
+            }
+
+            if (requestedLogin.toLowerCase() !== commenterLogin.toLowerCase()) {
+              await createComment(`认领失败：请使用自己的 GitHub 用户名认领，例如 \`认领：@${commenterLogin}\`。`);
+              core.info('Claim rejected because mentioned login differs from commenter.');
+              return;
+            }
+
+            const assignees = issue.assignees || [];
+            const existingAssignee = assignees.find((assignee) => assignee.login.toLowerCase() !== commenterLogin.toLowerCase());
+            if (existingAssignee) {
+              await createComment(`认领失败：本任务已有主责人 @${existingAssignee.login}。如需转让，请先在 issue 评论中完成交接。`);
+              core.info('Claim rejected because issue already has another assignee.');
+              return;
+            }
+
+            const alreadyAssigned = assignees.some((assignee) => assignee.login.toLowerCase() === commenterLogin.toLowerCase());
+            if (!alreadyAssigned) {
+              try {
+                await github.rest.issues.addAssignees({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  assignees: [commenterLogin],
+                });
+              } catch (error) {
+                await createComment(`认领失败：无法将 @${commenterLogin} 设为 Assignee。请确认该账号有仓库协作权限。`);
+                throw error;
+              }
+            }
+
+            const body = issue.body || '';
+            let syncState = 'pending';
+
+            try {
+              const projectQuery = `
+                query($login: String!, $number: Int!) {
+                  user(login: $login) {
+                    projectV2(number: $number) {
+                      id
+                      fields(first: 100) {
+                        nodes {
+                          ... on ProjectV2Field {
+                            id
+                            name
+                          }
+                          ... on ProjectV2SingleSelectField {
+                            id
+                            name
+                            options {
+                              id
+                              name
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `;
+              const itemQuery = `
+                query($issueId: ID!) {
+                  node(id: $issueId) {
+                    ... on Issue {
+                      projectItems(first: 50) {
+                        nodes {
+                          id
+                          project {
+                            id
+                            title
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `;
+              const addItemMutation = `
+                mutation($projectId: ID!, $contentId: ID!) {
+                  addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                    item {
+                      id
+                    }
+                  }
+                }
+              `;
+              const updateFieldMutation = `
+                mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                  updateProjectV2ItemFieldValue(input: {
+                    projectId: $projectId,
+                    itemId: $itemId,
+                    fieldId: $fieldId,
+                    value: $value
+                  }) {
+                    projectV2Item {
+                      id
+                    }
+                  }
+                }
+              `;
+
+              const projectResult = await projectGraphql(projectQuery, {
+                login: projectOwner,
+                number: projectNumber,
+              });
+              const project = projectResult.user?.projectV2;
+              if (!project) {
+                throw new Error(`Project '${projectName}' was not found for ${projectOwner}.`);
+              }
+
+              const fieldByName = new Map();
+              for (const field of project.fields.nodes.filter(Boolean)) {
+                fieldByName.set(field.name, field);
+              }
+
+              const itemResult = await projectGraphql(itemQuery, { issueId: issue.node_id });
+              let item = itemResult.node.projectItems.nodes.find((node) => node.project.id === project.id);
+
+              if (!item) {
+                const added = await projectGraphql(addItemMutation, {
+                  projectId: project.id,
+                  contentId: issue.node_id,
+                });
+                item = added.addProjectV2ItemById.item;
+              }
+
+              const updateSingleSelect = async (fieldName, optionName) => {
+                const field = fieldByName.get(fieldName);
+                const option = field?.options?.find((candidate) => candidate.name === optionName);
+                if (!field || !option) {
+                  throw new Error(`Project field '${fieldName}' option '${optionName}' is unavailable.`);
+                }
+                await projectGraphql(updateFieldMutation, {
+                  projectId: project.id,
+                  itemId: item.id,
+                  fieldId: field.id,
+                  value: { singleSelectOptionId: option.id },
+                });
+              };
+
+              const updateText = async (fieldName, text) => {
+                const field = fieldByName.get(fieldName);
+                if (!field) {
+                  throw new Error(`Project field '${fieldName}' is unavailable.`);
+                }
+                await projectGraphql(updateFieldMutation, {
+                  projectId: project.id,
+                  itemId: item.id,
+                  fieldId: field.id,
+                  value: { text },
+                });
+              };
+
+              await updateSingleSelect('Status', 'In Progress');
+              await updateSingleSelect('Group', group);
+              await updateSingleSelect('Priority', priority);
+              await updateSingleSelect('Batch', batch);
+              await updateSingleSelect('Module', moduleName);
+              await updateSingleSelect('Risk', 'Normal');
+              await updateText('Dependency', dependency);
+              await updateText('OwnerNote', `@${commenterLogin} 通过 issue 评论认领；任务编号 ${taskCode}；由 Task Claim 更新。`);
+              syncState = 'synced';
+            } catch (error) {
+              syncState = 'blocked';
+              core.warning(
+                `Project status sync failed. Configure a PROJECTS_TOKEN secret with Project read/write access if GITHUB_TOKEN cannot access the user project. ${error.message}`
+              );
+            }
+
+            let nextBody = body
+              .replace(/^- 状态：`?(Draft|Ready)`?$/imu, '- 状态：`In Progress`')
+              .replace(/^- Risk：`?(Needs Decision|Blocked|Normal)`?$/imu, '- Risk：`Normal`')
+              .replace(/^- Project sync：`?(pending|synced|blocked)`?$/imu, `- Project sync：\`${syncState}\``);
+
+            if (nextBody !== body) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: nextBody,
+              });
+            }
+
+            core.info(`Assigned issue #${issue.number} to @${commenterLogin}.`);

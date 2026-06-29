@@ -56,6 +56,52 @@ check 名称补入 `contexts`。
 `Auto Label` 负责根据提交账号和修改路径给 PR 自动添加 label。它不是合并
 门禁，不建议加入 required checks。
 
+## GitHub Project 自动同步
+
+[.github/workflows/task-issue-sync.yml](../../.github/workflows/task-issue-sync.yml)
+会在任务 issue 创建、编辑或重新打开时自动执行：
+
+- 识别标题形如 `[S-20260629-01] ...` 或 `[A-01] ...` 且正文写明
+  `GitHub Project：Software Teamwork` 的任务 issue。
+- 根据任务正文的 `主责小组`、`优先级`、`批次`、`模块`、`Risk`、`依赖任务`
+  同步 GitHub Project 字段。
+- 根据主责小组和模块自动补 label；仓库不存在的 label 会跳过并在日志中提示。
+- 同步成功后把正文中的 `Project sync` 改为 `synced`；同步失败则改为
+  `blocked`。
+
+GitHub user-level Projects v2 通常需要额外 token。维护者应创建一个有 Project
+读写权限的 fine-grained token 或 classic token，并在仓库 Secrets 中配置：
+
+```text
+PROJECTS_TOKEN
+```
+
+Issue label、Assignee 和正文更新仍使用默认 `GITHUB_TOKEN`，`PROJECTS_TOKEN`
+只用于 GitHub Project GraphQL 调用。如果未配置该 secret，workflow 会先尝试使用
+`GITHUB_TOKEN`；若 GitHub 拒绝访问 user Project，则 issue 仍会完成 label 同步，
+但 Project 字段会保持未同步。
+
+## Issue 认领自动化
+
+[.github/workflows/task-claim.yml](../../.github/workflows/task-claim.yml)
+会在 issue 评论创建时识别以下格式：
+
+```text
+认领：@your-github-login
+```
+
+规则：
+
+- 只能认领自己，评论中的用户名必须等于评论者 GitHub login。
+- `Blocked`、`Review`、`Done` 状态的任务不能直接认领，需要协调人先改为
+  `Draft` 或 `Ready`。
+- issue 已有其他 Assignee 时不会覆盖，会评论提示先完成交接。
+- 认领成功后自动把评论者设为 Assignee。
+- 若正文包含任务模板字段，会把 `状态` 从 `Draft` 或 `Ready` 改为
+  `In Progress`，并把 Project `Status` 同步为 `In Progress`。
+- 若 Project 同步成功，正文中的 `Project sync` 会写为 `synced`；同步失败会写为
+  `blocked`，此时维护者需要检查 `PROJECTS_TOKEN`。
+
 ## main 分支保护
 
 `main` 不是日常开发 PR 目标。普通开发和文档修改只能 PR 到 `develop`。
@@ -77,6 +123,11 @@ check 名称补入 `contexts`。
 - PR base 必须是 `develop`
 - PR head 必须来自个人 fork
 - PR 分支必须包含当前最新 `develop`
+- PR 标题不能包含中文字符
+- PR 描述必须包含中文内容
+- PR 描述的 `修改内容`、`关联 Issue`、`验证`、`已知风险` 不能保留模板占位文本
+- `关联 Issue` 必须填写 GitHub 自动关闭关键字，例如 `Closes #118`，或精确填写
+  `无`
 
 ## Auto Label 规则
 

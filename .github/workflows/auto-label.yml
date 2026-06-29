@@ -79,7 +79,7 @@ jobs:
                 return;
               }
               if (user.login) {
-                accountIds.add(user.login);
+                accountIds.add(user.login.toLowerCase());
               }
               if (user.id) {
                 accountIds.add(String(user.id));
@@ -101,7 +101,7 @@ jobs:
             }
 
             for (const rule of asArray(config.accountLabels)) {
-              const accounts = asArray(rule.accounts).map((account) => String(account));
+              const accounts = asArray(rule.accounts).map((account) => String(account).toLowerCase());
               if (accounts.some((account) => accountIds.has(account))) {
                 addConfiguredLabels(rule.labels);
               }

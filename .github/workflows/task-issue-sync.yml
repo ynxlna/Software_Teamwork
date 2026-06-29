@@ -1,0 +1,308 @@
+name: Task Issue Sync
+
+on:
+  issues:
+    types: [opened, edited, reopened]
+
+permissions:
+  contents: read
+  issues: write
+  repository-projects: write
+
+jobs:
+  sync:
+    if: ${{ !github.event.issue.pull_request }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sync task issue metadata
+        uses: actions/github-script@v7
+        env:
+          PROJECTS_TOKEN: ${{ secrets.PROJECTS_TOKEN }}
+        with:
+          script: |
+            const projectOwner = 'Sakayori-Iroha-168';
+            const projectNumber = 1;
+            const projectName = 'Software Teamwork';
+            const projectGraphql = process.env.PROJECTS_TOKEN
+              ? github.graphql.defaults({
+                  headers: {
+                    authorization: `bearer ${process.env.PROJECTS_TOKEN}`,
+                  },
+                })
+              : github.graphql;
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+
+            const titleMatch = issue.title.match(/^\[([SABCF]-(?:\d{8}-)?\d{2})\]\s+.+$/u);
+            const mentionsProject = body.includes(`GitHub Project`) && body.includes(projectName);
+
+            if (!titleMatch || !mentionsProject) {
+              core.info('Issue does not look like a managed task issue; skipping.');
+              return;
+            }
+
+            const taskCode = titleMatch[1];
+            const prefix = taskCode[0];
+            const defaultGroupByPrefix = {
+              A: 'L1nggTeam',
+              B: 'JerryTeam',
+              C: 'PrimeTeam',
+              F: 'Frontend',
+              S: 'Special',
+            };
+            const moduleLabelByModule = {
+              gateway: 'service:gateway',
+              auth: 'service:auth',
+              file: 'service:file',
+              qa: 'service:qa',
+              knowledge: 'service:knowledge',
+              document: 'service:document',
+              frontend: 'frontend',
+              deploy: 'deployment',
+              ci: 'ci',
+              openapi: 'documentation',
+            };
+
+            const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const cleanValue = (value) => value
+              .trim()
+              .replace(/^`|`$/g, '')
+              .replace(/`/g, '')
+              .trim();
+
+            const readField = (label) => {
+              const pattern = new RegExp(`^-\\s*${escapeRegExp(label)}\\s*[:：]\\s*(.+)$`, 'imu');
+              const match = body.match(pattern);
+              return match ? cleanValue(match[1]) : '';
+            };
+
+            const normalizeDependency = (value) => {
+              const normalized = cleanValue(value || '');
+              if (!normalized || normalized === '无') {
+                return '无';
+              }
+              return normalized
+                .split(/[，,、]/u)
+                .map((item) => cleanValue(item))
+                .filter(Boolean)
+                .join(', ') || '无';
+            };
+
+            const issueStatus = readField('状态') || 'Draft';
+            const group = readField('主责小组') || defaultGroupByPrefix[prefix];
+            const priority = readField('优先级') || 'P1';
+            const batch = readField('批次') || 'Batch 4';
+            const moduleName = readField('模块') || 'ci';
+            const explicitRisk = readField('Risk');
+            const risk = issueStatus === 'Blocked'
+              ? 'Blocked'
+              : (issueStatus === 'Draft' ? (explicitRisk || 'Needs Decision') : 'Normal');
+            const dependency = normalizeDependency(readField('依赖任务'));
+            const projectStatusByIssueStatus = {
+              Draft: 'Todo',
+              Ready: 'Todo',
+              Blocked: 'In Progress',
+              'In Progress': 'In Progress',
+              Review: 'In Progress',
+              Done: 'Done',
+            };
+            const projectStatus = projectStatusByIssueStatus[issueStatus] || 'Todo';
+
+            const labelsToAdd = new Set();
+            if (['L1nggTeam', 'JerryTeam', 'PrimeTeam'].includes(group)) {
+              labelsToAdd.add(group);
+            }
+            const moduleLabel = moduleLabelByModule[moduleName];
+            if (moduleLabel) {
+              labelsToAdd.add(moduleLabel);
+            }
+
+            if (labelsToAdd.size > 0) {
+              const existingLabels = await github.paginate(github.rest.issues.listLabelsForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+              });
+              const existingLabelNames = new Set(existingLabels.map((label) => label.name));
+              const validLabels = [...labelsToAdd].filter((label) => existingLabelNames.has(label));
+              const missingLabels = [...labelsToAdd].filter((label) => !existingLabelNames.has(label));
+
+              if (missingLabels.length > 0) {
+                core.warning(`Skipping missing labels: ${missingLabels.join(', ')}`);
+              }
+
+              if (validLabels.length > 0) {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  labels: validLabels,
+                });
+              }
+            }
+
+            const projectQuery = `
+              query($login: String!, $number: Int!) {
+                user(login: $login) {
+                  projectV2(number: $number) {
+                    id
+                    fields(first: 100) {
+                      nodes {
+                        ... on ProjectV2Field {
+                          id
+                          name
+                        }
+                        ... on ProjectV2SingleSelectField {
+                          id
+                          name
+                          options {
+                            id
+                            name
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const itemQuery = `
+              query($issueId: ID!) {
+                node(id: $issueId) {
+                  ... on Issue {
+                    projectItems(first: 50) {
+                      nodes {
+                        id
+                        project {
+                          id
+                          title
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const addItemMutation = `
+              mutation($projectId: ID!, $contentId: ID!) {
+                addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+                  item {
+                    id
+                  }
+                }
+              }
+            `;
+            const updateFieldMutation = `
+              mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: ProjectV2FieldValue!) {
+                updateProjectV2ItemFieldValue(input: {
+                  projectId: $projectId,
+                  itemId: $itemId,
+                  fieldId: $fieldId,
+                  value: $value
+                }) {
+                  projectV2Item {
+                    id
+                  }
+                }
+              }
+            `;
+
+            let syncState = 'blocked';
+            try {
+              const projectResult = await projectGraphql(projectQuery, {
+                login: projectOwner,
+                number: projectNumber,
+              });
+              const project = projectResult.user?.projectV2;
+              if (!project) {
+                throw new Error(`Project '${projectName}' was not found for ${projectOwner}.`);
+              }
+
+              const fieldByName = new Map();
+              for (const field of project.fields.nodes.filter(Boolean)) {
+                fieldByName.set(field.name, field);
+              }
+
+              let itemResult = await projectGraphql(itemQuery, { issueId: issue.node_id });
+              let item = itemResult.node.projectItems.nodes.find((node) => node.project.id === project.id);
+
+              if (!item) {
+                const added = await projectGraphql(addItemMutation, {
+                  projectId: project.id,
+                  contentId: issue.node_id,
+                });
+                item = added.addProjectV2ItemById.item;
+              }
+
+              const updateSingleSelect = async (fieldName, optionName) => {
+                const field = fieldByName.get(fieldName);
+                if (!field?.options) {
+                  core.warning(`Project field '${fieldName}' is missing or is not single-select.`);
+                  return;
+                }
+                const option = field.options.find((candidate) => candidate.name === optionName);
+                if (!option) {
+                  core.warning(`Project field '${fieldName}' has no option '${optionName}'.`);
+                  return;
+                }
+                await projectGraphql(updateFieldMutation, {
+                  projectId: project.id,
+                  itemId: item.id,
+                  fieldId: field.id,
+                  value: { singleSelectOptionId: option.id },
+                });
+              };
+
+              const updateText = async (fieldName, text) => {
+                const field = fieldByName.get(fieldName);
+                if (!field) {
+                  core.warning(`Project field '${fieldName}' is missing.`);
+                  return;
+                }
+                await projectGraphql(updateFieldMutation, {
+                  projectId: project.id,
+                  itemId: item.id,
+                  fieldId: field.id,
+                  value: { text },
+                });
+              };
+
+              await updateSingleSelect('Status', projectStatus);
+              await updateSingleSelect('Group', group);
+              await updateSingleSelect('Priority', priority);
+              await updateSingleSelect('Batch', batch);
+              await updateSingleSelect('Module', moduleName);
+              await updateSingleSelect('Risk', risk);
+              await updateText('Dependency', dependency);
+              await updateText(
+                'OwnerNote',
+                `自动同步自 issue #${issue.number}；任务编号 ${taskCode}；由 Task Issue Sync 更新。`
+              );
+
+              syncState = 'synced';
+            } catch (error) {
+              core.warning(
+                `Project sync failed. Configure a PROJECTS_TOKEN secret with Project read/write access if GITHUB_TOKEN cannot access the user project. ${error.message}`
+              );
+            }
+
+            const syncLinePattern = /^- Project sync：`?(pending|synced|blocked)`?$/imu;
+            const nextSyncLine = `- Project sync：\`${syncState}\``;
+            let nextBody = body;
+
+            if (syncLinePattern.test(nextBody)) {
+              nextBody = nextBody.replace(syncLinePattern, nextSyncLine);
+            } else {
+              nextBody = `${nextBody.trimEnd()}\n${nextSyncLine}\n`;
+            }
+
+            if (nextBody !== body) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: nextBody,
+              });
+            }
+
+            core.info(`Task issue #${issue.number} sync state: ${syncState}.`);

@@ -847,6 +847,122 @@ POST /report-templates -> document stores uploaded bytes itself -> response retu
 POST /report-templates -> document calls file /internal/v1/files -> stores file_ref internally -> response returns only template id and safe display metadata
 ```
 
+## Scenario: Document Report Settings Statistics And Operation Logs
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing Document Service report settings, report
+  statistics, operation-log APIs, AI Gateway profile validation for report
+  settings, or operation-log write paths.
+- Applies to `services/document/internal/http`, `services/document/internal/service`,
+  `services/document/internal/repository`, `services/document/internal/platform/aigateway`,
+  `services/document/internal/worker`, `services/document/migrations`, and the
+  matching gateway contract in `docs/services/gateway/api/openapi.yaml`.
+
+### 2. Signatures
+
+Service-local Document routes mirror the gateway resource paths:
+
+- `GET /report-settings`
+- `PATCH /report-settings`
+- `GET /report-statistics/overview`
+- `GET /report-statistics/daily?days=<1..366>`
+- `GET /report-operation-logs?page=&pageSize=&targetType=&targetId=&operationType=&requestId=&requestSource=&toolName=`
+
+Database and integration signatures:
+
+- `report_settings` stores singleton settings with `llm_json`,
+  `default_templates_json`, `file_json`, and `updated_at`.
+- `report_operation_logs` uses existing `parameter_summary_json` and
+  `metadata_json` columns.
+- Document validates settings profiles through AI Gateway
+  `GET /internal/v1/model-profiles/{profileId}` with `X-Caller-Service:
+  document`, propagated request/user headers, and optional `X-Service-Token`.
+- Runtime env includes `DOCUMENT_AI_GATEWAY_URL`,
+  `DOCUMENT_AI_GATEWAY_PROFILE_ID`, optional
+  `DOCUMENT_AI_GATEWAY_SERVICE_TOKEN`, and optional fallback
+  `INTERNAL_SERVICE_TOKEN`.
+
+### 3. Contracts
+
+- Gateway-facing responses use `{ data, requestId }`; operation-log lists use
+  `{ data, page, requestId }`.
+- `ReportSettings.llm.provider` is fixed to `ai-gateway`; provider base URLs
+  and API keys remain owned by AI Gateway and must not be stored in Document.
+- `ReportSettings.defaultTemplates` is a full `reportType ->
+  reportTemplateId` map, not a single default template id.
+- `PATCH /report-settings` may update only the supplied sections. Omitted
+  `llm.profileId` preserves the current profile/model; explicit empty
+  `profileId` clears the profile/model.
+- Statistics overview includes `reportCount`, `templateCount`,
+  `materialCount`, optional `jobStatusCounts`, and `recentDays`; daily
+  statistics is bounded by `days`.
+- Operation-log public filters are exactly the gateway-documented filters:
+  `targetType`, `targetId`, `operationType`, `requestId`, `requestSource`, and
+  `toolName`. Adding public filters requires a gateway OpenAPI update first.
+- Operation logs may store sanitized summaries only. They must not include
+  prompt text, raw document content, File Service IDs/file refs, object keys,
+  buckets, signed URLs, internal URLs, provider tokens, API keys, database URLs,
+  or full request/response bodies.
+
+### 4. Validation & Error Matrix
+
+| Condition | Response/error |
+| --- | --- |
+| Missing gateway user context | `401 unauthorized` |
+| Non-admin caller patches settings | `403 forbidden` |
+| Unsupported `llm.provider` | `400 validation_error` |
+| Non-empty `llm.profileId` missing, disabled, or not a chat profile | `400 validation_error` |
+| `defaultTemplates` report type is missing/disabled | `400 validation_error` |
+| `defaultTemplates` template is missing, disabled, soft-deleted, or wrong report type | `400 validation_error` |
+| Unsupported `file.defaultFormat` or `file.defaultNumberingMode` | `400 validation_error` |
+| `days` outside `1..366` or invalid pagination | `400 validation_error` |
+| AI Gateway or PostgreSQL failure | `502 dependency_error` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: settings update validates profile and template references before
+  saving, returns only `updatedAt`, and writes a sanitized
+  `update_report_settings` operation log.
+- Base: statistics queries use bounded date filters or indexed count/group
+  paths, and operation-log pagination runs a separate count so empty pages keep
+  the correct `total`.
+- Bad: storing a single `default_template_id`, accepting missing profile/template
+  references, returning `trend30d` instead of the gateway statistics schema, or
+  exposing prompts/object keys in `parameterSummary`.
+
+### 6. Tests Required
+
+- Handler tests for settings/statistics/log response envelopes, request id
+  propagation, query parsing, PATCH clear-vs-omit semantics, and route coverage
+  no longer returning `not_implemented`.
+- Service tests for admin authorization, profile validation, default-template
+  validation, file-default validation, bounded days, operation-log filtering,
+  and sensitive-field sanitization.
+- Repository or migration tests for `report_settings`, operation-log insert/list
+  with separate total count, daily statistics bounds, soft-delete exclusion, and
+  indexes for every documented operation-log filter.
+- Mutation-path tests confirming templates, materials, reports, outlines,
+  sections, jobs, retries, worker status transitions, and failure paths record
+  sanitized operation logs where Document owns the write.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+PATCH /report-settings -> store default_template_id=tpl_1 and llm.profileId=missing
+GET /report-operation-logs -> return raw prompt, fileRef, and objectKey
+```
+
+#### Correct
+
+```text
+PATCH /report-settings -> validate defaultTemplates[reportType] and AI Gateway chat profile -> store JSON settings map
+Document mutation -> record operation log with IDs and low-sensitive metadata only
+GET /report-operation-logs -> filter by documented fields and return sanitized summaries
+```
+
 ## Scenario: Gateway Redis Session Cache
 
 ### 1. Scope / Trigger

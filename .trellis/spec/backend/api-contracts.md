@@ -887,6 +887,11 @@ Database and integration signatures:
 
 - Gateway-facing responses use `{ data, requestId }`; operation-log lists use
   `{ data, page, requestId }`.
+- `GET /report-settings`, `PATCH /report-settings`,
+  `GET /report-statistics/overview`, `GET /report-statistics/daily`, and
+  `GET /report-operation-logs` are management/audit surfaces and must reject
+  non-admin callers in the Document service layer even when gateway already
+  authenticates the user.
 - `ReportSettings.llm.provider` is fixed to `ai-gateway`; provider base URLs
   and API keys remain owned by AI Gateway and must not be stored in Document.
 - `ReportSettings.defaultTemplates` is a full `reportType ->
@@ -910,7 +915,7 @@ Database and integration signatures:
 | Condition | Response/error |
 | --- | --- |
 | Missing gateway user context | `401 unauthorized` |
-| Non-admin caller patches settings | `403 forbidden` |
+| Non-admin caller reads or patches settings, statistics, or operation logs | `403 forbidden` |
 | Unsupported `llm.provider` | `400 validation_error` |
 | Non-empty `llm.profileId` missing, disabled, or not a chat profile | `400 validation_error` |
 | `defaultTemplates` report type is missing/disabled | `400 validation_error` |

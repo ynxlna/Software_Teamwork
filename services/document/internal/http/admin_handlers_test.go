@@ -15,7 +15,10 @@ import (
 func TestReportSettingsHandlersUseGatewayEnvelope(t *testing.T) {
 	now := time.Date(2026, 6, 30, 10, 0, 0, 0, time.UTC)
 	admin := &fakeAdminService{
-		getSettings: func(context.Context, service.RequestContext) (service.ReportSettings, error) {
+		getSettings: func(_ context.Context, reqCtx service.RequestContext) (service.ReportSettings, error) {
+			if !reqCtx.IsAdmin() {
+				t.Fatalf("GET settings request context roles = %+v, want admin", reqCtx.Roles)
+			}
 			return service.ReportSettings{
 				LLM: service.ReportSettingsModelConfig{
 					Provider:       "ai-gateway",
@@ -42,6 +45,7 @@ func TestReportSettingsHandlersUseGatewayEnvelope(t *testing.T) {
 
 	getReq := httptest.NewRequest(http.MethodGet, "/report-settings", nil)
 	getReq.Header.Set("X-User-Id", "admin-1")
+	getReq.Header.Set("X-User-Roles", "admin")
 	getReq.Header.Set("X-Request-Id", "req-get-settings")
 	getRec := httptest.NewRecorder()
 	server.ServeHTTP(getRec, getReq)
@@ -112,7 +116,10 @@ func TestUpdateSettingsInputDistinguishesProfileIDPresence(t *testing.T) {
 
 func TestStatisticsAndOperationLogHandlers(t *testing.T) {
 	admin := &fakeAdminService{
-		getOverview: func(_ context.Context, _ service.RequestContext, recentDays int) (service.ReportStatisticsOverview, error) {
+		getOverview: func(_ context.Context, reqCtx service.RequestContext, recentDays int) (service.ReportStatisticsOverview, error) {
+			if !reqCtx.IsAdmin() {
+				t.Fatalf("overview request context roles = %+v, want admin", reqCtx.Roles)
+			}
 			if recentDays != 30 {
 				t.Fatalf("overview recentDays = %d, want 30", recentDays)
 			}
@@ -124,13 +131,19 @@ func TestStatisticsAndOperationLogHandlers(t *testing.T) {
 				RecentDays:      30,
 			}, nil
 		},
-		listDaily: func(_ context.Context, _ service.RequestContext, days int) ([]service.ReportDailyStatistic, error) {
+		listDaily: func(_ context.Context, reqCtx service.RequestContext, days int) ([]service.ReportDailyStatistic, error) {
+			if !reqCtx.IsAdmin() {
+				t.Fatalf("daily request context roles = %+v, want admin", reqCtx.Roles)
+			}
 			if days != 7 {
 				t.Fatalf("daily days = %d, want 7", days)
 			}
 			return []service.ReportDailyStatistic{{Date: "2026-06-30", CreatedCount: 1, GeneratedCount: 1}}, nil
 		},
-		listLogs: func(_ context.Context, _ service.RequestContext, filter service.OperationLogListFilter) (service.OperationLogListResult, error) {
+		listLogs: func(_ context.Context, reqCtx service.RequestContext, filter service.OperationLogListFilter) (service.OperationLogListResult, error) {
+			if !reqCtx.IsAdmin() {
+				t.Fatalf("logs request context roles = %+v, want admin", reqCtx.Roles)
+			}
 			if filter.Page != 2 || filter.PageSize != 5 || filter.TargetType != "report" || filter.RequestSource != "mcp" {
 				t.Fatalf("unexpected log filter: %+v", filter)
 			}
@@ -156,6 +169,7 @@ func TestStatisticsAndOperationLogHandlers(t *testing.T) {
 
 	overviewReq := httptest.NewRequest(http.MethodGet, "/report-statistics/overview", nil)
 	overviewReq.Header.Set("X-User-Id", "admin-1")
+	overviewReq.Header.Set("X-User-Roles", "admin")
 	overviewRec := httptest.NewRecorder()
 	server.ServeHTTP(overviewRec, overviewReq)
 	if overviewRec.Code != http.StatusOK || !strings.Contains(overviewRec.Body.String(), `"reportCount":2`) {
@@ -164,6 +178,7 @@ func TestStatisticsAndOperationLogHandlers(t *testing.T) {
 
 	dailyReq := httptest.NewRequest(http.MethodGet, "/report-statistics/daily?days=7", nil)
 	dailyReq.Header.Set("X-User-Id", "admin-1")
+	dailyReq.Header.Set("X-User-Roles", "admin")
 	dailyRec := httptest.NewRecorder()
 	server.ServeHTTP(dailyRec, dailyReq)
 	if dailyRec.Code != http.StatusOK || !strings.Contains(dailyRec.Body.String(), `"createdCount":1`) {
@@ -172,6 +187,7 @@ func TestStatisticsAndOperationLogHandlers(t *testing.T) {
 
 	logReq := httptest.NewRequest(http.MethodGet, "/report-operation-logs?page=2&pageSize=5&targetType=report&requestSource=mcp", nil)
 	logReq.Header.Set("X-User-Id", "admin-1")
+	logReq.Header.Set("X-User-Roles", "admin")
 	logRec := httptest.NewRecorder()
 	server.ServeHTTP(logRec, logReq)
 	if logRec.Code != http.StatusOK {

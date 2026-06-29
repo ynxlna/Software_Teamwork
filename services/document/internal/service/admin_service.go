@@ -44,7 +44,7 @@ func NewAdminService(repo AdminRepository, profiles ModelProfileValidator) *Admi
 }
 
 func (s *AdminService) GetReportSettings(ctx context.Context, reqCtx RequestContext) (ReportSettings, error) {
-	if err := requireGatewayContext(reqCtx); err != nil {
+	if err := requireAdminContext(reqCtx); err != nil {
 		return ReportSettings{}, err
 	}
 	settings, err := s.repo.GetReportSettings(ctx)
@@ -55,11 +55,8 @@ func (s *AdminService) GetReportSettings(ctx context.Context, reqCtx RequestCont
 }
 
 func (s *AdminService) UpdateReportSettings(ctx context.Context, reqCtx RequestContext, input UpdateReportSettingsInput) (ReportSettings, error) {
-	if err := requireGatewayContext(reqCtx); err != nil {
+	if err := requireAdminContext(reqCtx); err != nil {
 		return ReportSettings{}, err
-	}
-	if !reqCtx.IsAdmin() {
-		return ReportSettings{}, NewError(CodeForbidden, "admin role is required to update report settings", nil)
 	}
 	current, err := s.repo.GetReportSettings(ctx)
 	if err != nil {
@@ -109,7 +106,7 @@ func (s *AdminService) UpdateReportSettings(ctx context.Context, reqCtx RequestC
 }
 
 func (s *AdminService) GetStatisticsOverview(ctx context.Context, reqCtx RequestContext, recentDays int) (ReportStatisticsOverview, error) {
-	if err := requireGatewayContext(reqCtx); err != nil {
+	if err := requireAdminContext(reqCtx); err != nil {
 		return ReportStatisticsOverview{}, err
 	}
 	days, err := normalizeStatisticsDays(recentDays)
@@ -130,7 +127,7 @@ func (s *AdminService) GetStatisticsOverview(ctx context.Context, reqCtx Request
 }
 
 func (s *AdminService) ListDailyStatistics(ctx context.Context, reqCtx RequestContext, days int) ([]ReportDailyStatistic, error) {
-	if err := requireGatewayContext(reqCtx); err != nil {
+	if err := requireAdminContext(reqCtx); err != nil {
 		return nil, err
 	}
 	normalizedDays, err := normalizeStatisticsDays(days)
@@ -148,7 +145,7 @@ func (s *AdminService) ListDailyStatistics(ctx context.Context, reqCtx RequestCo
 }
 
 func (s *AdminService) ListOperationLogs(ctx context.Context, reqCtx RequestContext, filter OperationLogListFilter) (OperationLogListResult, error) {
-	if err := requireGatewayContext(reqCtx); err != nil {
+	if err := requireAdminContext(reqCtx); err != nil {
 		return OperationLogListResult{}, err
 	}
 	filter.Page, filter.PageSize = normalizePage(filter.Page, filter.PageSize)
@@ -259,6 +256,16 @@ func (s *AdminService) validateDefaultTemplates(ctx context.Context, values map[
 
 func (s *AdminService) record(ctx context.Context, log OperationLog) {
 	recordOperationLog(ctx, s.repo, log)
+}
+
+func requireAdminContext(reqCtx RequestContext) error {
+	if err := requireGatewayContext(reqCtx); err != nil {
+		return err
+	}
+	if !reqCtx.IsAdmin() {
+		return NewError(CodeForbidden, "admin role is required", nil)
+	}
+	return nil
 }
 
 func normalizeReportSettings(settings ReportSettings) ReportSettings {

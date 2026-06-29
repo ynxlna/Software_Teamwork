@@ -68,6 +68,26 @@ func TestUpdateReportSettingsRequiresAdminAndValidatesReferences(t *testing.T) {
 	}
 }
 
+func TestAdminReadMethodsRequireAdmin(t *testing.T) {
+	ctx := context.Background()
+	repo := newFakeAdminRepository()
+	svc := NewAdminService(repo, nil)
+	reqCtx := RequestContext{UserID: "user-1"}
+
+	if _, err := svc.GetReportSettings(ctx, reqCtx); errorCode(t, err) != CodeForbidden {
+		t.Fatalf("GetReportSettings() error = %v, want forbidden", err)
+	}
+	if _, err := svc.GetStatisticsOverview(ctx, reqCtx, 0); errorCode(t, err) != CodeForbidden {
+		t.Fatalf("GetStatisticsOverview() error = %v, want forbidden", err)
+	}
+	if _, err := svc.ListDailyStatistics(ctx, reqCtx, 0); errorCode(t, err) != CodeForbidden {
+		t.Fatalf("ListDailyStatistics() error = %v, want forbidden", err)
+	}
+	if _, err := svc.ListOperationLogs(ctx, reqCtx, OperationLogListFilter{}); errorCode(t, err) != CodeForbidden {
+		t.Fatalf("ListOperationLogs() error = %v, want forbidden", err)
+	}
+}
+
 func TestUpdateReportSettingsPreservesProfileWhenProfileIDIsOmitted(t *testing.T) {
 	ctx := context.Background()
 	repo := newFakeAdminRepository()
@@ -176,8 +196,9 @@ func TestStatisticsOverviewAndDailyAreBounded(t *testing.T) {
 		{Date: "2026-06-30", ReportType: "summer_peak_inspection", CreatedCount: 1, GeneratedCount: 1},
 	}
 	svc := NewAdminService(repo, nil)
+	reqCtx := RequestContext{UserID: "admin-1", Roles: []string{"admin"}}
 
-	overview, err := svc.GetStatisticsOverview(ctx, RequestContext{UserID: "admin-1"}, 0)
+	overview, err := svc.GetStatisticsOverview(ctx, reqCtx, 0)
 	if err != nil {
 		t.Fatalf("GetStatisticsOverview() error = %v", err)
 	}
@@ -185,12 +206,12 @@ func TestStatisticsOverviewAndDailyAreBounded(t *testing.T) {
 		t.Fatalf("overview = %+v", overview)
 	}
 
-	_, err = svc.ListDailyStatistics(ctx, RequestContext{UserID: "admin-1"}, 367)
+	_, err = svc.ListDailyStatistics(ctx, reqCtx, 367)
 	if code := errorCode(t, err); code != CodeValidation {
 		t.Fatalf("days=367 error code = %q, want %q", code, CodeValidation)
 	}
 
-	daily, err := svc.ListDailyStatistics(ctx, RequestContext{UserID: "admin-1"}, 7)
+	daily, err := svc.ListDailyStatistics(ctx, reqCtx, 7)
 	if err != nil {
 		t.Fatalf("ListDailyStatistics() error = %v", err)
 	}

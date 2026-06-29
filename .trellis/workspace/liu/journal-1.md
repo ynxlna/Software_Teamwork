@@ -139,3 +139,36 @@ Implemented Document C-08 report settings, statistics, operation logs, AI Gatewa
 ### Next Steps
 
 - None - task complete
+
+
+## Session 5: C-08 PR review fixes
+
+**Date**: 2026-06-30
+**Task**: C-08 PR review fixes
+**Branch**: `PrimeTeam/feat/c08-settings-stats-logs-redo`
+
+### Summary
+
+Required admin role for Document report settings, statistics, and operation-log read endpoints after PR review.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `049c835` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

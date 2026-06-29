@@ -186,6 +186,7 @@ gh pr create \
 - `--base` 必须是 `develop`，不能是 `main`。
 - `--head` 必须是 `YOUR_NAME:<branch>`，也就是个人 fork 中的分支。
 - 如果 PR 解决或完成某个 issue，PR 描述中必须包含 GitHub 自动关闭关键字，例如 `Closes #118`，注意关键字和 `#` 之间要有空格。
+- 如果 PR 没有关联 issue，`关联 Issue` 必须写明原因，例如 `无。原因：修正文档错别字，不对应独立任务。`，不能只写 `无`。
 
 ### 8. PR 前同步最新 develop
 

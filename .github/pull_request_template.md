@@ -9,7 +9,10 @@
 
 ## 关联 Issue
 
-如果本 PR 解决或完成某个 issue，请填写 GitHub 自动关闭关键字，例如 `Closes #118`。注意关键字和 `#` 之间要有空格；如果没有关联 issue，请填写“无”。
+请保留其中一种并删除另一种：
+
+- Closes #<issue-number>
+- 无。原因：<说明本 PR 为什么不对应独立 issue>
 
 ## 验证
 
@@ -25,7 +28,7 @@
 - [ ] PR 来源是个人 fork 的独立分支
 - [ ] PR 标题使用英文
 - [ ] PR 描述使用中文
-- [ ] 如果 PR 解决或完成 issue，PR 描述已包含自动关闭关键字，例如 `Closes #118`
+- [ ] 关联 Issue 已填写自动关闭关键字，或无 issue 时已写明原因
 - [ ] 分支已经基于最新 `develop`
 - [ ] Commit message 符合 Conventional Commits
 - [ ] 已运行必要检查

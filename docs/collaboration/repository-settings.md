@@ -69,6 +69,10 @@ check 名称补入 `contexts`。
 - 同步成功后把正文中的 `Project sync` 改为 `synced`；同步失败则改为
   `blocked`。
 
+新任务 issue 默认使用 [.github/ISSUE_TEMPLATE/issue.md](../../.github/ISSUE_TEMPLATE/issue.md)。
+模板标题采用 `[F-YYYYMMDD-01] English task title` 格式，并内置任务前缀和模块枚举，
+以便 Task Issue Sync 识别和同步 Project 字段。
+
 GitHub user-level Projects v2 通常需要额外 token。维护者应创建一个有 Project
 读写权限的 fine-grained token 或 classic token，并在仓库 Secrets 中配置：
 
@@ -126,8 +130,8 @@ Issue label、Assignee 和正文更新仍使用默认 `GITHUB_TOKEN`，`PROJECTS
 - PR 标题不能包含中文字符
 - PR 描述必须包含中文内容
 - PR 描述的 `修改内容`、`关联 Issue`、`验证`、`已知风险` 不能保留模板占位文本
-- `关联 Issue` 必须填写 GitHub 自动关闭关键字，例如 `Closes #118`，或精确填写
-  `无`
+- `关联 Issue` 必须填写 GitHub 自动关闭关键字，例如 `Closes #118`；如果没有
+  关联 issue，必须填写 `无。原因：...`，不能只写 `无`
 
 ## Auto Label 规则
 

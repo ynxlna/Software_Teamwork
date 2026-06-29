@@ -48,6 +48,7 @@ interface FormData {
   chunkSize: number
   chunkOverlap: number
   separators: string
+  endpointUrl: string
 }
 
 type NotificationState = {
@@ -65,6 +66,7 @@ const EMPTY_FORM: FormData = {
   chunkSize: 512,
   chunkOverlap: 64,
   separators: '',
+  endpointUrl: '',
 }
 
 // ── Helpers ──
@@ -74,6 +76,10 @@ function formToCreateRequest(form: FormData) {
     name: form.name,
     backend: form.backend,
     concurrency: form.concurrency,
+  }
+
+  if (form.backend === 'remote_compatible' && form.endpointUrl.trim()) {
+    params.endpointUrl = form.endpointUrl.trim()
   }
 
   if (form.fileTypes.trim()) {
@@ -104,6 +110,10 @@ function formToUpdateRequest(form: FormData) {
     name: form.name,
     backend: form.backend,
     concurrency: form.concurrency,
+  }
+
+  if (form.backend === 'remote_compatible' && form.endpointUrl.trim()) {
+    params.endpointUrl = form.endpointUrl.trim()
   }
 
   if (form.fileTypes.trim()) {
@@ -219,6 +229,7 @@ export function ParserConfigsPage() {
         config.defaultParameters?.separators != null
           ? (config.defaultParameters.separators as string[]).join(', ')
           : '',
+      endpointUrl: config.endpointUrl ?? '',
     })
     setEditOpen(true)
   }, [])
@@ -489,6 +500,25 @@ export function ParserConfigsPage() {
               </select>
             </div>
 
+            {/* Conditional: endpointUrl (remote_compatible) */}
+            {form.backend === 'remote_compatible' && (
+              <div>
+                <label
+                  htmlFor="pc-create-endpointurl"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  远程地址
+                </label>
+                <Input
+                  id="pc-create-endpointurl"
+                  type="url"
+                  placeholder="https://parser-api.example.com/v1"
+                  value={form.endpointUrl}
+                  onChange={(e) => updateField('endpointUrl', e.target.value)}
+                />
+              </div>
+            )}
+
             {/* Concurrency */}
             <div>
               <label
@@ -660,6 +690,25 @@ export function ParserConfigsPage() {
                 ))}
               </select>
             </div>
+
+            {/* Conditional: endpointUrl (remote_compatible) */}
+            {form.backend === 'remote_compatible' && (
+              <div>
+                <label
+                  htmlFor="pc-edit-endpointurl"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  远程地址
+                </label>
+                <Input
+                  id="pc-edit-endpointurl"
+                  type="url"
+                  placeholder="https://parser-api.example.com/v1"
+                  value={form.endpointUrl}
+                  onChange={(e) => updateField('endpointUrl', e.target.value)}
+                />
+              </div>
+            )}
 
             {/* Concurrency */}
             <div>

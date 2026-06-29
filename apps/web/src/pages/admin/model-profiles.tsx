@@ -59,6 +59,7 @@ interface FormData {
   maxTokens: number
   dimension: number
   topN: number
+  supportsStreaming: boolean
 }
 
 type NotificationState = {
@@ -79,6 +80,7 @@ const EMPTY_FORM: FormData = {
   maxTokens: 0,
   dimension: 0,
   topN: 0,
+  supportsStreaming: false,
 }
 
 // ── Helpers ──
@@ -97,7 +99,7 @@ function formToCreateRequest(form: FormData): CreateModelProfileRequest {
     ...(form.purpose === 'rerank' && form.topN > 0 ? { topN: form.topN } : {}),
     enabled: true,
     isDefault: false,
-    supportsStreaming: false,
+    supportsStreaming: form.supportsStreaming,
   } as CreateModelProfileRequest
 }
 
@@ -113,6 +115,15 @@ function formToUpdateRequest(form: FormData) {
     params.apiKey = form.apiKey
   }
   params.defaultParameters = { max_tokens: form.maxTokens }
+  if (form.purpose === 'embedding' && form.dimension > 0) {
+    params.dimensions = form.dimension
+  }
+  if (form.purpose === 'rerank' && form.topN > 0) {
+    params.topN = form.topN
+  }
+  if (form.purpose === 'chat') {
+    params.supportsStreaming = form.supportsStreaming
+  }
   return params
 }
 
@@ -206,6 +217,7 @@ export function ModelProfilesPage() {
       maxTokens: (profile.defaultParameters?.max_tokens as number) ?? 0,
       dimension: (profile.dimensions as number) ?? 0,
       topN: (profile.topN as number) ?? 0,
+      supportsStreaming: profile.supportsStreaming,
     })
     setEditOpen(true)
   }, [])
@@ -527,6 +539,69 @@ export function ModelProfilesPage() {
               />
             </div>
 
+            {/* Conditional: supportsStreaming (chat) */}
+            {form.purpose === 'chat' && (
+              <div className="flex items-center gap-2">
+                <input
+                  id="mp-create-supportsstreaming"
+                  type="checkbox"
+                  checked={form.supportsStreaming}
+                  onChange={(e) => updateField('supportsStreaming', e.target.checked)}
+                  className="size-4 rounded border-input text-primary focus:ring-ring"
+                />
+                <label
+                  htmlFor="mp-create-supportsstreaming"
+                  className="text-sm font-medium text-foreground"
+                >
+                  启用流式传输
+                </label>
+              </div>
+            )}
+
+            {/* Conditional: dimension (embedding) */}
+            {form.purpose === 'embedding' && (
+              <div>
+                <label
+                  htmlFor="mp-create-dimension"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  向量维度
+                </label>
+                <Input
+                  id="mp-create-dimension"
+                  type="number"
+                  placeholder="1536"
+                  min={1}
+                  value={form.dimension || ''}
+                  onChange={(e) =>
+                    updateField('dimension', Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+              </div>
+            )}
+
+            {/* Conditional: topN (rerank) */}
+            {form.purpose === 'rerank' && (
+              <div>
+                <label
+                  htmlFor="mp-create-topn"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  默认 TopN
+                </label>
+                <Input
+                  id="mp-create-topn"
+                  type="number"
+                  placeholder="3"
+                  min={1}
+                  value={form.topN || ''}
+                  onChange={(e) =>
+                    updateField('topN', Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+              </div>
+            )}
+
             {/* API Key */}
             <div>
               <label
@@ -700,6 +775,69 @@ export function ModelProfilesPage() {
                 onChange={(e) => updateField('model', e.target.value)}
               />
             </div>
+
+            {/* Conditional: supportsStreaming (chat) */}
+            {form.purpose === 'chat' && (
+              <div className="flex items-center gap-2">
+                <input
+                  id="mp-edit-supportsstreaming"
+                  type="checkbox"
+                  checked={form.supportsStreaming}
+                  onChange={(e) => updateField('supportsStreaming', e.target.checked)}
+                  className="size-4 rounded border-input text-primary focus:ring-ring"
+                />
+                <label
+                  htmlFor="mp-edit-supportsstreaming"
+                  className="text-sm font-medium text-foreground"
+                >
+                  启用流式传输
+                </label>
+              </div>
+            )}
+
+            {/* Conditional: dimension (embedding) */}
+            {form.purpose === 'embedding' && (
+              <div>
+                <label
+                  htmlFor="mp-edit-dimension"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  向量维度
+                </label>
+                <Input
+                  id="mp-edit-dimension"
+                  type="number"
+                  placeholder="1536"
+                  min={1}
+                  value={form.dimension || ''}
+                  onChange={(e) =>
+                    updateField('dimension', Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+              </div>
+            )}
+
+            {/* Conditional: topN (rerank) */}
+            {form.purpose === 'rerank' && (
+              <div>
+                <label
+                  htmlFor="mp-edit-topn"
+                  className="mb-1 block text-sm font-medium text-foreground"
+                >
+                  默认 TopN
+                </label>
+                <Input
+                  id="mp-edit-topn"
+                  type="number"
+                  placeholder="3"
+                  min={1}
+                  value={form.topN || ''}
+                  onChange={(e) =>
+                    updateField('topN', Math.max(0, Number(e.target.value) || 0))
+                  }
+                />
+              </div>
+            )}
 
             {/* API Key */}
             <div>

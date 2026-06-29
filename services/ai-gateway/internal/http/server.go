@@ -222,10 +222,6 @@ func (s *Server) internalContext(w http.ResponseWriter, r *http.Request) (servic
 		CallerService: strings.TrimSpace(r.Header.Get("X-Caller-Service")),
 		UserID:        strings.TrimSpace(r.Header.Get("X-User-Id")),
 	}
-	if reqCtx.CallerService == "" {
-		writeError(w, r, service.UnauthorizedError())
-		return service.RequestContext{}, false
-	}
 	return reqCtx, true
 }
 
@@ -234,8 +230,13 @@ func (s *Server) authorizeInternal(w http.ResponseWriter, r *http.Request) bool 
 		writeError(w, r, service.UnauthorizedError())
 		return false
 	}
-	if strings.TrimSpace(r.Header.Get("X-Caller-Service")) == "" {
+	callerService := strings.TrimSpace(r.Header.Get("X-Caller-Service"))
+	if callerService == "" {
 		writeError(w, r, service.UnauthorizedError())
+		return false
+	}
+	if !isAllowedCallerService(callerService) {
+		writeError(w, r, service.NewError(service.CodeForbidden, "caller service is not allowed", nil))
 		return false
 	}
 	return true
@@ -246,11 +247,25 @@ func (s *Server) authorizeModelInvocation(w http.ResponseWriter, r *http.Request
 		writeOpenAIError(w, http.StatusUnauthorized, "authentication is required", "authentication_error", "unauthorized")
 		return false
 	}
-	if strings.TrimSpace(r.Header.Get("X-Caller-Service")) == "" {
+	callerService := strings.TrimSpace(r.Header.Get("X-Caller-Service"))
+	if callerService == "" {
 		writeOpenAIError(w, http.StatusUnauthorized, "authentication is required", "authentication_error", "unauthorized")
 		return false
 	}
+	if !isAllowedCallerService(callerService) {
+		writeOpenAIError(w, http.StatusForbidden, "caller service is not allowed", "permission_error", "forbidden")
+		return false
+	}
 	return true
+}
+
+func isAllowedCallerService(callerService string) bool {
+	switch callerService {
+	case "gateway", "qa", "knowledge", "document", "auth", "file":
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Server) requireProfiles(w http.ResponseWriter, r *http.Request) bool {

@@ -260,6 +260,8 @@ paths:
           $ref: '#/components/responses/OpenAIError'
         '429':
           $ref: '#/components/responses/OpenAIError'
+        '501':
+          $ref: '#/components/responses/OpenAIError'
         '502':
           $ref: '#/components/responses/OpenAIError'
   /internal/v1/embeddings:
@@ -296,6 +298,8 @@ paths:
           $ref: '#/components/responses/OpenAIError'
         '429':
           $ref: '#/components/responses/OpenAIError'
+        '501':
+          $ref: '#/components/responses/OpenAIError'
         '502':
           $ref: '#/components/responses/OpenAIError'
   /internal/v1/rerankings:
@@ -331,6 +335,8 @@ paths:
         '404':
           $ref: '#/components/responses/OpenAIError'
         '429':
+          $ref: '#/components/responses/OpenAIError'
+        '501':
           $ref: '#/components/responses/OpenAIError'
         '502':
           $ref: '#/components/responses/OpenAIError'
@@ -505,6 +511,7 @@ components:
           - not_found_error
           - conflict_error
           - rate_limit_error
+          - not_implemented_error
           - upstream_error
           - internal_error
         param:

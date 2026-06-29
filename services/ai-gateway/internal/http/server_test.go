@@ -41,6 +41,23 @@ func TestModelProfileRequiresCallerService(t *testing.T) {
 	}
 }
 
+func TestModelProfileRejectsUnknownCallerService(t *testing.T) {
+	server := newTestServer(t)
+	req := httptest.NewRequest(http.MethodGet, "/internal/v1/model-profiles", nil)
+	req.Header.Set("X-Service-Token", "service-token")
+	req.Header.Set("X-Caller-Service", "unknown-service")
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"code":"forbidden"`)) {
+		t.Fatalf("body = %s, want forbidden error", rec.Body.String())
+	}
+}
+
 func TestCreateModelProfileDoesNotReturnAPIKey(t *testing.T) {
 	server := newTestServer(t)
 	body := `{"name":"default-chat","purpose":"chat","provider":"siliconflow","baseUrl":"https://api.siliconflow.cn/v1","model":"Qwen","apiKey":"sk-secret-value","enabled":true,"isDefault":true}`
@@ -114,6 +131,23 @@ func TestModelInvocationRoutesReturnNotImplemented(t *testing.T) {
 				t.Fatalf("body = %s, model invocation errors must not use project envelope", rec.Body.String())
 			}
 		})
+	}
+}
+
+func TestModelInvocationRoutesRejectUnknownCallerService(t *testing.T) {
+	server := newTestServer(t)
+	req := httptest.NewRequest(http.MethodPost, "/internal/v1/chat/completions", strings.NewReader(`{}`))
+	req.Header.Set("X-Service-Token", "service-token")
+	req.Header.Set("X-Caller-Service", "unknown-service")
+	rec := httptest.NewRecorder()
+
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+	if !bytes.Contains(rec.Body.Bytes(), []byte(`"type":"permission_error"`)) {
+		t.Fatalf("body = %s, want OpenAI-style permission error", rec.Body.String())
 	}
 }
 

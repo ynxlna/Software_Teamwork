@@ -1,0 +1,5 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Verification baseline."}
+{"file":".trellis/spec/backend/api-contracts.md","reason":"Contract compatibility."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Safe failure behavior."}
+{"file":"docs/services/knowledge/docs/implementation.md","reason":"Acceptance criteria."}
+{"file":"services/knowledge/api/openapi.yaml","reason":"Internal endpoint schema."}

@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend implementation baseline."}
+{"file":".trellis/spec/backend/api-contracts.md","reason":"HTTP compatibility rules."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Sanitized errors."}
+{"file":"docs/services/knowledge/docs/implementation.md","reason":"Service boundaries."}
+{"file":"docs/services/knowledge/docs/data-models.md","reason":"Storage source-of-truth rules."}
+{"file":"docs/services/gateway/api/openapi.yaml","reason":"Public query contract."}
+{"file":"docs/services/ai-gateway/api/openapi.yaml","reason":"Reranking contract."}

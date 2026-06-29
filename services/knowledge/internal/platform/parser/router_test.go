@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -177,6 +178,20 @@ func TestRouterRejectsEmptyAndOversizedDocuments(t *testing.T) {
 		t.Fatal("Parse() empty text error = nil, want error")
 	}
 
+	ocr := &fakeOCRClient{textByName: map[string]string{"empty.pdf": "must not parse empty file"}}
+	_, err = parser.NewRouterWithOCR(ocr).Parse(context.Background(), service.ParseInput{
+		Name:        "empty.pdf",
+		ContentType: "application/pdf",
+		Body:        bytes.NewReader(nil),
+		SizeBytes:   0,
+	})
+	if err == nil {
+		t.Fatal("Parse() empty pdf error = nil, want error")
+	}
+	if len(ocr.requests) != 0 {
+		t.Fatalf("ocr requests = %+v, want none for empty document", ocr.requests)
+	}
+
 	oversized := bytes.Repeat([]byte("a"), 8<<20+1)
 	_, err = parser.NewRouter().Parse(context.Background(), service.ParseInput{
 		Name:        "large.txt",
@@ -186,6 +201,99 @@ func TestRouterRejectsEmptyAndOversizedDocuments(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("Parse() oversized text error = nil, want error")
+	}
+}
+
+func TestRouterParsesPDFThroughOCR(t *testing.T) {
+	ocr := &fakeOCRClient{
+		textByName: map[string]string{
+			"scan.pdf": "Transformer OCR label",
+		},
+	}
+	parsed, err := parser.NewRouterWithOCR(ocr).Parse(context.Background(), service.ParseInput{
+		Name:        "scan.pdf",
+		ContentType: "application/pdf",
+		Body:        bytes.NewReader([]byte("%PDF-1.7\nbinary page image")),
+		SizeBytes:   26,
+	})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if parsed.Title != "Transformer OCR label" || !strings.Contains(parsed.Content, "Transformer OCR label") {
+		t.Fatalf("parsed = %+v", parsed)
+	}
+	if len(ocr.requests) != 1 || ocr.requests[0].ContentType != "application/pdf" {
+		t.Fatalf("ocr requests = %+v", ocr.requests)
+	}
+}
+
+func TestRouterParsesPPTXImageTextThroughOCR(t *testing.T) {
+	image := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 'l', 'a', 'b', 'e', 'l'}
+	ocr := &fakeOCRClient{
+		textByName: map[string]string{
+			"ppt/media/image1.png": "Pump Station 3",
+		},
+	}
+	pptx := officeZip(t, map[string]string{
+		"ppt/presentation.xml":             `<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>`,
+		"ppt/_rels/presentation.xml.rels":  `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="slides/slide1.xml"/></Relationships>`,
+		"ppt/slides/slide1.xml":            `<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:pic><p:blipFill><a:blip r:embed="rId2"/></p:blipFill></p:pic></p:spTree></p:cSld></p:sld>`,
+		"ppt/slides/_rels/slide1.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId2" Target="../media/image1.png" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/></Relationships>`,
+		"ppt/media/image1.png":             string(image),
+	})
+
+	parsed, err := parser.NewRouterWithOCR(ocr).Parse(context.Background(), service.ParseInput{
+		Name:        "training.pptx",
+		ContentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		Body:        bytes.NewReader(pptx),
+		SizeBytes:   int64(len(pptx)),
+	})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if parsed.Title != "Pump Station 3" || !strings.Contains(parsed.Content, "Pump Station 3") {
+		t.Fatalf("parsed = %+v", parsed)
+	}
+	if len(ocr.requests) != 1 || ocr.requests[0].DocumentName != "ppt/media/image1.png" || ocr.requests[0].ContentType != "image/png" {
+		t.Fatalf("ocr requests = %+v", ocr.requests)
+	}
+}
+
+func TestRouterSkipsUnusedAndExternalPPTXImageRelationships(t *testing.T) {
+	image := []byte{0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n', 'l', 'a', 'b', 'e', 'l'}
+	ocr := &fakeOCRClient{
+		textByName: map[string]string{
+			"ppt/media/rendered.png": "Visible Safety Label",
+		},
+	}
+	pptx := officeZip(t, map[string]string{
+		"ppt/presentation.xml":            `<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:sldIdLst><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>`,
+		"ppt/_rels/presentation.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="slides/slide1.xml"/></Relationships>`,
+		"ppt/slides/slide1.xml":           `<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><p:cSld><p:spTree><p:pic><p:blipFill><a:blip r:embed="rVisible"/></p:blipFill></p:pic></p:spTree></p:cSld></p:sld>`,
+		"ppt/slides/_rels/slide1.xml.rels": `<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rUnused" Target="../media/unused.png" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/>
+<Relationship Id="rExternal" Target="https://files.internal/secret.png" TargetMode="External" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/>
+<Relationship Id="rTraversal" Target="../../media/outside.png" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/>
+<Relationship Id="rVisible" Target="../media/rendered.png" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image"/>
+</Relationships>`,
+		"ppt/media/unused.png":   string(image),
+		"ppt/media/rendered.png": string(image),
+	})
+
+	parsed, err := parser.NewRouterWithOCR(ocr).Parse(context.Background(), service.ParseInput{
+		Name:        "training.pptx",
+		ContentType: "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+		Body:        bytes.NewReader(pptx),
+		SizeBytes:   int64(len(pptx)),
+	})
+	if err != nil {
+		t.Fatalf("Parse() error = %v", err)
+	}
+	if !strings.Contains(parsed.Content, "Visible Safety Label") {
+		t.Fatalf("parsed = %+v", parsed)
+	}
+	if len(ocr.requests) != 1 || ocr.requests[0].DocumentName != "ppt/media/rendered.png" {
+		t.Fatalf("ocr requests = %+v", ocr.requests)
 	}
 }
 
@@ -206,4 +314,18 @@ func officeZip(t *testing.T, files map[string]string) []byte {
 		t.Fatalf("zip Close() error = %v", err)
 	}
 	return buf.Bytes()
+}
+
+type fakeOCRClient struct {
+	textByName map[string]string
+	requests   []parser.OCRRequest
+}
+
+func (c *fakeOCRClient) ExtractText(ctx context.Context, request parser.OCRRequest) (parser.OCRResult, error) {
+	c.requests = append(c.requests, request)
+	text, ok := c.textByName[request.DocumentName]
+	if !ok {
+		return parser.OCRResult{}, fmt.Errorf("unexpected OCR request")
+	}
+	return parser.OCRResult{Text: text}, nil
 }

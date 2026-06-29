@@ -28,10 +28,15 @@ const (
 
 type Router struct {
 	text *TextParser
+	ocr  OCRClient
 }
 
 func NewRouter() *Router {
 	return &Router{text: NewTextParser()}
+}
+
+func NewRouterWithOCR(ocr OCRClient) *Router {
+	return &Router{text: NewTextParser(), ocr: ocr}
 }
 
 func (r *Router) Parse(ctx context.Context, input service.ParseInput) (service.ParsedDocument, error) {
@@ -57,13 +62,28 @@ func (r *Router) Parse(ctx context.Context, input service.ParseInput) (service.P
 	case formatDOCX:
 		return parseDOCX(archive)
 	case formatPPTX:
-		return parsePPTX(archive)
+		return parsePPTX(ctx, archive, r.ocr, ocrRequestContext{
+			requestID: input.RequestID,
+			userID:    input.UserID,
+		})
 	case formatXLSX:
 		return parseXLSX(archive)
 	case formatPDF:
-		return service.ParsedDocument{}, fmt.Errorf("pdf parsing is not supported without external parser")
+		return parseWithOCR(ctx, r.ocr, OCRRequest{
+			DocumentName: input.Name,
+			ContentType:  "application/pdf",
+			Data:         data,
+			RequestID:    input.RequestID,
+			UserID:       input.UserID,
+		}, "pdf parsing is not supported without external parser")
 	case formatImage:
-		return service.ParsedDocument{}, fmt.Errorf("image OCR is not supported without external parser")
+		return parseWithOCR(ctx, r.ocr, OCRRequest{
+			DocumentName: input.Name,
+			ContentType:  imageContentType(input.Name, data),
+			Data:         data,
+			RequestID:    input.RequestID,
+			UserID:       input.UserID,
+		}, "image OCR is not supported without external parser")
 	case formatLegacyOffice:
 		return service.ParsedDocument{}, fmt.Errorf("legacy Office document parsing is not supported")
 	default:

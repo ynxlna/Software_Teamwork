@@ -2,6 +2,7 @@ package parser
 
 import (
 	"archive/zip"
+	"context"
 	"encoding/xml"
 	"fmt"
 	"io"
@@ -33,7 +34,12 @@ func parseDOCX(archive *zip.Reader) (service.ParsedDocument, error) {
 	}, nil
 }
 
-func parsePPTX(archive *zip.Reader) (service.ParsedDocument, error) {
+type ocrRequestContext struct {
+	requestID string
+	userID    string
+}
+
+func parsePPTX(ctx context.Context, archive *zip.Reader, ocr OCRClient, requestContext ocrRequestContext) (service.ParsedDocument, error) {
 	slideFiles := orderedPresentationSlides(archive)
 	if len(slideFiles) == 0 {
 		return service.ParsedDocument{}, fmt.Errorf("presentation has no slides")
@@ -49,12 +55,16 @@ func parsePPTX(archive *zip.Reader) (service.ParsedDocument, error) {
 		if err != nil {
 			return service.ParsedDocument{}, err
 		}
-		slideText := strings.TrimSpace(strings.Join(paragraphs, "\n"))
+		ocrParagraphs, err := extractSlideOCRText(ctx, archive, file, ocr, requestContext)
+		if err != nil {
+			return service.ParsedDocument{}, err
+		}
+		slideText := strings.TrimSpace(strings.Join(append(paragraphs, ocrParagraphs...), "\n"))
 		if slideText == "" {
 			continue
 		}
 		if title == "" {
-			title = firstNonEmptyLine(slideText)
+			title = firstPresentationTitle(slideText)
 		}
 		sections = append(sections, fmt.Sprintf("Slide %d\n%s", index+1, slideText))
 	}
@@ -63,6 +73,49 @@ func parsePPTX(archive *zip.Reader) (service.ParsedDocument, error) {
 		return service.ParsedDocument{}, fmt.Errorf("document is empty")
 	}
 	return service.ParsedDocument{Content: content, Title: title}, nil
+}
+
+func firstPresentationTitle(content string) string {
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || (strings.HasPrefix(line, "Image ") && strings.HasSuffix(line, " OCR")) {
+			continue
+		}
+		return line
+	}
+	return firstNonEmptyLine(content)
+}
+
+func extractSlideOCRText(ctx context.Context, archive *zip.Reader, slideFile string, ocr OCRClient, requestContext ocrRequestContext) ([]string, error) {
+	if ocr == nil {
+		return nil, nil
+	}
+	imageTargets := imageTargetsForSlide(archive, slideFile)
+	if len(imageTargets) == 0 {
+		return nil, nil
+	}
+	paragraphs := make([]string, 0, len(imageTargets))
+	for index, target := range imageTargets {
+		data, err := readArchiveFile(archive, target)
+		if err != nil {
+			continue
+		}
+		result, err := ocr.ExtractText(ctx, OCRRequest{
+			DocumentName: target,
+			ContentType:  imageContentType(target, data),
+			Data:         data,
+			RequestID:    requestContext.requestID,
+			UserID:       requestContext.userID,
+		})
+		if err != nil {
+			return nil, service.DependencyError("document OCR failed", err)
+		}
+		text := strings.TrimSpace(result.Text)
+		if text != "" {
+			paragraphs = append(paragraphs, fmt.Sprintf("Image %d OCR\n%s", index+1, text))
+		}
+	}
+	return paragraphs, nil
 }
 
 func parseXLSX(archive *zip.Reader) (service.ParsedDocument, error) {
@@ -206,6 +259,90 @@ func relationshipsFor(archive *zip.Reader, relsPath string, baseDir string) map[
 		rels[id] = normalizeArchiveTarget(baseDir, target)
 	}
 	return rels
+}
+
+func imageTargetsForSlide(archive *zip.Reader, slideFile string) []string {
+	slideData, err := readArchiveFile(archive, slideFile)
+	if err != nil {
+		return nil
+	}
+	referencedIDs := referencedImageRelationshipIDs(slideData)
+	if len(referencedIDs) == 0 {
+		return nil
+	}
+	relsPath := path.Dir(slideFile) + "/_rels/" + path.Base(slideFile) + ".rels"
+	data, err := readArchiveFile(archive, relsPath)
+	if err != nil {
+		return nil
+	}
+	decoder := xml.NewDecoder(strings.NewReader(string(data)))
+	targets := []string{}
+	seen := map[string]bool{}
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil
+		}
+		start, ok := token.(xml.StartElement)
+		if !ok || start.Name.Local != "Relationship" {
+			continue
+		}
+		id := attrValue(start.Attr, "Id")
+		relationshipType := attrValue(start.Attr, "Type")
+		target := attrValue(start.Attr, "Target")
+		targetMode := attrValue(start.Attr, "TargetMode")
+		if id == "" || !referencedIDs[id] || target == "" || strings.Contains(target, "://") || strings.EqualFold(targetMode, "External") {
+			continue
+		}
+		normalized := normalizeArchiveTarget(path.Dir(slideFile), target)
+		if !strings.HasSuffix(relationshipType, "/image") || !isImageArchivePath(normalized) || !strings.HasPrefix(normalized, "ppt/media/") {
+			continue
+		}
+		if normalized != "" && !seen[normalized] {
+			targets = append(targets, normalized)
+			seen[normalized] = true
+		}
+	}
+	return targets
+}
+
+func referencedImageRelationshipIDs(data []byte) map[string]bool {
+	decoder := xml.NewDecoder(strings.NewReader(string(data)))
+	ids := map[string]bool{}
+	for {
+		token, err := decoder.Token()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil
+		}
+		start, ok := token.(xml.StartElement)
+		if !ok {
+			continue
+		}
+		for _, attr := range start.Attr {
+			if (attr.Name.Local == "embed" || attr.Name.Local == "link") &&
+				strings.Contains(attr.Name.Space, "relationships") &&
+				strings.TrimSpace(attr.Value) != "" {
+				ids[attr.Value] = true
+			}
+		}
+	}
+	return ids
+}
+
+func isImageArchivePath(name string) bool {
+	ext := strings.ToLower(filepath.Ext(name))
+	switch ext {
+	case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff", ".webp":
+		return true
+	default:
+		return false
+	}
 }
 
 func orderedRelationshipIDs(data []byte, elementName string) ([]string, error) {

@@ -12,7 +12,9 @@ import (
 
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/config"
 	httpapi "github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/http"
+	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/platform/fileclient"
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/repository"
+	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/service"
 )
 
 func main() {
@@ -33,7 +35,14 @@ func main() {
 	}
 	defer repo.Close()
 
-	handler := httpapi.NewServer(httpapi.Config{Logger: logger, ReadyChecker: repo})
+	files, err := fileclient.New(cfg.FileServiceURL, nil)
+	if err != nil {
+		logger.Error("file client initialization failed", "service", "document", "dependency", "file", "error", err)
+		os.Exit(1)
+	}
+	documents := service.New(repo, files)
+
+	handler := httpapi.NewServer(httpapi.Config{Logger: logger, ReadyChecker: repo, DocumentService: documents})
 	server := &http.Server{
 		Addr:              cfg.HTTPAddr,
 		Handler:           handler,

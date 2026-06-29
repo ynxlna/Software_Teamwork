@@ -1,6 +1,10 @@
 package service
 
-import "time"
+import (
+	"encoding/json"
+	"io"
+	"time"
+)
 
 type ReportStatus string
 
@@ -28,6 +32,130 @@ type ReportType struct {
 	DefaultTemplateID string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+}
+
+type PageMeta struct {
+	Page     int
+	PageSize int
+	Total    int
+}
+
+type RequestContext struct {
+	RequestID      string
+	UserID         string
+	CallerService  string
+	ServiceToken   string
+	Roles          []string
+	Permissions    []string
+	ForwardedFor   string
+	ForwardedProto string
+}
+
+type UploadedFile struct {
+	Filename       string
+	ContentType    string
+	SizeBytes      int64
+	ChecksumSHA256 string
+	Content        io.Reader
+}
+
+type FileObject struct {
+	ID             string
+	Filename       string
+	ContentType    string
+	SizeBytes      int64
+	ChecksumSHA256 string
+	CreatedAt      time.Time
+}
+
+type ReportTemplate struct {
+	ID           string
+	TemplateName string
+	ReportType   string
+	Version      int
+	FileRef      string
+	Filename     string
+	FileSize     int64
+	Description  string
+	Enabled      bool
+	CreatedBy    string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
+}
+
+type ReportTemplateStructure struct {
+	OutlineSchema json.RawMessage
+	StyleConfig   json.RawMessage
+}
+
+type ReportTemplateListFilter struct {
+	Page       int
+	PageSize   int
+	ReportType string
+	Enabled    *bool
+}
+
+type ReportTemplateListResult struct {
+	Items []ReportTemplate
+	Page  PageMeta
+}
+
+type CreateReportTemplateInput struct {
+	TemplateName string
+	ReportType   string
+	Description  string
+	File         UploadedFile
+}
+
+type UpdateReportTemplateInput struct {
+	ID           string
+	TemplateName *string
+	Description  *string
+	Enabled      *bool
+}
+
+type UpdateReportTemplateStructureInput struct {
+	ID        string
+	Structure ReportTemplateStructure
+}
+
+type ReportMaterial struct {
+	ID           string
+	MaterialName string
+	MaterialType string
+	Category     string
+	FileRef      string
+	Filename     string
+	FileSize     int64
+	Description  string
+	Tags         []string
+	Enabled      bool
+	CreatedBy    string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
+}
+
+type ReportMaterialListFilter struct {
+	Page     int
+	PageSize int
+	Category string
+	Enabled  *bool
+}
+
+type ReportMaterialListResult struct {
+	Items []ReportMaterial
+	Page  PageMeta
+}
+
+type CreateReportMaterialInput struct {
+	MaterialName string
+	MaterialType string
+	Category     string
+	Description  string
+	Tags         []string
+	File         UploadedFile
 }
 
 type Report struct {

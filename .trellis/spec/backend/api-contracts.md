@@ -612,6 +612,114 @@ response includes contentType and sizeBytes, but no objectKey
 public GET /api/v1/documents/{documentId} stays knowledge-owned and does not expose objectKey
 ```
 
+## Scenario: Document Report Template And Material APIs
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing Document Service report-type, report-template,
+  template-structure, or report-material APIs.
+- Applies to `services/document/internal/http`, `services/document/internal/service`,
+  `services/document/internal/repository`, `services/document/internal/platform/fileclient`,
+  and the matching gateway contract in `docs/services/gateway/api/openapi.yaml`.
+
+### 2. Signatures
+
+Service-local Document routes should mirror the gateway resource paths unless the
+team introduces a versioned internal Document API:
+
+- `GET /report-types`
+- `GET /report-templates`
+- `POST /report-templates` with multipart field `file`, `templateName`,
+  `reportType`, and optional `description`
+- `GET /report-templates/{reportTemplateId}`
+- `PATCH /report-templates/{reportTemplateId}` with optional `templateName`,
+  `description`, and `enabled`
+- `DELETE /report-templates/{reportTemplateId}`
+- `GET /report-templates/{reportTemplateId}/structure`
+- `PATCH /report-templates/{reportTemplateId}/structure`
+- `GET /report-materials`
+- `POST /report-materials` with multipart field `file`, `materialName`,
+  `materialType`, optional `category`, `description`, and `tags`
+- `GET /report-materials/{materialId}`
+- `DELETE /report-materials/{materialId}`
+
+Document calls File Service through:
+
+- `POST /internal/v1/files`
+- `DELETE /internal/v1/files/{fileId}` for best-effort cleanup when a Document
+  business insert fails after upload
+
+### 3. Contracts
+
+- Gateway-facing responses use `{ data, requestId }`; list responses use
+  `{ data, page, requestId }`.
+- Public template DTOs may include `id`, `templateName`, `reportType`, `version`,
+  `description`, `enabled`, `filename`, `fileSize`, `createdBy`, `createdAt`,
+  and `updatedAt`.
+- Public material DTOs may include `id`, `materialName`, `materialType`,
+  `category`, `description`, `tags`, `enabled`, `filename`, `fileSize`,
+  `createdBy`, `createdAt`, and `updatedAt`.
+- Template structure follows gateway OpenAPI: `outlineSchema` array and
+  `styleConfig` object. Do not expose `materialMappings` unless the gateway
+  OpenAPI contract is updated first.
+- Document may persist `file_ref` internally, but public responses must not
+  expose File Service IDs, `file_ref`, buckets, object keys, internal URLs,
+  signed URLs, or storage credentials.
+- Template/material deletion should soft-delete business rows with `deleted_at`
+  and hide them from list/detail responses.
+
+### 4. Validation & Error Matrix
+
+| Condition | Response/error |
+| --- | --- |
+| Missing gateway user context | `401 unauthorized` |
+| Invalid page, pageSize, enabled, UUID, JSON shape, or multipart body | `400 validation_error` |
+| Missing `templateName`, `reportType`, `materialName`, `materialType`, or upload file | `400 validation_error` |
+| Template upload is not a DOCX in the first implementation slice | `400 validation_error` |
+| Disabled or missing report type on template create | `400 validation_error` |
+| Missing or soft-deleted template/material | `404 not_found` |
+| File Service upload failure | `502 dependency_error` |
+| PostgreSQL query/insert/update failure | `502 dependency_error` unless a typed domain error applies |
+
+### 5. Good/Base/Bad Cases
+
+- Good: handler parses multipart, service validates business fields and calls
+  File Service, repository stores `file_ref` plus safe display metadata, and the
+  response omits all internal file identifiers.
+- Base: template/material rows are soft-deleted and hidden from read APIs while
+  historical report references remain intact.
+- Bad: returning File Service `id` as a public template/material field, exposing
+  object storage details, or calling File Service while holding a database
+  transaction.
+
+### 6. Tests Required
+
+- Handler tests for response envelopes, pagination metadata, request ID
+  propagation, invalid query parameters, missing upload file, and JSON decode
+  errors.
+- Service tests or handler fakes for File Service dependency failure mapping,
+  required field validation, DOCX validation, and disabled/missing report type.
+- Repository integration tests, when `DOCUMENT_TEST_DATABASE_URL` is available,
+  for list filters, soft delete hiding, structure JSON round-trip, and tags JSON
+  round-trip.
+- Response safety tests asserting public bodies do not contain `file_ref`,
+  `fileRef`, raw File Service IDs, object keys, buckets, internal URLs, or signed
+  URLs.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+POST /report-templates -> document stores uploaded bytes itself -> response returns fileRef/fileId
+```
+
+#### Correct
+
+```text
+POST /report-templates -> document calls file /internal/v1/files -> stores file_ref internally -> response returns only template id and safe display metadata
+```
+
 ## Scenario: Gateway Redis Session Cache
 
 ### 1. Scope / Trigger

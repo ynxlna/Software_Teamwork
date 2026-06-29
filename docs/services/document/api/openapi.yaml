@@ -16,7 +16,19 @@ tags:
   - name: Jobs
   - name: Settings
   - name: Stats
+  - name: Logs
 paths:
+  /report-types:
+    get:
+      tags: [Reports]
+      summary: List report types
+      responses:
+        '200':
+          description: Supported report types
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportTypeList' }
+        default: { $ref: '#/components/responses/Error' }
   /report-templates:
     get:
       tags: [Templates]
@@ -26,7 +38,7 @@ paths:
         - $ref: '#/components/parameters/PageSize'
         - name: reportType
           in: query
-          schema: { $ref: '#/components/schemas/ReportType' }
+          schema: { $ref: '#/components/schemas/ReportTypeCode' }
       responses:
         '200':
           description: Template list
@@ -85,6 +97,18 @@ paths:
         '204': { description: Deleted }
         default: { $ref: '#/components/responses/Error' }
   /report-templates/{reportTemplateId}/structure:
+    get:
+      tags: [Templates]
+      summary: Get report template structure
+      parameters:
+        - $ref: '#/components/parameters/ReportTemplateId'
+      responses:
+        '200':
+          description: Template structure
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/TemplateStructure' }
+        default: { $ref: '#/components/responses/Error' }
     patch:
       tags: [Templates]
       summary: Update report template structure
@@ -111,7 +135,7 @@ paths:
         - $ref: '#/components/parameters/PageSize'
         - name: reportType
           in: query
-          schema: { $ref: '#/components/schemas/ReportType' }
+          schema: { $ref: '#/components/schemas/ReportTypeCode' }
         - name: year
           in: query
           schema: { type: integer }
@@ -628,6 +652,53 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ReportStats' }
         default: { $ref: '#/components/responses/Error' }
+  /report-statistics/daily:
+    get:
+      tags: [Stats]
+      summary: List daily report statistics
+      parameters:
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 366, default: 30 }
+      responses:
+        '200':
+          description: Daily report statistics
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportDailyStats' }
+        default: { $ref: '#/components/responses/Error' }
+  /report-operation-logs:
+    get:
+      tags: [Logs]
+      summary: List report operation logs
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: targetType
+          in: query
+          schema: { type: string }
+        - name: targetId
+          in: query
+          schema: { type: string }
+        - name: operationType
+          in: query
+          schema: { type: string }
+        - name: requestId
+          in: query
+          schema: { type: string }
+        - name: requestSource
+          in: query
+          schema: { type: string }
+        - name: toolName
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Report operation logs
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ReportOperationLogPage' }
+        default: { $ref: '#/components/responses/Error' }
 components:
   securitySchemes:
     bearerAuth:
@@ -685,9 +756,24 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
   schemas:
-    ReportType:
+    ReportTypeCode:
       type: string
       enum: [summer_peak_inspection, coal_inventory_audit]
+    ReportType:
+      type: object
+      required: [code, name, enabled]
+      properties:
+        code: { $ref: '#/components/schemas/ReportTypeCode' }
+        name: { type: string }
+        description: { type: string }
+        enabled: { type: boolean }
+        defaultTemplateId: { type: string }
+    ReportTypeList:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReportType' }
     ReportStatus:
       type: string
       enum: [draft, outline_generating, outline_generated, content_generating, generated, exporting, exported, failed, deleted]
@@ -702,7 +788,7 @@ components:
       properties:
         id: { type: string }
         name: { type: string }
-        reportType: { $ref: '#/components/schemas/ReportType' }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
         filename: { type: string }
         fileSize: { type: integer, format: int64 }
         status: { type: string, enum: [active, inactive, deleted] }
@@ -717,7 +803,7 @@ components:
       required: [name, reportType, file]
       properties:
         name: { type: string }
-        reportType: { $ref: '#/components/schemas/ReportType' }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
         file:
           type: string
           format: binary
@@ -728,7 +814,7 @@ components:
       type: object
       properties:
         name: { type: string }
-        reportType: { $ref: '#/components/schemas/ReportType' }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
         styleProfile:
           type: object
           additionalProperties: true
@@ -765,7 +851,7 @@ components:
       properties:
         id: { type: string }
         title: { type: string }
-        reportType: { $ref: '#/components/schemas/ReportType' }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
         specialty: { type: string }
         plantName: { type: string }
         year: { type: integer }
@@ -779,7 +865,7 @@ components:
       required: [title, reportType]
       properties:
         title: { type: string }
-        reportType: { $ref: '#/components/schemas/ReportType' }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
         specialty: { type: string }
         plantName: { type: string }
         year: { type: integer }
@@ -789,7 +875,7 @@ components:
       type: object
       properties:
         title: { type: string }
-        reportType: { $ref: '#/components/schemas/ReportType' }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
         specialty: { type: string }
         plantName: { type: string }
         year: { type: integer }
@@ -1110,6 +1196,52 @@ components:
             properties:
               date: { type: string, format: date }
               generatedCount: { type: integer }
+    ReportDailyStatistic:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        reportType: { $ref: '#/components/schemas/ReportTypeCode' }
+        createdCount: { type: integer, minimum: 0 }
+        generatedCount: { type: integer, minimum: 0 }
+        failedCount: { type: integer, minimum: 0 }
+        exportedCount: { type: integer, minimum: 0 }
+    ReportDailyStats:
+      type: object
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReportDailyStatistic' }
+    ReportOperationLog:
+      type: object
+      properties:
+        id: { type: string }
+        operatorId: { type: string }
+        operatorName: { type: string }
+        operationType: { type: string }
+        targetType: { type: string }
+        targetId: { type: string }
+        requestId: { type: string }
+        requestSource: { type: string }
+        toolName: { type: string }
+        parameterSummary:
+          type: object
+          additionalProperties: true
+          description: Sanitized parameter summary for MCP or API calls.
+        operationResult: { type: string }
+        errorMessage: { type: string, nullable: true }
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Sanitized audit metadata for troubleshooting and filtering.
+        createdAt: { type: string, format: date-time }
+    ReportOperationLogPage:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ReportOperationLog' }
     UpdatedAt:
       type: object
       properties:

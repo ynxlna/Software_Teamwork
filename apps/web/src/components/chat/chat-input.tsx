@@ -58,7 +58,7 @@ export default function ChatInput({ onSend, disabled, value, onChange }: ChatInp
           size="icon"
           onClick={handleSend}
           disabled={!canSend}
-          className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
+          className="shrink-0 rounded-full bg-primary text-primary-foreground transition-all duration-200 hover:bg-primary/90 hover:scale-110 hover:shadow-md active:scale-90"
           aria-label="发送消息"
         >
           <Send className="size-4" aria-hidden="true" />

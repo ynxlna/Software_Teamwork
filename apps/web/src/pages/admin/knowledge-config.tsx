@@ -93,7 +93,7 @@ export function KnowledgeConfig() {
       {!isLoading && !isError && (
         <div className="space-y-6">
           {/* Knowledge Bases list */}
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-lg border border-border bg-card p-6 hover:shadow-sm transition-shadow duration-200">
             <h4 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
               <Database aria-hidden="true" className="size-5" />
               知识库列表
@@ -108,7 +108,7 @@ export function KnowledgeConfig() {
                 {knowledgeBases.items.map((kb) => (
                   <div
                     key={kb.id}
-                    className="flex items-center justify-between rounded-md border border-border bg-background p-3"
+                    className="flex items-center justify-between rounded-md border border-border bg-background p-3 transition-colors duration-150 hover:bg-muted/30"
                   >
                     <div className="min-w-0">
                       <p className="truncate text-sm font-medium text-foreground">{kb.name}</p>
@@ -123,7 +123,7 @@ export function KnowledgeConfig() {
 
           {/* RAG Defaults */}
           {qaConfig && (
-            <div className="rounded-lg border border-border bg-card p-6">
+            <div className="rounded-lg border border-border bg-card p-6 hover:shadow-sm transition-shadow duration-200">
               <h4 className="mb-4 flex items-center gap-2 text-lg font-semibold text-foreground">
                 <Info aria-hidden="true" className="size-5" />
                 默认 RAG 参数

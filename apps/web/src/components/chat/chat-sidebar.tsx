@@ -104,9 +104,9 @@ export default function ChatSidebar({
         <h2 className="text-lg font-semibold text-foreground">对话历史</h2>
         <Button
           onClick={onCreate}
-          className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
+          className="group w-full bg-primary text-primary-foreground transition-all duration-200 hover:bg-primary/90 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98]"
         >
-          <Plus className="size-4" />
+          <Plus className="size-4 transition-transform duration-300 group-hover:rotate-90" />
           新建对话
         </Button>
       </div>

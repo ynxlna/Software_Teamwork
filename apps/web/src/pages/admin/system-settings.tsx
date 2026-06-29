@@ -166,11 +166,11 @@ export function SystemSettings() {
         全局系统配置，包括 LLM API 连接、向量数据库连接、系统参数等。
       </p>
 
-      {/* Notification banner */}
+      {/* Toast notification */}
       {notification && (
         <div
           role="alert"
-          className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          className={`toast-enter mb-4 rounded-lg border px-4 py-3 text-sm ${
             notification.type === 'success'
               ? 'border-emerald-500/50 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-950 dark:text-emerald-300'
               : 'border-destructive/50 bg-destructive/10 text-destructive'
@@ -181,7 +181,7 @@ export function SystemSettings() {
       )}
 
       {/* LLM Config Form */}
-      <div className="rounded-lg border border-border bg-card p-6">
+      <div className="rounded-lg border border-border bg-card p-6 hover:shadow-sm transition-shadow duration-200">
         <h4 className="mb-5 text-lg font-semibold text-foreground">LLM 配置</h4>
 
         <div className="grid grid-cols-2 gap-4">

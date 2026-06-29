@@ -62,7 +62,7 @@ export function StyleManagement() {
             type="button"
             onClick={() => setMode('light')}
             className={cn(
-              'cursor-pointer rounded-xl border-2 p-4 text-left transition-all',
+              'cursor-pointer rounded-xl border-2 p-4 text-left transition-all duration-200 hover:scale-[1.02]',
               mode === 'light'
                 ? 'border-primary ring-2 ring-ring/30'
                 : 'border-border hover:border-muted-foreground/30',
@@ -91,7 +91,7 @@ export function StyleManagement() {
             type="button"
             onClick={() => setMode('dark')}
             className={cn(
-              'cursor-pointer rounded-xl border-2 p-4 text-left transition-all',
+              'cursor-pointer rounded-xl border-2 p-4 text-left transition-all duration-200 hover:scale-[1.02]',
               mode === 'dark'
                 ? 'border-primary ring-2 ring-ring/30'
                 : 'border-border hover:border-muted-foreground/30',
@@ -134,7 +134,7 @@ export function StyleManagement() {
                 key={key}
                 type="button"
                 onClick={() => setPrimaryColor(key)}
-                className="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg py-2 transition-all hover:bg-muted/50"
+                className="flex cursor-pointer flex-col items-center gap-1.5 rounded-lg py-2 transition-all duration-200 hover:scale-[1.02] hover:bg-muted/50"
               >
                 <span
                   className={cn(

@@ -115,7 +115,7 @@ export function ReportRecordsPage() {
           </thead>
           <tbody>
             {reports.map((report) => (
-              <tr key={report.id} className="border-t border-border">
+              <tr key={report.id} className="border-t border-border hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-medium">{report.name}</td>
                 <td className="px-4 py-3 text-muted-foreground">{report.reportType}</td>
                 <td className="px-4 py-3 text-muted-foreground">{report.year ?? '-'}</td>

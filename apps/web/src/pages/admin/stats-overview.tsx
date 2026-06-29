@@ -131,7 +131,7 @@ function MetricCard({
   const unavailable = rawValue === undefined || rawValue === null
 
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
+    <div className="rounded-lg border border-border bg-card p-4 hover:shadow-md transition-shadow duration-200">
       <div className="mb-2 flex items-center justify-between gap-2 text-sm text-muted-foreground">
         <span className="flex items-center gap-2">
           <Icon aria-hidden="true" className="size-4" />
@@ -194,7 +194,7 @@ function TopQueriesTable({ queries }: { queries: QATopQuery[] }) {
           {queries.map((query) => (
             <tr
               key={`${query.query}-${query.lastAskedAt ?? ''}`}
-              className="border-t border-border"
+              className="border-t border-border transition-colors duration-150 hover:bg-muted/30"
             >
               <td className="break-words px-3 py-2 text-foreground">{query.query}</td>
               <td className="px-3 py-2 font-mono">{query.count}</td>

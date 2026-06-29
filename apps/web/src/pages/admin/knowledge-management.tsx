@@ -268,11 +268,11 @@ export function KnowledgeManagement() {
         </Button>
       </div>
 
-      {/* Notification banner */}
+      {/* Toast notification */}
       {notification && (
         <div
           role="alert"
-          className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          className={`toast-enter mb-4 rounded-lg border px-4 py-3 text-sm ${
             notification.type === 'success'
               ? 'border-emerald-500/50 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-950 dark:text-emerald-300'
               : 'border-destructive/50 bg-destructive/10 text-destructive'
@@ -390,7 +390,7 @@ export function KnowledgeManagement() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {data.items.map((kb) => (
-                      <tr key={kb.id} className="transition-colors hover:bg-muted/30">
+                      <tr key={kb.id} className="transition-colors duration-150 hover:bg-muted/30">
                         <td className="max-w-40 truncate px-4 py-2.5 font-medium text-foreground">
                           {kb.name}
                         </td>

@@ -343,7 +343,11 @@ export default function ChatMessages({
       {messages.map((msg, i) => {
         const isLast = i === messages.length - 1
         const isStreamingAsst = isLast && msg.role === 'assistant' && streaming
-        return <MessageBubble key={msg.id} msg={msg} isStreaming={isStreamingAsst} />
+        return (
+          <div key={msg.id} className="message-enter">
+            <MessageBubble msg={msg} isStreaming={isStreamingAsst} />
+          </div>
+        )
       })}
 
       {/* ── Error ── */}

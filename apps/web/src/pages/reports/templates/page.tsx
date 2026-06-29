@@ -163,19 +163,19 @@ export function ReportTemplatesPage() {
       )}
 
       <div className="mb-6 grid gap-4 md:grid-cols-3">
-        <section className="rounded-lg border border-border bg-card p-4">
+        <section className="rounded-lg border border-border bg-card p-4 hover:shadow-sm transition-shadow duration-200">
           <p className="text-sm text-muted-foreground">模板数量</p>
           <p className="mt-2 text-2xl font-semibold">
             {overview?.templateCount ?? templates.length}
           </p>
         </section>
-        <section className="rounded-lg border border-border bg-card p-4">
+        <section className="rounded-lg border border-border bg-card p-4 hover:shadow-sm transition-shadow duration-200">
           <p className="text-sm text-muted-foreground">素材数量</p>
           <p className="mt-2 text-2xl font-semibold">
             {overview?.materialCount ?? materials.length}
           </p>
         </section>
-        <section className="rounded-lg border border-border bg-card p-4">
+        <section className="rounded-lg border border-border bg-card p-4 hover:shadow-sm transition-shadow duration-200">
           <p className="text-sm text-muted-foreground">近 30 天报告</p>
           <p className="mt-2 text-2xl font-semibold">
             {overview?.reportCount ?? daily.reduce((total, item) => total + item.createdCount, 0)}
@@ -193,7 +193,7 @@ export function ReportTemplatesPage() {
           </div>
           <div className="divide-y divide-border">
             {templates.map((template) => (
-              <div key={template.id} className="flex items-center justify-between gap-4 p-4">
+              <div key={template.id} className="flex items-center justify-between gap-4 p-4 hover:bg-muted/20 transition-colors">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{template.templateName}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -236,7 +236,7 @@ export function ReportTemplatesPage() {
           </div>
           <div className="divide-y divide-border">
             {materials.map((material) => (
-              <div key={material.id} className="flex items-center justify-between gap-4 p-4">
+              <div key={material.id} className="flex items-center justify-between gap-4 p-4 hover:bg-muted/20 transition-colors">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{material.materialName}</p>
                   <p className="mt-1 text-xs text-muted-foreground">

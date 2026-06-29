@@ -8,6 +8,8 @@
 
 import type {
   CreateKnowledgeBaseRequest,
+  CreateModelProfileRequest,
+  CreateParserConfigRequest,
   CreateQAConfigVersionRequest,
   CreateQALLMConfigVersionRequest,
   DocumentChunk,
@@ -15,6 +17,8 @@ import type {
   KnowledgeBaseSummary,
   KnowledgeQueryRequest,
   KnowledgeQuerySummary,
+  ModelProfile,
+  ParserConfig,
   QAConfigVersion,
   QAIntentDistributionItem,
   QALLMConfigVersion,
@@ -27,6 +31,8 @@ import type {
   QATopQuery,
   UpdateDocumentRequest,
   UpdateKnowledgeBaseRequest,
+  UpdateModelProfileRequest,
+  UpdateParserConfigRequest,
 } from '@/lib/types'
 
 import { buildQuery, gatewayFileRequest, gatewayPageRequest, gatewayRequest } from './client'
@@ -288,6 +294,106 @@ export async function runKnowledgeQuery(
     method: 'POST',
     body: params,
   })
+}
+
+// =========================================================================
+// Model Profiles (admin-runtime-config, owner: ai-gateway)
+// =========================================================================
+
+/** GET /admin/model-profiles?purpose=&enabled= */
+export async function listModelProfiles(params?: {
+  purpose?: string
+  enabled?: boolean
+}): Promise<ModelProfile[]> {
+  return gatewayRequest<ModelProfile[]>(
+    `/admin/model-profiles${buildQuery({
+      purpose: params?.purpose,
+      enabled: params?.enabled,
+    })}`,
+  )
+}
+
+/** POST /admin/model-profiles */
+export async function createModelProfile(params: CreateModelProfileRequest): Promise<ModelProfile> {
+  return gatewayRequest<ModelProfile>('/admin/model-profiles', {
+    method: 'POST',
+    body: params,
+  })
+}
+
+/** GET /admin/model-profiles/{profileId} */
+export async function getModelProfile(profileId: string): Promise<ModelProfile> {
+  return gatewayRequest<ModelProfile>(
+    `/admin/model-profiles/${encodeURIComponent(profileId)}`,
+  )
+}
+
+/** PATCH /admin/model-profiles/{profileId} */
+export async function updateModelProfile(
+  profileId: string,
+  params: UpdateModelProfileRequest,
+): Promise<ModelProfile> {
+  return gatewayRequest<ModelProfile>(
+    `/admin/model-profiles/${encodeURIComponent(profileId)}`,
+    { method: 'PATCH', body: params },
+  )
+}
+
+/** DELETE /admin/model-profiles/{profileId} */
+export async function deleteModelProfile(profileId: string): Promise<void> {
+  await gatewayRequest<void>(
+    `/admin/model-profiles/${encodeURIComponent(profileId)}`,
+    { method: 'DELETE' },
+  )
+}
+
+// =========================================================================
+// Parser Configs (admin-runtime-config, owner: knowledge)
+// =========================================================================
+
+/** GET /admin/parser-configs?enabled= */
+export async function listParserConfigs(params?: {
+  enabled?: boolean
+}): Promise<ParserConfig[]> {
+  return gatewayRequest<ParserConfig[]>(
+    `/admin/parser-configs${buildQuery({ enabled: params?.enabled })}`,
+  )
+}
+
+/** POST /admin/parser-configs */
+export async function createParserConfig(
+  params: CreateParserConfigRequest,
+): Promise<ParserConfig> {
+  return gatewayRequest<ParserConfig>('/admin/parser-configs', {
+    method: 'POST',
+    body: params,
+  })
+}
+
+/** GET /admin/parser-configs/{parserConfigId} */
+export async function getParserConfig(parserConfigId: string): Promise<ParserConfig> {
+  return gatewayRequest<ParserConfig>(
+    `/admin/parser-configs/${encodeURIComponent(parserConfigId)}`,
+  )
+}
+
+/** PATCH /admin/parser-configs/{parserConfigId} */
+export async function updateParserConfig(
+  parserConfigId: string,
+  params: UpdateParserConfigRequest,
+): Promise<ParserConfig> {
+  return gatewayRequest<ParserConfig>(
+    `/admin/parser-configs/${encodeURIComponent(parserConfigId)}`,
+    { method: 'PATCH', body: params },
+  )
+}
+
+/** DELETE /admin/parser-configs/{parserConfigId} */
+export async function deleteParserConfig(parserConfigId: string): Promise<void> {
+  await gatewayRequest<void>(
+    `/admin/parser-configs/${encodeURIComponent(parserConfigId)}`,
+    { method: 'DELETE' },
+  )
 }
 
 // =========================================================================

@@ -97,6 +97,7 @@ export function KnowledgeChunksPage({ documentId, onNavigateBack }: KnowledgeChu
   // ── Fetch document info and KB name ──
 
   useEffect(() => {
+    if (!documentId) return
     let cancelled = false
     setDocLoading(true)
     setDocError(null)

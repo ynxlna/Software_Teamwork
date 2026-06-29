@@ -88,6 +88,18 @@ const menuItems: AdminNavigationItem[] = [
       },
       { key: 'qa-settings', label: 'QA / LLM 配置', path: '/admin/qa-settings' },
       { key: 'qa-retrieval-test', label: 'QA 检索测试', path: '/admin/qa-retrieval-test' },
+      {
+        key: 'model-profiles',
+        label: '模型管理',
+        path: '/admin/model-profiles',
+        requirement: { any: ['admin:model-profile:write'] },
+      },
+      {
+        key: 'parser-configs',
+        label: '解析器配置',
+        path: '/admin/parser-configs',
+        requirement: { any: ['admin:parser-config:write'] },
+      },
     ],
   },
   {

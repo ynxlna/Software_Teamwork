@@ -13,7 +13,9 @@ import type { PermissionRequirement } from '@/lib/permissions'
 import { canAccess } from '@/lib/permissions'
 import { KnowledgeConfig } from '@/pages/admin/knowledge-config'
 import { KnowledgeManagement } from '@/pages/admin/knowledge-management'
+import { ModelProfilesPage } from '@/pages/admin/model-profiles'
 import { AdminPage } from '@/pages/admin/page'
+import { ParserConfigsPage } from '@/pages/admin/parser-configs'
 import { QARetrievalTestPage } from '@/pages/admin/qa-retrieval-test'
 import { QASettings } from '@/pages/admin/qa-settings'
 import { StatsOverviewPage } from '@/pages/admin/stats-overview'
@@ -358,6 +360,23 @@ const adminStatsRoute = createRoute({
   component: StatsOverviewPage,
 })
 
+const modelProfilesPerm: PermissionRequirement = { any: ['admin:model-profile:write'] }
+const parserConfigsPerm: PermissionRequirement = { any: ['admin:parser-config:write'] }
+
+const adminModelProfilesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'model-profiles',
+  beforeLoad: requireAuth(modelProfilesPerm),
+  component: ModelProfilesPage,
+})
+
+const adminParserConfigsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'parser-configs',
+  beforeLoad: requireAuth(parserConfigsPerm),
+  component: ParserConfigsPage,
+})
+
 const adminReportRecordsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: 'reports/records',
@@ -394,6 +413,8 @@ const routeTree = rootRoute.addChildren([
       adminKnowledgeChunksRoute,
       adminQASettingsRoute,
       adminQARetrievalTestRoute,
+      adminModelProfilesRoute,
+      adminParserConfigsRoute,
       adminSettingsRoute,
       adminStatsRoute,
       adminReportRecordsRoute,

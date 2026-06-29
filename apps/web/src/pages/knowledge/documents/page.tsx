@@ -662,14 +662,18 @@ export function KnowledgeDocumentsPage({
                                 if (token) {
                                   // Fetch with auth header to get blob
                                   import('@/api/admin').then(({ getDocumentContent }) => {
-                                    getDocumentContent(doc.id).then((blob) => {
-                                      const url = URL.createObjectURL(blob)
-                                      const a2 = document.createElement('a')
-                                      a2.href = url
-                                      a2.download = doc.name
-                                      a2.click()
-                                      URL.revokeObjectURL(url)
-                                    })
+                                    getDocumentContent(doc.id)
+                                      .then((blob) => {
+                                        const url = URL.createObjectURL(blob)
+                                        const a2 = document.createElement('a')
+                                        a2.href = url
+                                        a2.download = doc.name
+                                        a2.click()
+                                        URL.revokeObjectURL(url)
+                                      })
+                                      .catch(() => {
+                                        setNotification({ type: 'error', text: '下载失败，请检查网络连接' })
+                                      })
                                   })
                                 }
                               }}

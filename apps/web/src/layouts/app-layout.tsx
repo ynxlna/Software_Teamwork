@@ -101,8 +101,9 @@ export function AppLayout({ children }: PropsWithChildren) {
   const visibleNavItems = navItems.filter((item) => canAccess(user, item.requirement))
 
   const handleLogout = () => {
-    useAuthStore.getState().clearSession()
     void router.navigate({ to: '/login' })
+    // Fire-and-forget: try to end the server session, best-effort
+    void useAuthStore.getState().logout()
   }
 
   return (

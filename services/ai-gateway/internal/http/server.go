@@ -11,6 +11,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -28,6 +29,8 @@ type ModelProfileService interface {
 	CheckReady(context.Context) (service.Readiness, error)
 	CreateChatCompletion(context.Context, service.ChatCompletionInput) (service.ChatCompletionResult, error)
 	StreamChatCompletion(context.Context, service.ChatCompletionInput) (service.ChatCompletionStream, error)
+	CreateEmbeddings(context.Context, service.RequestContext, service.EmbeddingInput) (service.EmbeddingResponse, error)
+	CreateReranking(context.Context, service.RequestContext, service.RerankingInput) (service.RerankingResponse, error)
 }
 
 type Config struct {
@@ -74,8 +77,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("PATCH /internal/v1/model-profiles/{profileId}", s.handleUpdateModelProfile)
 	s.mux.HandleFunc("DELETE /internal/v1/model-profiles/{profileId}", s.handleDeleteModelProfile)
 	s.mux.HandleFunc("POST /internal/v1/chat/completions", s.handleCreateChatCompletion)
-	s.mux.HandleFunc("POST /internal/v1/embeddings", s.handleModelInvocationNotImplemented)
-	s.mux.HandleFunc("POST /internal/v1/rerankings", s.handleModelInvocationNotImplemented)
+	s.mux.HandleFunc("POST /internal/v1/embeddings", s.handleCreateEmbeddings)
+	s.mux.HandleFunc("POST /internal/v1/rerankings", s.handleCreateReranking)
 	s.mux.HandleFunc("/", s.handleNotFound)
 }
 
@@ -329,6 +332,40 @@ func (s *Server) handleCreateChatCompletionStream(w http.ResponseWriter, r *http
 	}
 }
 
+func (s *Server) handleCreateEmbeddings(w http.ResponseWriter, r *http.Request) {
+	reqCtx, ok := s.modelInvocationContext(w, r)
+	if !ok || !s.requireProfilesForModelInvocation(w, r) {
+		return
+	}
+	var payload embeddingRequest
+	if !s.decodeModelJSON(w, r, &payload) {
+		return
+	}
+	response, err := s.profiles.CreateEmbeddings(r.Context(), reqCtx, embeddingInputFromRequest(payload))
+	if err != nil {
+		writeOpenAIAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) handleCreateReranking(w http.ResponseWriter, r *http.Request) {
+	reqCtx, ok := s.modelInvocationContext(w, r)
+	if !ok || !s.requireProfilesForModelInvocation(w, r) {
+		return
+	}
+	var payload rerankingRequest
+	if !s.decodeModelJSON(w, r, &payload) {
+		return
+	}
+	response, err := s.profiles.CreateReranking(r.Context(), reqCtx, rerankingInputFromRequest(payload))
+	if err != nil {
+		writeOpenAIAppError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
 func (s *Server) handleNotFound(w http.ResponseWriter, r *http.Request) {
 	writeError(w, r, service.NotFoundError("route not found", nil))
 }
@@ -447,6 +484,22 @@ func (s *Server) decodeRawJSONObject(w http.ResponseWriter, r *http.Request) (ma
 	return payload, true
 }
 
+func (s *Server) decodeModelJSON(w http.ResponseWriter, r *http.Request, target any) bool {
+	defer r.Body.Close()
+	r.Body = http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		writeOpenAIError(w, http.StatusBadRequest, "request validation failed", "invalid_request_error", "validation_error")
+		return false
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		writeOpenAIError(w, http.StatusBadRequest, "request validation failed", "invalid_request_error", "validation_error")
+		return false
+	}
+	return true
+}
+
 func parseListFilter(w http.ResponseWriter, r *http.Request) (service.ListModelProfilesFilter, bool) {
 	var filter service.ListModelProfilesFilter
 	if raw := strings.TrimSpace(r.URL.Query().Get("purpose")); raw != "" {
@@ -530,6 +583,26 @@ func writeOpenAIErrorFromError(w http.ResponseWriter, err error) {
 		return
 	}
 	writeOpenAIError(w, http.StatusInternalServerError, "internal server error", "internal_error", "internal_error")
+}
+
+func writeOpenAIAppError(w http.ResponseWriter, err error) {
+	appErr, ok := service.Classify(err)
+	if !ok {
+		appErr = service.NewError(service.CodeInternal, "internal server error", err)
+	}
+	writeOpenAIErrorWithParam(w, statusForCode(appErr.Code), appErr.Message, service.OpenAIErrorTypeForCode(appErr.Code), openAIErrorParam(appErr), string(appErr.Code))
+}
+
+func openAIErrorParam(appErr *service.AppError) string {
+	if appErr == nil || appErr.Code != service.CodeValidation || len(appErr.Fields) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(appErr.Fields))
+	for key := range appErr.Fields {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys[0]
 }
 
 func writeOpenAIErrorWithParam(w http.ResponseWriter, status int, message, errorType, param, code string) {
@@ -770,6 +843,8 @@ func statusForCode(code service.Code) int {
 		return http.StatusTooManyRequests
 	case service.CodeDependency:
 		return http.StatusBadGateway
+	case service.CodeNotImplemented:
+		return http.StatusNotImplemented
 	default:
 		return http.StatusInternalServerError
 	}

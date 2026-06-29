@@ -7,6 +7,29 @@ import (
 	"testing"
 )
 
+type fakeInvoker struct {
+	embeddingReq ProviderEmbeddingRequest
+	rerankingReq ProviderRerankingRequest
+	embeddingFn  func(context.Context, ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error)
+	rerankingFn  func(context.Context, ProviderRerankingRequest) (RerankingResponse, ProviderCallMetadata, error)
+}
+
+func (f *fakeInvoker) CreateEmbeddings(ctx context.Context, req ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error) {
+	f.embeddingReq = req
+	if f.embeddingFn != nil {
+		return f.embeddingFn(ctx, req)
+	}
+	return EmbeddingResponse{}, ProviderCallMetadata{}, nil
+}
+
+func (f *fakeInvoker) CreateReranking(ctx context.Context, req ProviderRerankingRequest) (RerankingResponse, ProviderCallMetadata, error) {
+	f.rerankingReq = req
+	if f.rerankingFn != nil {
+		return f.rerankingFn(ctx, req)
+	}
+	return RerankingResponse{}, ProviderCallMetadata{}, nil
+}
+
 func TestCreateModelProfileRedactsCredential(t *testing.T) {
 	repo := newMemoryRepository()
 	encryptor, err := NewCredentialEncryptor([]byte("12345678901234567890123456789012"), "local-v1")
@@ -149,8 +172,201 @@ func TestUpdateModelProfileRejectsEmptyAPIKey(t *testing.T) {
 	}
 }
 
-func intPtr(value int) *int {
-	return &value
+func TestCreateEmbeddingsUsesDefaultProfileAndRecordsSafeSummary(t *testing.T) {
+	repo := newMemoryRepository()
+	invoker := &fakeInvoker{
+		embeddingFn: func(context.Context, ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error) {
+			return EmbeddingResponse{
+				Object: "list",
+				Data: []EmbeddingVector{{
+					Object:    "embedding",
+					Index:     0,
+					Embedding: json.RawMessage(`[0.1,0.2]`),
+				}},
+				Model: "BAAI/bge-m3",
+				Usage: &TokenUsage{PromptTokens: 8, TotalTokens: 8},
+			}, ProviderCallMetadata{StatusCode: 200}, nil
+		},
+	}
+	svc := New(repo, mustEncryptor(t), 60000, invoker)
+	dimensions := 1024
+	isDefault := true
+	if _, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+		Name:       "default-embedding",
+		Purpose:    PurposeEmbedding,
+		Provider:   ProviderSiliconFlow,
+		BaseURL:    "https://api.siliconflow.cn/v1",
+		Model:      "BAAI/bge-m3",
+		APIKey:     "sk-secret-value",
+		IsDefault:  &isDefault,
+		Dimensions: &dimensions,
+	}); err != nil {
+		t.Fatalf("CreateModelProfile() error = %v", err)
+	}
+
+	response, err := svc.CreateEmbeddings(context.Background(), RequestContext{RequestID: "req-1", CallerService: "knowledge", UserID: "user-1"}, EmbeddingInput{
+		Model: "BAAI/bge-m3",
+		Input: []string{"sensitive transformer text"},
+	})
+	if err != nil {
+		t.Fatalf("CreateEmbeddings() error = %v", err)
+	}
+	if response.Usage == nil || response.Usage.TotalTokens != 8 {
+		t.Fatalf("response usage = %#v, want total 8", response.Usage)
+	}
+	if invoker.embeddingReq.Dimensions == nil || *invoker.embeddingReq.Dimensions != dimensions {
+		t.Fatalf("provider dimensions = %#v, want %d", invoker.embeddingReq.Dimensions, dimensions)
+	}
+	if invoker.embeddingReq.APIKey != "sk-secret-value" {
+		t.Fatalf("provider API key was not decrypted")
+	}
+	if len(repo.invocations) != 1 {
+		t.Fatalf("invocations = %d, want 1", len(repo.invocations))
+	}
+	invocation := repo.invocations[0]
+	if invocation.Operation != OperationEmbedding || invocation.Status != InvocationSucceeded {
+		t.Fatalf("invocation = %#v, want successful embedding", invocation)
+	}
+	if invocation.InputCount == nil || *invocation.InputCount != 1 {
+		t.Fatalf("InputCount = %#v, want 1", invocation.InputCount)
+	}
+	if invocation.EmbeddingDimensions == nil || *invocation.EmbeddingDimensions != dimensions {
+		t.Fatalf("EmbeddingDimensions = %#v, want %d", invocation.EmbeddingDimensions, dimensions)
+	}
+	body, _ := json.Marshal(invocation)
+	for _, forbidden := range []string{"sensitive transformer text", "sk-secret-value", "0.1", "0.2"} {
+		if bytes.Contains(body, []byte(forbidden)) {
+			t.Fatalf("invocation leaked %q: %s", forbidden, body)
+		}
+	}
+}
+
+func TestCreateEmbeddingsRejectsWrongPurposeProfile(t *testing.T) {
+	svc := New(newMemoryRepository(), mustEncryptor(t), 60000, &fakeInvoker{})
+	profile, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+		Name:     "default-chat",
+		Purpose:  PurposeChat,
+		Provider: ProviderSiliconFlow,
+		BaseURL:  "https://api.siliconflow.cn/v1",
+		Model:    "Qwen/Qwen2.5",
+		APIKey:   "sk-secret",
+	})
+	if err != nil {
+		t.Fatalf("CreateModelProfile() error = %v", err)
+	}
+	_, err = svc.CreateEmbeddings(context.Background(), RequestContext{}, EmbeddingInput{
+		Model:     "BAAI/bge-m3",
+		ProfileID: profile.ID,
+		Input:     []string{"text"},
+	})
+	appErr, ok := Classify(err)
+	if !ok || appErr.Code != CodeValidation || appErr.Fields["profile_id"] == "" {
+		t.Fatalf("CreateEmbeddings() error = %#v, want profile purpose validation", err)
+	}
+}
+
+func TestCreateRerankingUsesDefaultTopNAndRecordsSafeSummary(t *testing.T) {
+	repo := newMemoryRepository()
+	invoker := &fakeInvoker{
+		rerankingFn: func(context.Context, ProviderRerankingRequest) (RerankingResponse, ProviderCallMetadata, error) {
+			return RerankingResponse{
+				Object: "list",
+				Data: []RerankingResult{{
+					Index:      1,
+					DocumentID: "chunk-2",
+					Score:      0.91,
+				}},
+				Model: "BAAI/bge-reranker-v2-m3",
+				Usage: &TokenUsage{PromptTokens: 12, TotalTokens: 12},
+			}, ProviderCallMetadata{StatusCode: 200}, nil
+		},
+	}
+	svc := New(repo, mustEncryptor(t), 60000, invoker)
+	topN := 3
+	isDefault := true
+	if _, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+		Name:      "default-rerank",
+		Purpose:   PurposeRerank,
+		Provider:  ProviderSiliconFlow,
+		BaseURL:   "https://api.siliconflow.cn/v1",
+		Model:     "BAAI/bge-reranker-v2-m3",
+		APIKey:    "sk-secret-value",
+		IsDefault: &isDefault,
+		TopN:      &topN,
+	}); err != nil {
+		t.Fatalf("CreateModelProfile() error = %v", err)
+	}
+
+	_, err := svc.CreateReranking(context.Background(), RequestContext{RequestID: "req-2", CallerService: "knowledge"}, RerankingInput{
+		Model: "BAAI/bge-reranker-v2-m3",
+		Query: "sensitive user query",
+		Documents: []RerankingDocument{
+			{ID: "chunk-1", Text: "first sensitive document"},
+			{ID: "chunk-2", Text: "second sensitive document"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateReranking() error = %v", err)
+	}
+	if invoker.rerankingReq.TopN == nil || *invoker.rerankingReq.TopN != topN {
+		t.Fatalf("provider topN = %#v, want %d", invoker.rerankingReq.TopN, topN)
+	}
+	if len(repo.invocations) != 1 {
+		t.Fatalf("invocations = %d, want 1", len(repo.invocations))
+	}
+	invocation := repo.invocations[0]
+	if invocation.Operation != OperationReranking || invocation.RerankTopN == nil || *invocation.RerankTopN != topN {
+		t.Fatalf("invocation = %#v, want reranking topN %d", invocation, topN)
+	}
+	body, _ := json.Marshal(invocation)
+	for _, forbidden := range []string{"sensitive user query", "first sensitive document", "second sensitive document", "sk-secret-value"} {
+		if bytes.Contains(body, []byte(forbidden)) {
+			t.Fatalf("invocation leaked %q: %s", forbidden, body)
+		}
+	}
+}
+
+func TestCreateEmbeddingsNormalizesProviderRateLimit(t *testing.T) {
+	repo := newMemoryRepository()
+	statusCode := 429
+	invoker := &fakeInvoker{
+		embeddingFn: func(context.Context, ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error) {
+			return EmbeddingResponse{}, ProviderCallMetadata{StatusCode: statusCode}, NewProviderError(CodeRateLimited, "provider rate limit exceeded", &statusCode, nil)
+		},
+	}
+	svc := New(repo, mustEncryptor(t), 60000, invoker)
+	dimensions := 1024
+	isDefault := true
+	if _, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+		Name:       "default-embedding",
+		Purpose:    PurposeEmbedding,
+		Provider:   ProviderSiliconFlow,
+		BaseURL:    "https://api.siliconflow.cn/v1",
+		Model:      "BAAI/bge-m3",
+		APIKey:     "sk-secret-value",
+		IsDefault:  &isDefault,
+		Dimensions: &dimensions,
+	}); err != nil {
+		t.Fatalf("CreateModelProfile() error = %v", err)
+	}
+	_, err := svc.CreateEmbeddings(context.Background(), RequestContext{RequestID: "req-rate", CallerService: "knowledge"}, EmbeddingInput{
+		Model: "BAAI/bge-m3",
+		Input: []string{"text"},
+	})
+	appErr, ok := Classify(err)
+	if !ok || appErr.Code != CodeRateLimited {
+		t.Fatalf("CreateEmbeddings() error = %#v, want rate_limited", err)
+	}
+	if len(repo.invocations) != 1 {
+		t.Fatalf("invocations = %d, want 1", len(repo.invocations))
+	}
+	invocation := repo.invocations[0]
+	if invocation.Status != InvocationFailed || invocation.NormalizedErrorCode != string(CodeRateLimited) {
+		t.Fatalf("invocation = %#v, want failed rate_limited summary", invocation)
+	}
+	if invocation.ProviderStatusCode == nil || *invocation.ProviderStatusCode != statusCode {
+		t.Fatalf("ProviderStatusCode = %#v, want %d", invocation.ProviderStatusCode, statusCode)
+	}
 }
 
 func mustEncryptor(t *testing.T) *CredentialEncryptor {

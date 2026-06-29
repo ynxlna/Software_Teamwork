@@ -13,8 +13,8 @@ import (
 
 const chatCompletionOperation = "chat_completion"
 
-func NewWithChatProvider(repo Repository, encryptor *CredentialEncryptor, defaultTimeoutMS int, chatProvider ChatProvider) *Service {
-	svc := New(repo, encryptor, defaultTimeoutMS)
+func NewWithChatProvider(repo Repository, encryptor *CredentialEncryptor, defaultTimeoutMS int, chatProvider ChatProvider, invokers ...ModelInvoker) *Service {
+	svc := New(repo, encryptor, defaultTimeoutMS, invokers...)
 	svc.chatProvider = chatProvider
 	return svc
 }

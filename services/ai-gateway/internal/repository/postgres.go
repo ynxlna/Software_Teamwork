@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -237,29 +239,8 @@ func (r *PostgresRepository) SoftDeleteModelProfile(ctx context.Context, id stri
 
 func (r *PostgresRepository) RecordProviderInvocation(ctx context.Context, invocation service.ProviderInvocation, attempts []service.ProviderInvocationAttempt) error {
 	return r.withTx(ctx, func(tx *PostgresRepository) error {
-		if _, err := tx.db.Exec(ctx, `
-			INSERT INTO provider_invocations (
-				id, request_id, caller_service, external_user_id, operation,
-				profile_id, provider, model, stream, status, provider_status_code,
-				prompt_tokens, completion_tokens, total_tokens, duration_ms,
-				attempt_count, normalized_error_code, normalized_error_type,
-				error_message, created_at, finished_at
-			)
-			VALUES (
-				$1, NULLIF($2, ''), NULLIF($3, ''), NULLIF($4, ''), $5,
-				$6, $7, $8, $9, $10, $11,
-				$12, $13, $14, $15,
-				$16, NULLIF($17, ''), NULLIF($18, ''),
-				NULLIF($19, ''), $20, $21
-			)`,
-			invocation.ID, invocation.RequestID, invocation.CallerService, invocation.ExternalUserID,
-			invocation.Operation, invocation.ProfileID, string(invocation.Provider), invocation.Model,
-			invocation.Stream, string(invocation.Status), invocation.ProviderStatusCode,
-			invocation.PromptTokens, invocation.CompletionTokens, invocation.TotalTokens,
-			invocation.DurationMS, invocation.AttemptCount, invocation.NormalizedErrorCode,
-			invocation.NormalizedErrorType, invocation.ErrorMessage, invocation.CreatedAt,
-			invocation.FinishedAt); err != nil {
-			return fmt.Errorf("insert provider invocation: %w", err)
+		if err := tx.insertProviderInvocation(ctx, invocation); err != nil {
+			return err
 		}
 		for _, attempt := range attempts {
 			if _, err := tx.db.Exec(ctx, `
@@ -280,8 +261,75 @@ func (r *PostgresRepository) RecordProviderInvocation(ctx context.Context, invoc
 				return fmt.Errorf("insert provider invocation attempt: %w", err)
 			}
 		}
-		return nil
+		return tx.upsertUsageAggregate(ctx, invocation)
 	})
+}
+
+func (r *PostgresRepository) insertProviderInvocation(ctx context.Context, invocation service.ProviderInvocation) error {
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO provider_invocations (
+			id, request_id, caller_service, external_user_id, operation, profile_id,
+			provider, model, stream, status, provider_status_code, prompt_tokens,
+			completion_tokens, total_tokens, input_count, embedding_dimensions,
+			rerank_top_n, duration_ms, attempt_count, normalized_error_code,
+			normalized_error_type, error_message, created_at, finished_at
+		)
+		VALUES (
+			$1, NULLIF($2, ''), NULLIF($3, ''), NULLIF($4, ''), $5, $6,
+			$7, $8, $9, $10, $11, $12,
+			$13, $14, $15, $16,
+			$17, $18, $19, NULLIF($20, ''),
+			NULLIF($21, ''), NULLIF($22, ''), $23, $24
+		)`,
+		invocation.ID, invocation.RequestID, invocation.CallerService, invocation.ExternalUserID,
+		invocation.Operation, invocation.ProfileID, string(invocation.Provider), invocation.Model,
+		invocation.Stream, string(invocation.Status), nullableInt(invocation.ProviderStatusCode),
+		nullableInt(invocation.PromptTokens), nullableInt(invocation.CompletionTokens),
+		nullableInt(invocation.TotalTokens), nullableInt(invocation.InputCount),
+		nullableInt(invocation.EmbeddingDimensions), nullableInt(invocation.RerankTopN),
+		invocation.DurationMS, invocation.AttemptCount, invocation.NormalizedErrorCode,
+		invocation.NormalizedErrorType, invocation.ErrorMessage, invocation.CreatedAt, invocation.FinishedAt)
+	if err != nil {
+		return fmt.Errorf("insert provider invocation: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) upsertUsageAggregate(ctx context.Context, invocation service.ProviderInvocation) error {
+	bucket := invocation.CreatedAt.UTC().Truncate(time.Hour)
+	successCount := 0
+	failureCount := 0
+	if invocation.Status == service.InvocationSucceeded {
+		successCount = 1
+	} else {
+		failureCount = 1
+	}
+	now := time.Now().UTC()
+	_, err := r.db.Exec(ctx, `
+		INSERT INTO model_usage_aggregates (
+			id, bucket_start_at, bucket_granularity, caller_service, profile_id, operation,
+			request_count, success_count, failure_count, prompt_tokens, completion_tokens,
+			total_tokens, total_duration_ms, created_at, updated_at
+		)
+		VALUES ($1, $2, 'hour', $3, $4, $5, 1, $6, $7, $8, $9, $10, $11, $12, $12)
+		ON CONFLICT (bucket_start_at, bucket_granularity, caller_service, profile_id, operation)
+		DO UPDATE SET
+			request_count = model_usage_aggregates.request_count + EXCLUDED.request_count,
+			success_count = model_usage_aggregates.success_count + EXCLUDED.success_count,
+			failure_count = model_usage_aggregates.failure_count + EXCLUDED.failure_count,
+			prompt_tokens = model_usage_aggregates.prompt_tokens + EXCLUDED.prompt_tokens,
+			completion_tokens = model_usage_aggregates.completion_tokens + EXCLUDED.completion_tokens,
+			total_tokens = model_usage_aggregates.total_tokens + EXCLUDED.total_tokens,
+			total_duration_ms = model_usage_aggregates.total_duration_ms + EXCLUDED.total_duration_ms,
+			updated_at = EXCLUDED.updated_at`,
+		usageAggregateID(bucket, invocation.CallerService, invocation.ProfileID, invocation.Operation),
+		bucket, invocation.CallerService, invocation.ProfileID, invocation.Operation,
+		successCount, failureCount, intValue(invocation.PromptTokens),
+		intValue(invocation.CompletionTokens), intValue(invocation.TotalTokens), invocation.DurationMS, now)
+	if err != nil {
+		return fmt.Errorf("upsert model usage aggregate: %w", err)
+	}
+	return nil
 }
 
 func (r *PostgresRepository) withTx(ctx context.Context, fn func(*PostgresRepository) error) error {
@@ -501,6 +549,25 @@ func isUniqueViolation(err error) bool {
 func isCheckViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23514"
+}
+
+func nullableInt(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func intValue(value *int) int {
+	if value == nil {
+		return 0
+	}
+	return *value
+}
+
+func usageAggregateID(bucket time.Time, callerService, profileID, operation string) string {
+	sum := sha256.Sum256([]byte(bucket.Format(time.RFC3339) + "\x00" + callerService + "\x00" + profileID + "\x00" + operation))
+	return "usage_" + hex.EncodeToString(sum[:12])
 }
 
 func rawJSON(raw json.RawMessage) string {

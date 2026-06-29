@@ -195,9 +195,100 @@ type ChatProvider interface {
 }
 
 type TokenUsage struct {
-	PromptTokens     int
-	CompletionTokens int
-	TotalTokens      int
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
+}
+
+const (
+	OperationEmbedding = "embedding"
+	OperationReranking = "reranking"
+)
+
+type EmbeddingInput struct {
+	Model          string
+	ProfileID      string
+	Input          []string
+	Dimensions     *int
+	EncodingFormat string
+	User           string
+}
+
+type EmbeddingVector struct {
+	Object    string          `json:"object"`
+	Index     int             `json:"index"`
+	Embedding json.RawMessage `json:"embedding"`
+}
+
+type EmbeddingResponse struct {
+	Object string            `json:"object"`
+	Data   []EmbeddingVector `json:"data"`
+	Model  string            `json:"model"`
+	Usage  *TokenUsage       `json:"usage,omitempty"`
+}
+
+type RerankingDocument struct {
+	ID   string
+	Text string
+}
+
+type RerankingInput struct {
+	Model     string
+	ProfileID string
+	Query     string
+	Documents []RerankingDocument
+	TopN      *int
+	Metadata  map[string]string
+}
+
+type RerankingResult struct {
+	Index      int     `json:"index"`
+	DocumentID string  `json:"document_id"`
+	Score      float64 `json:"score"`
+}
+
+type RerankingResponse struct {
+	Object string            `json:"object"`
+	Data   []RerankingResult `json:"data"`
+	Model  string            `json:"model"`
+	Usage  *TokenUsage       `json:"usage,omitempty"`
+}
+
+type ProviderEmbeddingRequest struct {
+	RequestID         string
+	Provider          Provider
+	BaseURL           string
+	APIKey            string
+	TimeoutMS         int
+	Model             string
+	Input             []string
+	Dimensions        *int
+	EncodingFormat    string
+	User              string
+	DefaultParameters json.RawMessage
+}
+
+type ProviderRerankingRequest struct {
+	RequestID         string
+	Provider          Provider
+	BaseURL           string
+	APIKey            string
+	TimeoutMS         int
+	Model             string
+	Query             string
+	Documents         []RerankingDocument
+	TopN              *int
+	Metadata          map[string]string
+	DefaultParameters json.RawMessage
+}
+
+type ProviderCallMetadata struct {
+	StatusCode int
+}
+
+type ModelInvoker interface {
+	CreateEmbeddings(context.Context, ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error)
+	CreateReranking(context.Context, ProviderRerankingRequest) (RerankingResponse, ProviderCallMetadata, error)
 }
 
 type InvocationStatus string
@@ -224,6 +315,9 @@ type ProviderInvocation struct {
 	PromptTokens        *int
 	CompletionTokens    *int
 	TotalTokens         *int
+	InputCount          *int
+	EmbeddingDimensions *int
+	RerankTopN          *int
 	DurationMS          int64
 	AttemptCount        int
 	NormalizedErrorCode string

@@ -47,7 +47,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	profiles := service.NewWithChatProvider(repo, encryptor, cfg.DefaultTimeoutMS, provider.NewHTTPChatClient(nil))
+	profiles := service.NewWithChatProvider(repo, encryptor, cfg.DefaultTimeoutMS, provider.NewHTTPChatClient(nil), provider.NewHTTPClient(nil))
 	handler := httpapi.NewServer(httpapi.Config{
 		Logger:          logger,
 		Profiles:        profiles,

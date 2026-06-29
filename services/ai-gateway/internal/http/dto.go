@@ -58,6 +58,29 @@ type updateModelProfileRequest struct {
 	DefaultParameters *json.RawMessage  `json:"defaultParameters"`
 }
 
+type embeddingRequest struct {
+	ProfileID      string   `json:"profile_id"`
+	Model          string   `json:"model"`
+	Input          []string `json:"input"`
+	Dimensions     *int     `json:"dimensions"`
+	EncodingFormat string   `json:"encoding_format"`
+	User           string   `json:"user"`
+}
+
+type rerankingRequest struct {
+	ProfileID string              `json:"profile_id"`
+	Model     string              `json:"model"`
+	Query     string              `json:"query"`
+	Documents []rerankingDocument `json:"documents"`
+	TopN      *int                `json:"top_n"`
+	Metadata  map[string]string   `json:"metadata"`
+}
+
+type rerankingDocument struct {
+	ID   string `json:"id"`
+	Text string `json:"text"`
+}
+
 func profilesFromDomain(items []service.ModelProfile) []modelProfileResponse {
 	out := make([]modelProfileResponse, len(items))
 	for i, item := range items {
@@ -128,10 +151,50 @@ func updateInputFromRequest(id string, payload updateModelProfileRequest) servic
 	}
 }
 
+func embeddingInputFromRequest(payload embeddingRequest) service.EmbeddingInput {
+	return service.EmbeddingInput{
+		Model:          payload.Model,
+		ProfileID:      payload.ProfileID,
+		Input:          append([]string(nil), payload.Input...),
+		Dimensions:     cloneIntPtr(payload.Dimensions),
+		EncodingFormat: payload.EncodingFormat,
+		User:           payload.User,
+	}
+}
+
+func rerankingInputFromRequest(payload rerankingRequest) service.RerankingInput {
+	documents := make([]service.RerankingDocument, len(payload.Documents))
+	for i, document := range payload.Documents {
+		documents[i] = service.RerankingDocument{
+			ID:   document.ID,
+			Text: document.Text,
+		}
+	}
+	return service.RerankingInput{
+		Model:     payload.Model,
+		ProfileID: payload.ProfileID,
+		Query:     payload.Query,
+		Documents: documents,
+		TopN:      cloneIntPtr(payload.TopN),
+		Metadata:  cloneStringMap(payload.Metadata),
+	}
+}
+
 func cloneIntPtr(value *int) *int {
 	if value == nil {
 		return nil
 	}
 	cloned := *value
 	return &cloned
+}
+
+func cloneStringMap(value map[string]string) map[string]string {
+	if len(value) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(value))
+	for key, item := range value {
+		out[key] = item
+	}
+	return out
 }

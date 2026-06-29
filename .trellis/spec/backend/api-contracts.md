@@ -340,6 +340,90 @@ qa service -> ai-gateway /internal/v1/chat/completions
 qa owns messages, MCP tool calls, citations, and public SSE event shape
 ```
 
+## Scenario: AI Gateway Embeddings And Rerankings
+
+### 1. Scope / Trigger
+
+- Trigger: implementing or changing AI Gateway model invocation routes, provider adapters, profile purpose resolution, provider invocation summaries, or usage aggregation.
+- Applies to `services/ai-gateway/internal/http`, `services/ai-gateway/internal/service`, `services/ai-gateway/internal/provider`, `services/ai-gateway/internal/repository`, `services/ai-gateway/migrations`, and `docs/services/ai-gateway/api/openapi.yaml`.
+
+### 2. Signatures
+
+- Internal routes:
+  - `POST /internal/v1/embeddings`.
+  - `POST /internal/v1/rerankings`.
+- Required internal headers:
+  - `X-Service-Token`.
+  - `X-Caller-Service`.
+  - propagate `X-Request-Id` and `X-User-Id` when present.
+- Profile routing:
+  - embeddings require `purpose = 'embedding'`.
+  - rerankings require `purpose = 'rerank'`.
+  - omitted `profile_id` resolves the enabled default profile for that purpose.
+- Provider paths:
+  - embeddings call provider `/embeddings` under the configured profile `base_url`.
+  - rerankings call provider `/rerank` under the configured profile `base_url`.
+- Database tables:
+  - `provider_invocations` stores one secret-safe model call summary.
+  - `model_usage_aggregates` stores low-cardinality hourly usage counts and token/duration sums.
+
+### 3. Contracts
+
+- Embedding requests use OpenAI-compatible snake_case fields: `model`, optional `profile_id`, `input[]`, optional `dimensions`, optional `encoding_format`, and optional `user`.
+- Reranking requests use the project OpenAI-style extension: `model`, optional `profile_id`, `query`, `documents[]` with `id` and `text`, optional `top_n`, and optional low-sensitive `metadata`.
+- Model invocation success and error responses must not use the project `{ data, requestId }` envelope. Request IDs remain in `X-Request-Id`.
+- Provider credentials are decrypted only inside the model invocation boundary and sent as provider bearer tokens. They must not appear in responses, ordinary logs, invocation summaries, usage aggregates, metrics labels, or test failure messages.
+- `provider_invocations` may store profile ID, provider, model, operation, status, provider status code, token usage, input count, dimensions/topN, duration, attempt count, normalized error code/type, caller service, external user ID, and timestamps.
+- `provider_invocations` must not store embedding input text, rerank query text, rerank document text, embedding vectors, full provider request/response bodies, raw provider URL query, API keys, bearer tokens, or credential fingerprints.
+- Rerank provider requests should avoid asking providers to echo document text, for example by sending `return_documents=false` when the provider supports it.
+
+### 4. Validation & Error Matrix
+
+| Condition | Response/error |
+| --- | --- |
+| Missing or invalid service token | `401` OpenAI-style `authentication_error`, code `unauthorized` |
+| Missing or unknown caller service | `401`/`403` OpenAI-style auth/permission error |
+| Missing `model`, empty `input`, empty `query`, empty `documents`, invalid `dimensions`, or invalid `top_n` | `400` OpenAI-style `invalid_request_error`, code `validation_error` |
+| `profile_id` references the wrong purpose, such as chat profile for embeddings | `400` OpenAI-style `invalid_request_error`, code `validation_error` |
+| Missing explicit profile or missing enabled default profile | `404` OpenAI-style `not_found_error`, code `not_found` |
+| Profile has no active credential or credential cannot be decrypted | `502` OpenAI-style `upstream_error`, code `dependency_error` |
+| Provider returns request validation failure | `400` OpenAI-style `invalid_request_error`, code `validation_error` |
+| Provider rate limits | `429` OpenAI-style `rate_limit_error`, code `rate_limited` |
+| Provider auth, permission, network, timeout, malformed JSON, or 5xx failure | `502` OpenAI-style `upstream_error`, code `dependency_error` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: handler decodes OpenAI-style JSON, service resolves and validates an enabled purpose-matched profile, decrypts only the active credential, provider adapter calls a fake-testable HTTP endpoint, service records a secret-safe invocation summary, and the response body remains OpenAI-compatible.
+- Base: a fake provider test asserts embeddings pass batch input and dimensions, rerank passes text-only documents with `return_documents=false`, and provider errors never include raw provider bodies in returned errors.
+- Bad: returning project envelopes from model invocation routes, writing raw `input` or `documents[].text` to `provider_invocations`, logging provider bearer tokens, using a chat profile for embeddings/rerank, or letting Knowledge/QA call providers directly.
+
+### 6. Tests Required
+
+- Handler tests for auth failure, validation error shape, successful embedding response shape, successful reranking response shape, and no API key/request text leakage.
+- Service tests for default profile resolution, explicit wrong-purpose profile rejection, dimensions/topN resolution, provider error normalization, invocation status/error fields, and secret-safe summaries.
+- Provider client tests with fake HTTP servers for request path, bearer token placement, batch input, dimensions, rerank `top_n`, `return_documents=false`, provider error mapping, and malformed provider response handling.
+- Repository/migration validation should be added when a local PostgreSQL test harness is available; until then, migrations must be reviewed for explicit columns, no raw payload columns, safe indexes, and goose `-- +goose Up`.
+- Required checks from `services/ai-gateway`: `go test ./...`, `go build ./cmd/server`, and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+knowledge -> OpenAI provider directly
+ai-gateway logs request body and provider error body for debugging
+provider_invocations.input_text = documents[].text
+```
+
+#### Correct
+
+```text
+knowledge -> ai-gateway /internal/v1/embeddings
+ai-gateway resolves an embedding profile and calls provider /embeddings
+provider_invocations stores counts, dimensions, usage, status, and normalized error only
+knowledge owns Qdrant persistence and chunk state
+```
+
 ## Scenario: Missing Downstream API Contracts
 
 ### 1. Scope / Trigger

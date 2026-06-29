@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -14,678 +13,306 @@ type MemoryRepository struct {
 	mu             sync.RWMutex
 	knowledgeBases map[string]service.KnowledgeBase
 	documents      map[string]service.KnowledgeDocument
-	chunks         map[string][]service.DocumentChunk
-	jobs           map[string]service.ProcessingJob
-	jobsByKey      map[string]string
 }
 
 func NewMemoryRepository() *MemoryRepository {
 	return &MemoryRepository{
 		knowledgeBases: map[string]service.KnowledgeBase{},
 		documents:      map[string]service.KnowledgeDocument{},
-		chunks:         map[string][]service.DocumentChunk{},
-		jobs:           map[string]service.ProcessingJob{},
-		jobsByKey:      map[string]string{},
 	}
 }
 
-func (r *MemoryRepository) CreateKnowledgeBase(ctx context.Context, base service.KnowledgeBase) (service.KnowledgeBase, error) {
+func (r *MemoryRepository) CreateKnowledgeBase(ctx context.Context, input service.CreateKnowledgeBaseRecord) (service.KnowledgeBase, error) {
 	if err := ctx.Err(); err != nil {
 		return service.KnowledgeBase{}, err
 	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, exists := r.knowledgeBases[base.ID]; exists {
+
+	if _, exists := r.knowledgeBases[input.ID]; exists {
 		return service.KnowledgeBase{}, service.ErrConflict
 	}
-	stored := cloneKnowledgeBase(base)
-	r.knowledgeBases[stored.ID] = stored
-	return cloneKnowledgeBase(stored), nil
+	kb := service.KnowledgeBase{
+		ID:                input.ID,
+		Name:              input.Name,
+		Description:       input.Description,
+		DocType:           input.DocType,
+		ChunkStrategy:     cloneRaw(input.ChunkStrategy),
+		RetrievalStrategy: cloneRaw(input.RetrievalStrategy),
+		CreatedBy:         input.CreatedBy,
+		CreatedAt:         input.CreatedAt,
+		UpdatedAt:         input.UpdatedAt,
+	}
+	r.knowledgeBases[kb.ID] = kb
+	return r.hydrateKnowledgeBaseLocked(kb), nil
 }
 
-func (r *MemoryRepository) ListKnowledgeBases(ctx context.Context, filter service.KnowledgeBaseFilter) (service.KnowledgeBaseList, error) {
+func (r *MemoryRepository) ListKnowledgeBases(ctx context.Context, scope service.AccessScope, page service.PageInput) (service.KnowledgeBaseList, error) {
 	if err := ctx.Err(); err != nil {
 		return service.KnowledgeBaseList{}, err
 	}
-
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	keyword := strings.ToLower(strings.TrimSpace(filter.Keyword))
-	docType := strings.TrimSpace(filter.DocType)
-	owner := strings.TrimSpace(filter.OwnerUserID)
 	items := make([]service.KnowledgeBase, 0, len(r.knowledgeBases))
-	for _, base := range r.knowledgeBases {
-		if base.DeletedAt != nil {
+	for _, kb := range r.knowledgeBases {
+		if kb.DeletedAt != nil || !canRead(kb.CreatedBy, scope) {
 			continue
 		}
-		if owner != "" && base.CreatedBy != owner {
-			continue
-		}
-		if docType != "" && base.DocType != docType {
-			continue
-		}
-		if keyword != "" && !strings.Contains(strings.ToLower(base.Name), keyword) && !strings.Contains(strings.ToLower(base.Description), keyword) {
-			continue
-		}
-		items = append(items, cloneKnowledgeBase(base))
+		items = append(items, r.hydrateKnowledgeBaseLocked(kb))
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].CreatedAt.Equal(items[j].CreatedAt) {
-			return items[i].ID < items[j].ID
-		}
+	sort.Slice(items, func(i, j int) bool {
 		return items[i].CreatedAt.After(items[j].CreatedAt)
 	})
-
-	page := filter.Page
-	if page < 1 {
-		page = 1
-	}
-	pageSize := filter.PageSize
-	if pageSize < 1 {
-		pageSize = 20
-	}
-	total := len(items)
-	start := (page - 1) * pageSize
-	if start >= total {
-		items = nil
-	} else {
-		end := start + pageSize
-		if end > total {
-			end = total
-		}
-		items = items[start:end]
-	}
-
+	total := int64(len(items))
+	items = paginate(items, page)
 	return service.KnowledgeBaseList{
-		Items: items,
+		Items: cloneKnowledgeBases(items),
 		Page: service.Page{
-			Page:     page,
-			PageSize: pageSize,
+			Page:     page.Page,
+			PageSize: page.PageSize,
 			Total:    total,
 		},
 	}, nil
 }
 
-func (r *MemoryRepository) FindKnowledgeBaseByID(ctx context.Context, id string) (service.KnowledgeBase, error) {
+func (r *MemoryRepository) GetKnowledgeBase(ctx context.Context, id string, scope service.AccessScope) (service.KnowledgeBase, error) {
 	if err := ctx.Err(); err != nil {
 		return service.KnowledgeBase{}, err
 	}
-
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	base, exists := r.knowledgeBases[id]
-	if !exists || base.DeletedAt != nil {
+
+	kb, exists := r.knowledgeBases[id]
+	if !exists || kb.DeletedAt != nil || !canRead(kb.CreatedBy, scope) {
 		return service.KnowledgeBase{}, service.ErrNotFound
 	}
-	return cloneKnowledgeBase(base), nil
+	return cloneKnowledgeBase(r.hydrateKnowledgeBaseLocked(kb)), nil
 }
 
-func (r *MemoryRepository) UpdateKnowledgeBase(ctx context.Context, base service.KnowledgeBase) (service.KnowledgeBase, error) {
+func (r *MemoryRepository) UpdateKnowledgeBase(ctx context.Context, input service.UpdateKnowledgeBaseRecord, scope service.AccessScope) (service.KnowledgeBase, error) {
 	if err := ctx.Err(); err != nil {
 		return service.KnowledgeBase{}, err
 	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	existing, exists := r.knowledgeBases[base.ID]
-	if !exists || existing.DeletedAt != nil {
+
+	kb, exists := r.knowledgeBases[input.ID]
+	if !exists || kb.DeletedAt != nil || !canRead(kb.CreatedBy, scope) {
 		return service.KnowledgeBase{}, service.ErrNotFound
 	}
-	stored := cloneKnowledgeBase(base)
-	r.knowledgeBases[stored.ID] = stored
-	return cloneKnowledgeBase(stored), nil
+	if input.Name != nil {
+		kb.Name = *input.Name
+	}
+	if input.Description != nil {
+		kb.Description = *input.Description
+	}
+	if input.DocType != nil {
+		kb.DocType = *input.DocType
+	}
+	if input.ChunkStrategy != nil {
+		kb.ChunkStrategy = cloneRaw(*input.ChunkStrategy)
+	}
+	if input.RetrievalStrategy != nil {
+		kb.RetrievalStrategy = cloneRaw(*input.RetrievalStrategy)
+	}
+	kb.UpdatedAt = input.UpdatedAt
+	r.knowledgeBases[kb.ID] = kb
+	return cloneKnowledgeBase(r.hydrateKnowledgeBaseLocked(kb)), nil
 }
 
-func (r *MemoryRepository) MarkKnowledgeBaseDeleted(ctx context.Context, id string, deletedAt time.Time) error {
+func (r *MemoryRepository) SoftDeleteKnowledgeBase(ctx context.Context, id string, deletedAt time.Time, scope service.AccessScope) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	base, exists := r.knowledgeBases[id]
-	if !exists || base.DeletedAt != nil {
+
+	kb, exists := r.knowledgeBases[id]
+	if !exists || kb.DeletedAt != nil || !canRead(kb.CreatedBy, scope) {
 		return service.ErrNotFound
 	}
 	deleted := deletedAt.UTC()
-	base.DeletedAt = &deleted
-	base.UpdatedAt = deleted
-	r.knowledgeBases[id] = base
+	kb.DeletedAt = &deleted
+	kb.UpdatedAt = deleted
+	r.knowledgeBases[id] = kb
+
+	for docID, doc := range r.documents {
+		if doc.KnowledgeBaseID == id && doc.DeletedAt == nil {
+			doc.DeletedAt = &deleted
+			doc.UpdatedAt = deleted
+			r.documents[docID] = doc
+		}
+	}
 	return nil
 }
 
-func (r *MemoryRepository) PutDocumentForTest(doc service.KnowledgeDocument) {
+func (r *MemoryRepository) ListDocumentsByKnowledgeBase(ctx context.Context, knowledgeBaseID string, status *service.DocumentStatus, scope service.AccessScope, page service.PageInput) (service.DocumentList, error) {
+	if err := ctx.Err(); err != nil {
+		return service.DocumentList{}, err
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	kb, exists := r.knowledgeBases[knowledgeBaseID]
+	if !exists || kb.DeletedAt != nil || !canRead(kb.CreatedBy, scope) {
+		return service.DocumentList{}, service.ErrNotFound
+	}
+
+	items := make([]service.KnowledgeDocument, 0)
+	for _, doc := range r.documents {
+		if doc.KnowledgeBaseID != knowledgeBaseID || doc.DeletedAt != nil {
+			continue
+		}
+		if status != nil && doc.Status != *status {
+			continue
+		}
+		if !canRead(doc.CreatedBy, scope) && !canRead(kb.CreatedBy, scope) {
+			continue
+		}
+		items = append(items, r.hydrateDocumentLocked(doc))
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
+	total := int64(len(items))
+	items = paginate(items, page)
+	return service.DocumentList{
+		Items: cloneDocuments(items),
+		Page: service.Page{
+			Page:     page.Page,
+			PageSize: page.PageSize,
+			Total:    total,
+		},
+	}, nil
+}
+
+func (r *MemoryRepository) GetDocument(ctx context.Context, id string, scope service.AccessScope) (service.KnowledgeDocument, error) {
+	if err := ctx.Err(); err != nil {
+		return service.KnowledgeDocument{}, err
+	}
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	doc, exists := r.documents[id]
+	if !exists || doc.DeletedAt != nil {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	kb, exists := r.knowledgeBases[doc.KnowledgeBaseID]
+	if !exists || kb.DeletedAt != nil {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	if !canRead(doc.CreatedBy, scope) && !canRead(kb.CreatedBy, scope) {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	return cloneDocument(r.hydrateDocumentLocked(doc)), nil
+}
+
+func (r *MemoryRepository) SeedKnowledgeBase(kb service.KnowledgeBase) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.knowledgeBases[kb.ID] = cloneKnowledgeBase(kb)
+}
+
+func (r *MemoryRepository) SeedDocument(doc service.KnowledgeDocument) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.documents[doc.ID] = cloneDocument(doc)
 }
 
-func (r *MemoryRepository) PutChunksForTest(documentID string, chunks []service.DocumentChunk) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	copied := make([]service.DocumentChunk, 0, len(chunks))
-	for _, chunk := range chunks {
-		copied = append(copied, cloneChunk(chunk))
-	}
-	r.chunks[documentID] = copied
-}
-
-func (r *MemoryRepository) CreateIngestionJob(ctx context.Context, doc service.KnowledgeDocument, job service.ProcessingJob) (service.KnowledgeDocument, service.ProcessingJob, error) {
-	if err := ctx.Err(); err != nil {
-		return service.KnowledgeDocument{}, service.ProcessingJob{}, err
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if job.IdempotencyKey != nil {
-		if existingJobID, ok := r.jobsByKey[*job.IdempotencyKey]; ok {
-			existingJob, exists := r.jobs[existingJobID]
-			if !exists {
-				return service.KnowledgeDocument{}, service.ProcessingJob{}, service.ErrConflict
-			}
-			if existingJob.DocumentID == nil {
-				return service.KnowledgeDocument{}, service.ProcessingJob{}, service.ErrConflict
-			}
-			existingDoc, exists := r.documents[*existingJob.DocumentID]
-			if !exists {
-				return service.KnowledgeDocument{}, service.ProcessingJob{}, service.ErrConflict
-			}
-			return cloneDocument(existingDoc), cloneJob(existingJob), nil
-		}
-	}
-	if _, exists := r.documents[doc.ID]; exists {
-		return service.KnowledgeDocument{}, service.ProcessingJob{}, service.ErrConflict
-	}
-	if _, exists := r.jobs[job.ID]; exists {
-		return service.KnowledgeDocument{}, service.ProcessingJob{}, service.ErrConflict
-	}
-	storedDoc := cloneDocument(doc)
-	storedJob := cloneJob(job)
-	r.documents[storedDoc.ID] = storedDoc
-	r.jobs[storedJob.ID] = storedJob
-	if storedJob.IdempotencyKey != nil {
-		r.jobsByKey[*storedJob.IdempotencyKey] = storedJob.ID
-	}
-	return cloneDocument(storedDoc), cloneJob(storedJob), nil
-}
-
-func (r *MemoryRepository) FindJobByID(ctx context.Context, id string) (service.ProcessingJob, error) {
-	if err := ctx.Err(); err != nil {
-		return service.ProcessingJob{}, err
-	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	job, exists := r.jobs[id]
-	if !exists {
-		return service.ProcessingJob{}, service.ErrNotFound
-	}
-	return cloneJob(job), nil
-}
-
-func (r *MemoryRepository) CreateProcessingJob(ctx context.Context, job service.ProcessingJob) (service.ProcessingJob, error) {
-	if err := ctx.Err(); err != nil {
-		return service.ProcessingJob{}, err
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.jobs[job.ID]; exists {
-		return service.ProcessingJob{}, service.ErrConflict
-	}
-	stored := cloneJob(job)
-	r.jobs[stored.ID] = stored
-	return cloneJob(stored), nil
-}
-
-func (r *MemoryRepository) UpdateJobState(ctx context.Context, id string, update service.JobStateUpdate) (service.ProcessingJob, error) {
-	if err := ctx.Err(); err != nil {
-		return service.ProcessingJob{}, err
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	job, exists := r.jobs[id]
-	if !exists {
-		return service.ProcessingJob{}, service.ErrNotFound
-	}
-	job.Status = update.Status
-	job.CurrentStage = cloneJobStagePtr(update.CurrentStage)
-	job.ProgressPercent = update.ProgressPercent
-	job.Message = cloneStringPtr(update.Message)
-	job.ErrorCode = cloneStringPtr(update.ErrorCode)
-	job.ErrorMessage = cloneStringPtr(update.ErrorMessage)
-	if update.Attempts != nil {
-		job.Attempts = *update.Attempts
-	}
-	job.StartedAt = cloneTimePtr(update.StartedAt)
-	if update.FinishedAt != nil {
-		job.FinishedAt = cloneTimePtr(update.FinishedAt)
-	}
-	job.UpdatedAt = update.UpdatedAt
-	r.jobs[id] = job
-	return cloneJob(job), nil
-}
-
-func (r *MemoryRepository) ListDocuments(ctx context.Context, filter service.DocumentFilter) (service.DocumentList, error) {
-	if err := ctx.Err(); err != nil {
-		return service.DocumentList{}, err
-	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	items := make([]service.KnowledgeDocument, 0, len(r.documents))
+func (r *MemoryRepository) hydrateKnowledgeBaseLocked(kb service.KnowledgeBase) service.KnowledgeBase {
+	kb.DocumentCount = 0
+	kb.ChunkCount = 0
 	for _, doc := range r.documents {
-		if doc.DeletedAt != nil {
-			continue
+		if doc.KnowledgeBaseID == kb.ID && doc.DeletedAt == nil {
+			kb.DocumentCount++
+			kb.ChunkCount += doc.ChunkCount
 		}
-		if doc.KnowledgeBaseID != filter.KnowledgeBaseID {
-			continue
-		}
-		if filter.OwnerUserID != "" && doc.CreatedBy != filter.OwnerUserID {
-			continue
-		}
-		if filter.Status != "" && doc.Status != filter.Status {
-			continue
-		}
-		items = append(items, cloneDocument(doc))
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].CreatedAt.Equal(items[j].CreatedAt) {
-			return items[i].ID < items[j].ID
-		}
-		return items[i].CreatedAt.After(items[j].CreatedAt)
-	})
-
-	page := filter.Page
-	if page < 1 {
-		page = 1
-	}
-	pageSize := filter.PageSize
-	if pageSize < 1 {
-		pageSize = 20
-	}
-	total := len(items)
-	start := (page - 1) * pageSize
-	if start >= total {
-		items = nil
-	} else {
-		end := start + pageSize
-		if end > total {
-			end = total
-		}
-		items = items[start:end]
-	}
-
-	return service.DocumentList{
-		Items: items,
-		Page: service.Page{
-			Page:     page,
-			PageSize: pageSize,
-			Total:    total,
-		},
-	}, nil
+	return cloneKnowledgeBase(kb)
 }
 
-func (r *MemoryRepository) FindDocumentByID(ctx context.Context, id string) (service.KnowledgeDocument, error) {
-	if err := ctx.Err(); err != nil {
-		return service.KnowledgeDocument{}, err
-	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	doc, exists := r.documents[id]
-	if !exists || doc.DeletedAt != nil {
-		return service.KnowledgeDocument{}, service.ErrNotFound
-	}
-	return cloneDocument(doc), nil
+func (r *MemoryRepository) hydrateDocumentLocked(doc service.KnowledgeDocument) service.KnowledgeDocument {
+	return cloneDocument(doc)
 }
 
-func (r *MemoryRepository) UpdateDocumentProcessingState(ctx context.Context, id string, update service.DocumentStateUpdate) (service.KnowledgeDocument, error) {
-	if err := ctx.Err(); err != nil {
-		return service.KnowledgeDocument{}, err
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	doc, exists := r.documents[id]
-	if !exists || doc.DeletedAt != nil {
-		return service.KnowledgeDocument{}, service.ErrNotFound
-	}
-	doc.Status = update.Status
-	doc.ErrorCode = cloneStringPtr(update.ErrorCode)
-	doc.ErrorMessage = cloneStringPtr(update.ErrorMessage)
-	if update.ParsedContent != nil {
-		doc.ParsedContent = cloneStringPtr(update.ParsedContent)
-	}
-	if update.ChunkCount != nil {
-		doc.ChunkCount = *update.ChunkCount
-	}
-	doc.UpdatedAt = &update.UpdatedAt
-	r.documents[id] = doc
-	return cloneDocument(doc), nil
+func canRead(createdBy string, scope service.AccessScope) bool {
+	return scope.CanReadAll || createdBy == scope.UserID
 }
 
-func (r *MemoryRepository) ListChunks(ctx context.Context, filter service.ChunkFilter) (service.ChunkList, error) {
-	if err := ctx.Err(); err != nil {
-		return service.ChunkList{}, err
+func paginate[T any](items []T, page service.PageInput) []T {
+	start := (page.Page - 1) * page.PageSize
+	if start >= len(items) {
+		return []T{}
 	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	all := r.chunks[filter.DocumentID]
-	items := make([]service.DocumentChunk, 0, len(all))
-	for _, chunk := range all {
-		items = append(items, cloneChunk(chunk))
+	end := start + page.PageSize
+	if end > len(items) {
+		end = len(items)
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].ChunkIndex == items[j].ChunkIndex {
-			return items[i].ID < items[j].ID
-		}
-		return items[i].ChunkIndex < items[j].ChunkIndex
-	})
-
-	page := filter.Page
-	if page < 1 {
-		page = 1
-	}
-	pageSize := filter.PageSize
-	if pageSize < 1 {
-		pageSize = 50
-	}
-	total := len(items)
-	start := (page - 1) * pageSize
-	if start >= total {
-		items = nil
-	} else {
-		end := start + pageSize
-		if end > total {
-			end = total
-		}
-		items = items[start:end]
-	}
-
-	return service.ChunkList{
-		Items: items,
-		Page: service.Page{
-			Page:     page,
-			PageSize: pageSize,
-			Total:    total,
-		},
-	}, nil
+	return items[start:end]
 }
 
-func (r *MemoryRepository) ReplaceDocumentChunks(ctx context.Context, documentID string, chunks []service.DocumentChunk) error {
-	if err := ctx.Err(); err != nil {
-		return err
+func cloneKnowledgeBases(items []service.KnowledgeBase) []service.KnowledgeBase {
+	out := make([]service.KnowledgeBase, len(items))
+	for i, item := range items {
+		out[i] = cloneKnowledgeBase(item)
 	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.documents[documentID]; !exists {
-		return service.ErrNotFound
-	}
-	copied := make([]service.DocumentChunk, 0, len(chunks))
-	for _, chunk := range chunks {
-		copied = append(copied, cloneChunk(chunk))
-	}
-	r.chunks[documentID] = copied
-	return nil
+	return out
 }
 
-func (r *MemoryRepository) FindChunksByIDs(ctx context.Context, ids []string) ([]service.DocumentChunk, error) {
-	if err := ctx.Err(); err != nil {
-		return nil, err
+func cloneKnowledgeBase(kb service.KnowledgeBase) service.KnowledgeBase {
+	kb.ChunkStrategy = cloneRaw(kb.ChunkStrategy)
+	kb.RetrievalStrategy = cloneRaw(kb.RetrievalStrategy)
+	if kb.DeletedAt != nil {
+		value := *kb.DeletedAt
+		kb.DeletedAt = &value
 	}
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	wanted := make(map[string]int, len(ids))
-	for index, id := range ids {
-		if _, exists := wanted[id]; !exists {
-			wanted[id] = index
-		}
-	}
-	found := make([]service.DocumentChunk, 0, len(wanted))
-	for _, chunks := range r.chunks {
-		for _, chunk := range chunks {
-			if _, ok := wanted[chunk.ID]; ok {
-				found = append(found, cloneChunk(chunk))
-			}
-		}
-	}
-	sort.SliceStable(found, func(i, j int) bool {
-		return wanted[found[i].ID] < wanted[found[j].ID]
-	})
-	return found, nil
+	return kb
 }
 
-func (r *MemoryRepository) GetKnowledgeStats(ctx context.Context, filter service.StatsFilter) (service.KnowledgeStats, error) {
-	if err := ctx.Err(); err != nil {
-		return service.KnowledgeStats{}, err
+func cloneDocuments(items []service.KnowledgeDocument) []service.KnowledgeDocument {
+	out := make([]service.KnowledgeDocument, len(items))
+	for i, item := range items {
+		out[i] = cloneDocument(item)
 	}
-
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-
-	owner := strings.TrimSpace(filter.OwnerUserID)
-	stats := service.KnowledgeStats{}
-	uploads := map[string]int{}
-	visibleBases := map[string]struct{}{}
-
-	for _, base := range r.knowledgeBases {
-		if base.DeletedAt != nil {
-			continue
-		}
-		if owner != "" && strings.TrimSpace(base.CreatedBy) != owner {
-			continue
-		}
-		stats.KnowledgeBaseCount++
-		visibleBases[base.ID] = struct{}{}
-	}
-
-	for _, doc := range r.documents {
-		if doc.DeletedAt != nil {
-			continue
-		}
-		if _, ok := visibleBases[doc.KnowledgeBaseID]; !ok {
-			continue
-		}
-		if owner != "" && strings.TrimSpace(doc.CreatedBy) != owner {
-			continue
-		}
-		stats.DocumentCount++
-		switch doc.Status {
-		case service.DocumentStatusReady:
-			stats.ReadyDocumentCount++
-		case service.DocumentStatusFailed:
-			stats.FailedDocumentCount++
-		}
-		if !doc.CreatedAt.Before(filter.Since) && (filter.Until.IsZero() || !doc.CreatedAt.After(filter.Until)) {
-			uploads[doc.CreatedAt.UTC().Format("2006-01-02")]++
-		}
-	}
-
-	for documentID, chunks := range r.chunks {
-		doc, ok := r.documents[documentID]
-		if !ok || doc.DeletedAt != nil {
-			continue
-		}
-		if _, ok := visibleBases[doc.KnowledgeBaseID]; !ok {
-			continue
-		}
-		if owner != "" && strings.TrimSpace(doc.CreatedBy) != owner {
-			continue
-		}
-		stats.ChunkCount += len(chunks)
-	}
-
-	stats.RecentUploads = uploadStatsFromMap(uploads)
-	return stats, nil
-}
-
-func uploadStatsFromMap(input map[string]int) []service.DailyUploadStat {
-	items := make([]service.DailyUploadStat, 0, len(input))
-	for date, count := range input {
-		items = append(items, service.DailyUploadStat{Date: date, Count: count})
-	}
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].Date < items[j].Date
-	})
-	return items
-}
-
-func cloneKnowledgeBase(base service.KnowledgeBase) service.KnowledgeBase {
-	base.ChunkStrategy = cloneMap(base.ChunkStrategy)
-	base.RetrievalStrategy = cloneMap(base.RetrievalStrategy)
-	if base.DeletedAt != nil {
-		deletedAt := *base.DeletedAt
-		base.DeletedAt = &deletedAt
-	}
-	return base
+	return out
 }
 
 func cloneDocument(doc service.KnowledgeDocument) service.KnowledgeDocument {
 	doc.Tags = append([]string(nil), doc.Tags...)
-	if doc.ContentType != nil {
-		value := *doc.ContentType
-		doc.ContentType = &value
-	}
-	if doc.ErrorCode != nil {
-		value := *doc.ErrorCode
-		doc.ErrorCode = &value
-	}
-	if doc.ErrorMessage != nil {
-		value := *doc.ErrorMessage
-		doc.ErrorMessage = &value
-	}
-	if doc.ParsedContent != nil {
-		value := *doc.ParsedContent
-		doc.ParsedContent = &value
-	}
-	if doc.ParserBackend != nil {
-		value := *doc.ParserBackend
-		doc.ParserBackend = &value
-	}
-	if doc.UpdatedAt != nil {
-		value := *doc.UpdatedAt
-		doc.UpdatedAt = &value
-	}
+	doc.FileRef = cloneStringPtr(doc.FileRef)
+	doc.ContentType = cloneStringPtr(doc.ContentType)
+	doc.SizeBytes = cloneInt64Ptr(doc.SizeBytes)
+	doc.ErrorCode = cloneStringPtr(doc.ErrorCode)
+	doc.ErrorMessage = cloneStringPtr(doc.ErrorMessage)
+	doc.ParserBackend = cloneStringPtr(doc.ParserBackend)
+	doc.CurrentJobID = cloneStringPtr(doc.CurrentJobID)
 	if doc.DeletedAt != nil {
 		value := *doc.DeletedAt
 		doc.DeletedAt = &value
 	}
-	if doc.CurrentJobID != nil {
-		value := *doc.CurrentJobID
-		doc.CurrentJobID = &value
-	}
 	return doc
 }
 
-func cloneChunk(chunk service.DocumentChunk) service.DocumentChunk {
-	if chunk.SectionPath != nil {
-		value := *chunk.SectionPath
-		chunk.SectionPath = &value
+func cloneRaw(value []byte) []byte {
+	if value == nil {
+		return nil
 	}
-	if chunk.ChunkType != nil {
-		value := *chunk.ChunkType
-		chunk.ChunkType = &value
-	}
-	if chunk.QdrantPointID != nil {
-		value := *chunk.QdrantPointID
-		chunk.QdrantPointID = &value
-	}
-	if chunk.EmbeddingProvider != nil {
-		value := *chunk.EmbeddingProvider
-		chunk.EmbeddingProvider = &value
-	}
-	if chunk.EmbeddingModel != nil {
-		value := *chunk.EmbeddingModel
-		chunk.EmbeddingModel = &value
-	}
-	if chunk.EmbeddingDimension != nil {
-		value := *chunk.EmbeddingDimension
-		chunk.EmbeddingDimension = &value
-	}
-	chunk.Metadata = cloneMap(chunk.Metadata)
-	return chunk
-}
-
-func cloneJob(job service.ProcessingJob) service.ProcessingJob {
-	if job.DocumentID != nil {
-		value := *job.DocumentID
-		job.DocumentID = &value
-	}
-	if job.CurrentStage != nil {
-		value := *job.CurrentStage
-		job.CurrentStage = &value
-	}
-	if job.Message != nil {
-		value := *job.Message
-		job.Message = &value
-	}
-	if job.ErrorCode != nil {
-		value := *job.ErrorCode
-		job.ErrorCode = &value
-	}
-	if job.ErrorMessage != nil {
-		value := *job.ErrorMessage
-		job.ErrorMessage = &value
-	}
-	if job.IdempotencyKey != nil {
-		value := *job.IdempotencyKey
-		job.IdempotencyKey = &value
-	}
-	if job.StartedAt != nil {
-		value := *job.StartedAt
-		job.StartedAt = &value
-	}
-	if job.FinishedAt != nil {
-		value := *job.FinishedAt
-		job.FinishedAt = &value
-	}
-	return job
+	return append([]byte(nil), value...)
 }
 
 func cloneStringPtr(value *string) *string {
 	if value == nil {
 		return nil
 	}
-	clone := *value
-	return &clone
+	cloned := *value
+	return &cloned
 }
 
-func cloneJobStagePtr(value *service.JobStage) *service.JobStage {
+func cloneInt64Ptr(value *int64) *int64 {
 	if value == nil {
 		return nil
 	}
-	clone := *value
-	return &clone
-}
-
-func cloneTimePtr(value *time.Time) *time.Time {
-	if value == nil {
-		return nil
-	}
-	clone := *value
-	return &clone
-}
-
-func cloneMap[M ~map[string]any](source M) M {
-	if source == nil {
-		return nil
-	}
-	clone := make(M, len(source))
-	for key, value := range source {
-		clone[key] = value
-	}
-	return clone
+	cloned := *value
+	return &cloned
 }

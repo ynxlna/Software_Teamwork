@@ -1,0 +1,7 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "backend service completion checklist"}
+{"file": ".trellis/spec/backend/api-contracts.md", "reason": "verify response envelope, request id, route ownership, and error mapping"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "verify migrations, repository boundaries, soft delete, and transaction safety"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "verify expected errors are classified and safe"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "verify logs avoid secrets, object keys, full document content, and internal URLs"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "verify go test/build expectations and test coverage"}
+{"file": ".trellis/tasks/06-29-knowledge-core-api/research/docs-contract-review.md", "reason": "verify implementation matches issue #81 and documented scope boundaries"}

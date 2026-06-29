@@ -12,6 +12,12 @@ type successEnvelope struct {
 	RequestID string `json:"requestId"`
 }
 
+type pageEnvelope struct {
+	Data      any      `json:"data"`
+	Page      pageInfo `json:"page"`
+	RequestID string   `json:"requestId"`
+}
+
 type errorEnvelope struct {
 	Error errorBody `json:"error"`
 }
@@ -23,10 +29,30 @@ type errorBody struct {
 	Fields    map[string]string `json:"fields,omitempty"`
 }
 
+type pageInfo struct {
+	Page     int   `json:"page"`
+	PageSize int   `json:"pageSize"`
+	Total    int64 `json:"total"`
+}
+
 func writeJSON(w http.ResponseWriter, status int, data any, requestID string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(successEnvelope{Data: data, RequestID: requestID})
+}
+
+func writePageJSON(w http.ResponseWriter, status int, data any, page service.Page, requestID string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(pageEnvelope{
+		Data: data,
+		Page: pageInfo{
+			Page:     page.Page,
+			PageSize: page.PageSize,
+			Total:    page.Total,
+		},
+		RequestID: requestID,
+	})
 }
 
 func writeAppError(w http.ResponseWriter, r *http.Request, err error) {

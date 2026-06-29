@@ -405,3 +405,36 @@ Read GitHub Discussion #65 and refactored QA and AI gateway contracts around Age
 ### Next Steps
 
 - None - task complete
+
+
+## Session 13: Implement Knowledge core API
+
+**Date**: 2026-06-29
+**Task**: Implement Knowledge core API
+**Branch**: `L1nggTeam/feat/knowledge-core-api`
+
+### Summary
+
+Rebuilt services/knowledge with Go 1.25.0, Knowledge Base CRUD, document status reads, PostgreSQL/sqlc migration path, tests, and docs for issue #81.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3d4046b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

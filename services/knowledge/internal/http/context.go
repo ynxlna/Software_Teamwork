@@ -9,6 +9,6 @@ func contextWithRequestID(ctx context.Context, requestID string) context.Context
 }
 
 func requestIDFromContext(ctx context.Context) string {
-	requestID, _ := ctx.Value(requestIDKey{}).(string)
-	return requestID
+	value, _ := ctx.Value(requestIDKey{}).(string)
+	return value
 }

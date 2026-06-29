@@ -1,81 +1,63 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/knowledge/internal/service"
 )
 
-type knowledgeBaseRequest struct {
-	ID                string         `json:"id,omitempty"`
-	Name              string         `json:"name"`
-	Description       string         `json:"description,omitempty"`
-	DocType           string         `json:"docType,omitempty"`
-	ChunkStrategy     map[string]any `json:"chunkStrategy,omitempty"`
-	RetrievalStrategy map[string]any `json:"retrievalStrategy,omitempty"`
+type createKnowledgeBaseRequest struct {
+	ID                *string          `json:"id"`
+	Name              string           `json:"name"`
+	Description       *string          `json:"description"`
+	DocType           *string          `json:"docType"`
+	ChunkStrategy     *json.RawMessage `json:"chunkStrategy"`
+	RetrievalStrategy *json.RawMessage `json:"retrievalStrategy"`
 }
 
 type updateKnowledgeBaseRequest struct {
-	Name              *string        `json:"name,omitempty"`
-	Description       *string        `json:"description,omitempty"`
-	DocType           *string        `json:"docType,omitempty"`
-	ChunkStrategy     map[string]any `json:"chunkStrategy,omitempty"`
-	RetrievalStrategy map[string]any `json:"retrievalStrategy,omitempty"`
+	Name              *string          `json:"name"`
+	Description       *string          `json:"description"`
+	DocType           *string          `json:"docType"`
+	ChunkStrategy     *json.RawMessage `json:"chunkStrategy"`
+	RetrievalStrategy *json.RawMessage `json:"retrievalStrategy"`
 }
 
 type knowledgeBaseSummary struct {
-	ID                string         `json:"id"`
-	Name              string         `json:"name"`
-	Description       string         `json:"description"`
-	DocType           string         `json:"docType"`
-	ChunkStrategy     map[string]any `json:"chunkStrategy"`
-	RetrievalStrategy map[string]any `json:"retrievalStrategy"`
-	DocumentCount     int            `json:"documentCount"`
-	ChunkCount        int            `json:"chunkCount"`
-	CreatedBy         string         `json:"createdBy,omitempty"`
-	CreatedAt         string         `json:"createdAt"`
-	UpdatedAt         string         `json:"updatedAt"`
+	ID                string          `json:"id"`
+	Name              string          `json:"name"`
+	Description       string          `json:"description"`
+	DocType           string          `json:"docType"`
+	ChunkStrategy     json.RawMessage `json:"chunkStrategy"`
+	RetrievalStrategy json.RawMessage `json:"retrievalStrategy"`
+	DocumentCount     int64           `json:"documentCount"`
+	ChunkCount        int64           `json:"chunkCount"`
+	CreatedBy         string          `json:"createdBy,omitempty"`
+	CreatedAt         time.Time       `json:"createdAt"`
+	UpdatedAt         time.Time       `json:"updatedAt"`
 }
 
-func knowledgeBaseSummaryFromDomain(base service.KnowledgeBase) knowledgeBaseSummary {
+func knowledgeBaseFromDomain(kb service.KnowledgeBase) knowledgeBaseSummary {
 	return knowledgeBaseSummary{
-		ID:                base.ID,
-		Name:              base.Name,
-		Description:       base.Description,
-		DocType:           base.DocType,
-		ChunkStrategy:     cloneJSONMap(base.ChunkStrategy),
-		RetrievalStrategy: cloneJSONMap(base.RetrievalStrategy),
-		DocumentCount:     base.DocumentCount,
-		ChunkCount:        base.ChunkCount,
-		CreatedBy:         base.CreatedBy,
-		CreatedAt:         base.CreatedAt.UTC().Format(time.RFC3339),
-		UpdatedAt:         base.UpdatedAt.UTC().Format(time.RFC3339),
+		ID:                kb.ID,
+		Name:              kb.Name,
+		Description:       kb.Description,
+		DocType:           kb.DocType,
+		ChunkStrategy:     cloneRaw(kb.ChunkStrategy),
+		RetrievalStrategy: cloneRaw(kb.RetrievalStrategy),
+		DocumentCount:     kb.DocumentCount,
+		ChunkCount:        kb.ChunkCount,
+		CreatedBy:         kb.CreatedBy,
+		CreatedAt:         kb.CreatedAt,
+		UpdatedAt:         kb.UpdatedAt,
 	}
 }
 
-func knowledgeBaseListFromDomain(list service.KnowledgeBaseList) []knowledgeBaseSummary {
-	items := make([]knowledgeBaseSummary, 0, len(list.Items))
-	for _, base := range list.Items {
-		items = append(items, knowledgeBaseSummaryFromDomain(base))
+func knowledgeBasesFromDomain(items []service.KnowledgeBase) []knowledgeBaseSummary {
+	out := make([]knowledgeBaseSummary, 0, len(items))
+	for _, item := range items {
+		out = append(out, knowledgeBaseFromDomain(item))
 	}
-	return items
-}
-
-func pageInfoFromDomain(page service.Page) map[string]int {
-	return map[string]int{
-		"page":     page.Page,
-		"pageSize": page.PageSize,
-		"total":    page.Total,
-	}
-}
-
-func cloneJSONMap(source map[string]any) map[string]any {
-	if source == nil {
-		return nil
-	}
-	clone := make(map[string]any, len(source))
-	for key, value := range source {
-		clone[key] = value
-	}
-	return clone
+	return out
 }

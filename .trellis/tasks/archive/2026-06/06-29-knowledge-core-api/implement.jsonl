@@ -1,0 +1,9 @@
+{"file": ".trellis/spec/backend/index.md", "reason": "backend service pre-development checklist and service quality expectations"}
+{"file": ".trellis/spec/backend/directory-structure.md", "reason": "standard Go microservice layout for rebuilding services/knowledge"}
+{"file": ".trellis/spec/backend/api-contracts.md", "reason": "gateway/internal API envelope, route ownership, request context, and error contract"}
+{"file": ".trellis/spec/backend/database-guidelines.md", "reason": "PostgreSQL, migration, repository, transaction, Redis/Qdrant boundary rules"}
+{"file": ".trellis/spec/backend/error-handling.md", "reason": "service-local AppError classification and HTTP error mapping"}
+{"file": ".trellis/spec/backend/logging-guidelines.md", "reason": "slog fields and sensitive data exclusions for service handlers"}
+{"file": ".trellis/spec/backend/quality-guidelines.md", "reason": "required Go service tests and build checks"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "feature spans HTTP, service, repository, migration, and docs"}
+{"file": ".trellis/tasks/06-29-knowledge-core-api/research/docs-contract-review.md", "reason": "issue #81 and docs contract decisions for this implementation"}

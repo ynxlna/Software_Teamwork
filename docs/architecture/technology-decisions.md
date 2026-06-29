@@ -157,6 +157,12 @@
 | Knowledge public API draft | `3.0.3` | `0.1.0` | Knowledge 公开资源设计草案；稳定公开入口仍以 gateway OpenAPI 为准。 |
 | File service API | `3.0.3` | `0.2.0` | File 服务是后端内部基础文件能力，不直接作为前端公开 API。 |
 
+## 服务级偏离
+
+| 服务 | 偏离项 | 原因 |
+| --- | --- | --- |
+| `knowledge` | `services/knowledge/go.mod` 使用 `go 1.25.0`。 | Knowledge 是新重建的 RAG 底座服务，需要为后续 RAG MCP server 化预留较新的 Go module 基线；仍沿用标准库 `net/http` / `http.ServeMux` 路由形态。 |
+
 ## 三选一决策记录
 
 | 领域 | 备选 1 | 备选 2 | 备选 3 | 当前决定 | 版本状态 |

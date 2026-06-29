@@ -11,6 +11,7 @@ type JobRepository interface {
 	FindReportJobByID(ctx context.Context, id string) (ReportJob, error)
 	ListReportJobsByReportID(ctx context.Context, reportID string) ([]ReportJob, error)
 	UpdateReportJobStatus(ctx context.Context, id string, status JobStatus, errorCode, errorMessage string, startedAt, finishedAt *time.Time) (ReportJob, error)
+	IncrementJobRetryCount(ctx context.Context, id string) (ReportJob, error)
 	CreateReportJobAttempt(ctx context.Context, value ReportJobAttempt) (ReportJobAttempt, error)
 	ListReportJobAttemptsByJobID(ctx context.Context, jobID string) ([]ReportJobAttempt, error)
 	ListReportEventsByReportID(ctx context.Context, reportID string) ([]ReportEvent, error)
@@ -63,9 +64,8 @@ func (s *JobService) RetryJob(ctx context.Context, id string) (ReportJobAttempt,
 	if err != nil {
 		return ReportJobAttempt{}, fmt.Errorf("create retry attempt: %w", err)
 	}
-	_, err = s.repo.UpdateReportJobStatus(ctx, id, JobStatusPending, "", "", nil, nil)
-	if err != nil {
-		return ReportJobAttempt{}, fmt.Errorf("reset job status: %w", err)
+	if _, err = s.repo.IncrementJobRetryCount(ctx, id); err != nil {
+		return ReportJobAttempt{}, fmt.Errorf("increment retry count: %w", err)
 	}
 	return attempt, nil
 }

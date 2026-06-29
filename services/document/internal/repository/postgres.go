@@ -714,6 +714,10 @@ func (r *PostgresRepository) CreateReportEvent(ctx context.Context, value servic
 }
 
 func (r *PostgresRepository) ListReportJobsByReportID(ctx context.Context, reportID string) ([]service.ReportJob, error) {
+	id, err := parseUUID(reportID)
+	if err != nil {
+		return nil, service.NewError(service.CodeValidation, "invalid report id", err)
+	}
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			id::text, COALESCE(request_id, ''), source, job_type, target_type,
@@ -722,8 +726,8 @@ func (r *PostgresRepository) ListReportJobsByReportID(ctx context.Context, repor
 			COALESCE(error_message, ''), retry_count, max_attempts, started_at,
 			finished_at, created_at
 		FROM report_jobs
-		WHERE report_id = $1::uuid
-		ORDER BY created_at DESC`, reportID)
+		WHERE report_id = $1
+		ORDER BY created_at DESC`, id)
 	if err != nil {
 		return nil, fmt.Errorf("list report jobs: %w", err)
 	}
@@ -771,15 +775,44 @@ func (r *PostgresRepository) UpdateReportJobStatus(ctx context.Context, id strin
 	return job, nil
 }
 
+func (r *PostgresRepository) IncrementJobRetryCount(ctx context.Context, id string) (service.ReportJob, error) {
+	jobID, err := parseUUID(id)
+	if err != nil {
+		return service.ReportJob{}, service.NewError(service.CodeValidation, "invalid job id", err)
+	}
+	row := r.db.QueryRow(ctx, `
+		UPDATE report_jobs SET
+			retry_count = retry_count + 1,
+			status = 'pending',
+			error_code = NULL,
+			error_message = NULL
+		WHERE id = $1
+		RETURNING
+			id::text, COALESCE(request_id, ''), source, job_type, target_type,
+			target_id, COALESCE(asynq_task_id, ''), queue_name, report_id::text,
+			COALESCE(template_id::text, ''), status, COALESCE(error_code, ''),
+			COALESCE(error_message, ''), retry_count, max_attempts, started_at,
+			finished_at, created_at`, jobID)
+	job, err := scanReportJob(row)
+	if err != nil {
+		return service.ReportJob{}, fmt.Errorf("increment job retry count: %w", err)
+	}
+	return job, nil
+}
+
 func (r *PostgresRepository) ListReportJobAttemptsByJobID(ctx context.Context, jobID string) ([]service.ReportJobAttempt, error) {
+	id, err := parseUUID(jobID)
+	if err != nil {
+		return nil, service.NewError(service.CodeValidation, "invalid job id", err)
+	}
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			id::text, job_id::text, attempt_number, COALESCE(asynq_task_id, ''),
 			trigger_source, COALESCE(reason, ''), status, COALESCE(error_code, ''),
 			COALESCE(error_message, ''), started_at, finished_at, created_at
 		FROM report_job_attempts
-		WHERE job_id = $1::uuid
-		ORDER BY attempt_number ASC`, jobID)
+		WHERE job_id = $1
+		ORDER BY attempt_number ASC`, id)
 	if err != nil {
 		return nil, fmt.Errorf("list report job attempts: %w", err)
 	}
@@ -799,13 +832,17 @@ func (r *PostgresRepository) ListReportJobAttemptsByJobID(ctx context.Context, j
 }
 
 func (r *PostgresRepository) ListReportEventsByReportID(ctx context.Context, reportID string) ([]service.ReportEvent, error) {
+	id, err := parseUUID(reportID)
+	if err != nil {
+		return nil, service.NewError(service.CodeValidation, "invalid report id", err)
+	}
 	rows, err := r.db.Query(ctx, `
 		SELECT
 			id::text, report_id::text, COALESCE(job_id::text, ''), event_type,
 			COALESCE(message, ''), created_at
 		FROM report_events
-		WHERE report_id = $1::uuid
-		ORDER BY created_at DESC`, reportID)
+		WHERE report_id = $1
+		ORDER BY created_at DESC`, id)
 	if err != nil {
 		return nil, fmt.Errorf("list report events: %w", err)
 	}

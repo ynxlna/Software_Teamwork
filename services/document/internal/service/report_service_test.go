@@ -595,6 +595,24 @@ func TestSaveSectionsPersistsExplicitSortOrder(t *testing.T) {
 	}
 }
 
+func TestCreateSectionPersistsExplicitSortOrder(t *testing.T) {
+	svc, _ := newTestService()
+	report := mustCreateReport(t, svc, "owner-1")
+	actor := RequestContext{UserID: "owner-1"}
+
+	sortOrder := 5
+	section, err := svc.CreateSection(context.Background(), actor, report.ID, CreateSectionInput{
+		Title:     "Sorted section",
+		SortOrder: &sortOrder,
+	})
+	if err != nil {
+		t.Fatalf("CreateSection() error = %v", err)
+	}
+	if section.SortOrder != sortOrder {
+		t.Fatalf("SortOrder = %d, want %d", section.SortOrder, sortOrder)
+	}
+}
+
 func TestCreateSectionWithoutContentDefaultsToManualSource(t *testing.T) {
 	svc, _ := newTestService()
 	report := mustCreateReport(t, svc, "owner-1")

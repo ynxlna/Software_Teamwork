@@ -1752,9 +1752,6 @@ export interface components {
             specialty?: string;
             businessObject?: string;
             year?: number;
-            extraContext?: {
-                [key: string]: unknown;
-            };
             /** @enum {string} */
             source?: "frontend" | "admin" | "mcp" | "backend";
         };
@@ -1765,9 +1762,6 @@ export interface components {
             specialty?: string;
             businessObject?: string;
             year?: number;
-            extraContext?: {
-                [key: string]: unknown;
-            };
         };
         Report: {
             id: string;
@@ -1779,9 +1773,6 @@ export interface components {
             businessObject?: string;
             year?: number;
             status: components["schemas"]["ReportStatus"];
-            extraContext?: {
-                [key: string]: unknown;
-            };
             creatorId?: string;
             creatorName?: string;
             source?: string;
@@ -1810,6 +1801,7 @@ export interface components {
             clientSectionId?: string;
             title: string;
             level: number;
+            sortOrder?: number;
             numbering?: string;
             children?: components["schemas"]["ReportOutlineNode"][];
         };
@@ -1870,6 +1862,7 @@ export interface components {
             /** @description Required when id is omitted. */
             title?: string;
             level?: number;
+            sortOrder?: number;
             numbering?: string;
             content?: string;
             tables?: {
@@ -1920,8 +1913,6 @@ export interface components {
             /** @enum {string} */
             source: "manual" | "ai";
             requirements?: string;
-            materialIds?: string[];
-            preserveManualEdits?: boolean;
         };
         ReportSectionVersion: {
             id: string;

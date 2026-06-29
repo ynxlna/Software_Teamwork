@@ -3582,9 +3582,6 @@ components:
           type: string
         year:
           type: integer
-        extraContext:
-          type: object
-          additionalProperties: true
         source:
           type: string
           enum:
@@ -3607,9 +3604,6 @@ components:
           type: string
         year:
           type: integer
-        extraContext:
-          type: object
-          additionalProperties: true
     Report:
       type: object
       required:
@@ -3637,9 +3631,6 @@ components:
           type: integer
         status:
           $ref: '#/components/schemas/ReportStatus'
-        extraContext:
-          type: object
-          additionalProperties: true
         creatorId:
           type: string
         creatorName:
@@ -3701,6 +3692,9 @@ components:
           type: string
         level:
           type: integer
+        sortOrder:
+          type: integer
+          minimum: 0
         numbering:
           type: string
         children:
@@ -3836,6 +3830,9 @@ components:
           description: Required when id is omitted.
         level:
           type: integer
+        sortOrder:
+          type: integer
+          minimum: 0
         numbering:
           type: string
         content:
@@ -3953,12 +3950,6 @@ components:
           - ai
         requirements:
           type: string
-        materialIds:
-          type: array
-          items:
-            type: string
-        preserveManualEdits:
-          type: boolean
     ReportSectionVersion:
       type: object
       required:

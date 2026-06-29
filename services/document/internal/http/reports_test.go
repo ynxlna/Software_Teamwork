@@ -15,8 +15,9 @@ import (
 // fakeReportService implements ReportService for HTTP-layer tests so they
 // don't depend on PostgreSQL.
 type fakeReportService struct {
-	reports       map[string]service.Report
-	savedSections []service.SaveSectionInput
+	reports             map[string]service.Report
+	createdSectionInput service.CreateSectionInput
+	savedSections       []service.SaveSectionInput
 }
 
 func newFakeReportService() *fakeReportService {
@@ -99,8 +100,25 @@ func (f *fakeReportService) DeleteOutlineSection(context.Context, service.Reques
 func (f *fakeReportService) ListSections(context.Context, service.RequestContext, string) ([]service.ReportSection, error) {
 	return nil, nil
 }
-func (f *fakeReportService) CreateSection(context.Context, service.RequestContext, string, service.CreateSectionInput) (service.ReportSection, error) {
-	return service.ReportSection{}, nil
+func (f *fakeReportService) CreateSection(_ context.Context, _ service.RequestContext, reportID string, input service.CreateSectionInput) (service.ReportSection, error) {
+	f.createdSectionInput = input
+	sortOrder := 0
+	if input.SortOrder != nil {
+		sortOrder = *input.SortOrder
+	}
+	now := time.Date(2026, 6, 29, 0, 0, 0, 0, time.UTC)
+	return service.ReportSection{
+		ID:               "section-created",
+		ReportID:         reportID,
+		Title:            input.Title,
+		Level:            1,
+		SortOrder:        sortOrder,
+		GenerationStatus: service.JobStatusPending,
+		ContentSource:    service.ContentSourceManual,
+		Version:          1,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}, nil
 }
 func (f *fakeReportService) SaveSections(_ context.Context, _ service.RequestContext, reportID string, input service.SaveSectionsInput) ([]service.ReportSection, error) {
 	f.savedSections = input.Sections
@@ -267,6 +285,24 @@ func TestPostSectionsBatchSaveUsesCollectionEndpoint(t *testing.T) {
 	}
 	if len(body.Data) != 2 || body.Data[0].ID != "section-1" || body.Data[1].Title != "New section" {
 		t.Fatalf("unexpected batch response: %+v", body.Data)
+	}
+}
+
+func TestPostSectionsCreateParsesSortOrder(t *testing.T) {
+	fake := newFakeReportService()
+	server := NewServer(Config{ReportService: fake})
+
+	req := httptest.NewRequest(http.MethodPost, "/reports/report-1/sections", strings.NewReader(`{"title":"Intro","sortOrder":5}`))
+	req.SetPathValue("reportId", "report-1")
+	req.Header.Set("X-User-Id", "user-1")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want 201, body = %s", rec.Code, rec.Body.String())
+	}
+	if fake.createdSectionInput.SortOrder == nil || *fake.createdSectionInput.SortOrder != 5 {
+		t.Fatalf("CreateSection sortOrder = %v, want 5", fake.createdSectionInput.SortOrder)
 	}
 }
 

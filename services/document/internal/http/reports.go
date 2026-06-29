@@ -260,6 +260,7 @@ type createSectionRequest struct {
 	ParentID      string           `json:"parentId,omitempty"`
 	Title         string           `json:"title"`
 	Level         int              `json:"level,omitempty"`
+	SortOrder     *int             `json:"sortOrder,omitempty"`
 	Numbering     string           `json:"numbering,omitempty"`
 	Content       string           `json:"content,omitempty"`
 	Tables        []map[string]any `json:"tables,omitempty"`
@@ -586,6 +587,7 @@ func (s *Server) handleCreateSection(w http.ResponseWriter, r *http.Request) {
 		ParentID:      body.ParentID,
 		Title:         body.Title,
 		Level:         body.Level,
+		SortOrder:     body.SortOrder,
 		Numbering:     body.Numbering,
 		Content:       body.Content,
 		Tables:        body.Tables,

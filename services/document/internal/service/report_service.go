@@ -83,6 +83,7 @@ type CreateSectionInput struct {
 	ParentID      string
 	Title         string
 	Level         int
+	SortOrder     *int
 	Numbering     string
 	Content       string
 	Tables        []map[string]any
@@ -429,12 +430,19 @@ func (s *ReportService) CreateSection(ctx context.Context, reqCtx RequestContext
 	if strings.TrimSpace(input.Title) == "" {
 		return ReportSection{}, ValidationError(map[string]string{"title": "title is required"})
 	}
+	if err := validateSectionSortOrder(input.SortOrder); err != nil {
+		return ReportSection{}, err
+	}
 
 	siblings, err := s.repo.ListReportSections(ctx, reportID)
 	if err != nil {
 		return ReportSection{}, dependencyError("list report sections", err)
 	}
-	section := buildNewSection(reportID, input, nextSectionSortOrder(siblings, input.ParentID), s.now())
+	sortOrder := nextSectionSortOrder(siblings, input.ParentID)
+	if input.SortOrder != nil {
+		sortOrder = *input.SortOrder
+	}
+	section := buildNewSection(reportID, input, sortOrder, s.now())
 	if err := validateSectionParent(reportID, section, sectionsByID(siblings)); err != nil {
 		return ReportSection{}, err
 	}
@@ -639,6 +647,7 @@ func createInputFromSaveSection(input SaveSectionInput) (CreateSectionInput, err
 		ParentID:      stringPtrValue(input.ParentID),
 		Title:         *input.Title,
 		Level:         level,
+		SortOrder:     input.SortOrder,
 		Numbering:     stringPtrValue(input.Numbering),
 		Content:       stringPtrValue(input.Content),
 		Tables:        tables,

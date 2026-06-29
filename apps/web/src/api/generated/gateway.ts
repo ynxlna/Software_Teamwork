@@ -4,5101 +4,5055 @@
  */
 
 export interface paths {
-  '/healthz': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Liveness check */
-    get: operations['getHealthz']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/readyz': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Readiness check */
-    get: operations['getReadyz']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/users': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Create user */
-    post: operations['createUser']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/sessions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Create session */
-    post: operations['createSession']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/sessions/current': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /** Delete current session */
-    delete: operations['deleteCurrentSession']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/users/me': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Get current user */
-    get: operations['getCurrentUser']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/knowledge-bases': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List knowledge bases */
-    get: operations['listKnowledgeBases']
-    put?: never
-    /** Create knowledge base */
-    post: operations['createKnowledgeBase']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/knowledge-bases/{knowledgeBaseId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    /** Get knowledge base */
-    get: operations['getKnowledgeBase']
-    put?: never
-    post?: never
-    /** Delete knowledge base */
-    delete: operations['deleteKnowledgeBase']
-    options?: never
-    head?: never
-    /**
-     * Update knowledge base
-     * @description Updating chunk or retrieval strategies may require reprocessing documents; reprocessing job behavior is owned by knowledge service.
-     */
-    patch: operations['updateKnowledgeBase']
-    trace?: never
-  }
-  '/api/v1/knowledge-bases/{knowledgeBaseId}/documents': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    /** List knowledge-base documents */
-    get: operations['listKnowledgeBaseDocuments']
-    put?: never
-    /**
-     * Upload a document to a knowledge base
-     * @description Gateway exposes the knowledge-base document upload workflow. Knowledge service owns the document resource, knowledge-base association, metadata, ingestion state, chunks, embeddings, and retrieval lifecycle, and may call file service internally for the raw file object. Report templates, report materials, and generated report files are separate document-owned resources and must not be modeled through this path.
-     */
-    post: operations['uploadKnowledgeBaseDocument']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/documents/{documentId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    /** Get document processing details */
-    get: operations['getDocument']
-    put?: never
-    post?: never
-    /**
-     * Delete document
-     * @description Delete the knowledge-owned document resource. Knowledge service coordinates chunk/index cleanup and any underlying file reference cleanup through its document lifecycle.
-     */
-    delete: operations['deleteDocument']
-    options?: never
-    head?: never
-    /**
-     * Update document tags
-     * @description Update knowledge-owned document metadata only. File service base object metadata and knowledge-owned processing fields are not mutated by this operation.
-     */
-    patch: operations['updateDocument']
-    trace?: never
-  }
-  '/api/v1/documents/{documentId}/chunks': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    /** List document chunks */
-    get: operations['listDocumentChunks']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/documents/{documentId}/content': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get original document content
-     * @description Return the original knowledge document content through gateway. Knowledge service owns the document content resource and may read the underlying bytes from file service internally.
-     */
-    get: operations['getDocumentContent']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/knowledge-queries': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Create knowledge query
-     * @description Run a resource-mode knowledge retrieval query. Query execution is modeled as creating a knowledge-query resource, not as an action-style search path.
-     */
-    post: operations['createKnowledgeQuery']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/admin/model-profiles': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List runtime model profiles */
-    get: operations['listAdminModelProfiles']
-    put?: never
-    /** Create runtime model profile */
-    post: operations['createAdminModelProfile']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/admin/model-profiles/{profileId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        profileId: components['parameters']['ProfileId']
-      }
-      cookie?: never
-    }
-    /** Get runtime model profile */
-    get: operations['getAdminModelProfile']
-    put?: never
-    post?: never
-    /** Delete or disable runtime model profile */
-    delete: operations['deleteAdminModelProfile']
-    options?: never
-    head?: never
-    /** Update runtime model profile */
-    patch: operations['updateAdminModelProfile']
-    trace?: never
-  }
-  '/api/v1/admin/parser-configs': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List document parser configs */
-    get: operations['listAdminParserConfigs']
-    put?: never
-    /** Create document parser config */
-    post: operations['createAdminParserConfig']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/admin/parser-configs/{parserConfigId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        parserConfigId: components['parameters']['ParserConfigId']
-      }
-      cookie?: never
-    }
-    /** Get document parser config */
-    get: operations['getAdminParserConfig']
-    put?: never
-    post?: never
-    /** Delete or disable document parser config */
-    delete: operations['deleteAdminParserConfig']
-    options?: never
-    head?: never
-    /** Update document parser config */
-    patch: operations['updateAdminParserConfig']
-    trace?: never
-  }
-  '/api/v1/report-types': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List report types */
-    get: operations['listReportTypes']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-templates': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List report templates */
-    get: operations['listReportTemplates']
-    put?: never
-    /** Create report template */
-    post: operations['createReportTemplate']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-templates/{reportTemplateId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    /** Get report template */
-    get: operations['getReportTemplate']
-    put?: never
-    post?: never
-    /**
-     * Delete report template
-     * @description Prefer disabling or soft deleting templates that have been used by reports.
-     */
-    delete: operations['deleteReportTemplate']
-    options?: never
-    head?: never
-    /** Update report template */
-    patch: operations['updateReportTemplate']
-    trace?: never
-  }
-  '/api/v1/report-templates/{reportTemplateId}/structure': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    /** Get report template structure */
-    get: operations['getReportTemplateStructure']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /** Update report template structure */
-    patch: operations['updateReportTemplateStructure']
-    trace?: never
-  }
-  '/api/v1/report-materials': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List report materials */
-    get: operations['listReportMaterials']
-    put?: never
-    /** Create report material */
-    post: operations['createReportMaterial']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-materials/{materialId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        materialId: components['parameters']['MaterialId']
-      }
-      cookie?: never
-    }
-    /** Get report material */
-    get: operations['getReportMaterial']
-    put?: never
-    post?: never
-    /**
-     * Delete report material
-     * @description Prefer soft deletion when material has been referenced by generation jobs.
-     */
-    delete: operations['deleteReportMaterial']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List reports */
-    get: operations['listReports']
-    put?: never
-    /** Create report */
-    post: operations['createReport']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    /** Get report */
-    get: operations['getReport']
-    put?: never
-    post?: never
-    /**
-     * Delete report
-     * @description Prefer soft deletion so historical jobs and generated files remain auditable.
-     */
-    delete: operations['deleteReport']
-    options?: never
-    head?: never
-    /** Update report */
-    patch: operations['updateReport']
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/outlines': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    /** List report outlines */
-    get: operations['listReportOutlines']
-    put?: never
-    /**
-     * Create report outline
-     * @description Manual outline saves create a new outline version. AI-created outlines are produced by report jobs.
-     */
-    post: operations['createReportOutline']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/outlines/{outlineId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        outlineId: components['parameters']['OutlineId']
-      }
-      cookie?: never
-    }
-    /** Get report outline */
-    get: operations['getReportOutline']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /** Update report outline */
-    patch: operations['updateReportOutline']
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/outlines/{outlineId}/sections/{sectionId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        outlineId: components['parameters']['OutlineId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /** Delete report outline section */
-    delete: operations['deleteReportOutlineSection']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/sections': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    /** List report sections */
-    get: operations['listReportSections']
-    put?: never
-    /** Create report section */
-    post: operations['createReportSection']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/sections/{sectionId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    /** Get report section */
-    get: operations['getReportSection']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /** Update report section */
-    patch: operations['updateReportSection']
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/sections/{sectionId}/versions': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    /** List report section versions */
-    get: operations['listReportSectionVersions']
-    put?: never
-    /**
-     * Create report section version
-     * @description Creates a new section content version, including versions produced by AI regeneration.
-     */
-    post: operations['createReportSectionVersion']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/jobs': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    /** List report jobs */
-    get: operations['listReportJobs']
-    put?: never
-    /**
-     * Create report job
-     * @description Creates long-running work for outline creation, content creation, section regeneration, or report file creation.
-     */
-    post: operations['createReportJob']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-jobs/{jobId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        jobId: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    /** Get report job */
-    get: operations['getReportJob']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-jobs/{jobId}/attempts': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        jobId: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    /** List report job attempts */
-    get: operations['listReportJobAttempts']
-    put?: never
-    /**
-     * Create report job attempt
-     * @description Creates a new attempt for an existing failed or interrupted report job.
-     */
-    post: operations['createReportJobAttempt']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/reports/{reportId}/events': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    /**
-     * List report events
-     * @description Returns report workflow events for polling. A future SSE contract must be added explicitly before streaming clients rely on it.
-     */
-    get: operations['listReportEvents']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-files': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List report files */
-    get: operations['listReportFiles']
-    put?: never
-    /**
-     * Create report file
-     * @description Creates generated report files such as DOCX without exposing storage internals to frontend clients. Document service owns report-file business metadata and should use file service for underlying object storage/content access instead of duplicating public file semantics.
-     */
-    post: operations['createReportFile']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-files/{reportFileId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportFileId: components['parameters']['ReportFileId']
-      }
-      cookie?: never
-    }
-    /** Get report file */
-    get: operations['getReportFile']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-files/{reportFileId}/content': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportFileId: components['parameters']['ReportFileId']
-      }
-      cookie?: never
-    }
-    /**
-     * Get report file content
-     * @description Returns generated file content. Error responses still use the standard gateway error envelope.
-     */
-    get: operations['getReportFileContent']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-statistics/overview': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Get report statistics overview */
-    get: operations['getReportStatisticsOverview']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-statistics/daily': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List daily report statistics */
-    get: operations['listDailyReportStatistics']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-operation-logs': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List report operation logs */
-    get: operations['listReportOperationLogs']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/report-settings': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get report generation settings
-     * @description Returns admin-visible report generation settings. Provider base URLs and API keys remain owned by AI Gateway model profiles and are never returned here.
-     */
-    get: operations['getReportSettings']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /** Update report generation settings */
-    patch: operations['updateReportSettings']
-    trace?: never
-  }
-  '/api/v1/qa-sessions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List QA sessions */
-    get: operations['listQASessions']
-    put?: never
-    /** Create QA session */
-    post: operations['createQASession']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-sessions/{sessionId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    /** Get QA session */
-    get: operations['getQASession']
-    put?: never
-    post?: never
-    /**
-     * Delete QA session
-     * @description Soft-deletes the QA session owned by the current user.
-     */
-    delete: operations['deleteQASession']
-    options?: never
-    head?: never
-    /** Update QA session */
-    patch: operations['updateQASession']
-    trace?: never
-  }
-  '/api/v1/qa-sessions/{sessionId}/messages': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    /** List QA session messages */
-    get: operations['listQAMessages']
-    put?: never
-    /**
-     * Create QA message and answer
-     * @description Creates a user message and runs the QA Agent Host. JSON clients receive
-     *     the completed answer payload; clients that send `Accept: text/event-stream`
-     *     receive the same run as an SSE stream. QA owns the ReAct loop, calls AI
-     *     Gateway for OpenAI-compatible function-calling transport, and calls
-     *     approved MCP tools through QA/MCP Client.
-     */
-    post: operations['createQAMessage']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-sessions/{sessionId}/events': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    /**
-     * List QA response stream events
-     * @description Returns short-lived persisted SSE events for reconnect recovery or debugging. This endpoint is a polling/replay resource and does not itself open an SSE stream.
-     */
-    get: operations['listQAStreamEvents']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/response-runs/{responseRunId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        responseRunId: components['parameters']['ResponseRunId']
-      }
-      cookie?: never
-    }
-    /** Get QA response run */
-    get: operations['getQAResponseRun']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /**
-     * Update QA response run
-     * @description The stable public mutation is cancellation by setting `status` to `cancelled`.
-     */
-    patch: operations['updateQAResponseRun']
-    trace?: never
-  }
-  '/api/v1/response-runs/{responseRunId}/tool-calls': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        responseRunId: components['parameters']['ResponseRunId']
-      }
-      cookie?: never
-    }
-    /**
-     * List QA response run tool calls
-     * @description Returns sanitized tool-call summaries only. Raw MCP schemas, full arguments, raw tool results, prompts, internal URLs, object keys, and provider errors are not part of the public contract.
-     */
-    get: operations['listQAResponseRunToolCalls']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/messages/{messageId}/citations': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        messageId: components['parameters']['MessageId']
-      }
-      cookie?: never
-    }
-    /** List QA message citations */
-    get: operations['listQAMessageCitations']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/citations/{citationId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        citationId: components['parameters']['CitationId']
-      }
-      cookie?: never
-    }
-    /** Get QA citation detail */
-    get: operations['getQACitation']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/citation-lookups': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Create QA citation lookup
-     * @description Creates a batch lookup for saved citation details. QA owns the saved citation snapshots and may call knowledge or file internally to enrich source availability, while gateway keeps the public response envelope stable.
-     */
-    post: operations['createQACitationLookup']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-config-versions/current': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Get current QA config version */
-    get: operations['getCurrentQAConfigVersion']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-config-versions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Create QA config version
-     * @description Creates a versioned QA runtime configuration so historical answers remain traceable to the retrieval and Agent settings used at generation time.
-     */
-    post: operations['createQAConfigVersion']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/llm-config-versions/current': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Get current QA LLM config version
-     * @description Returns the active QA LLM settings. Provider base URLs and API keys remain owned by AI Gateway model profiles and are never returned here.
-     */
-    get: operations['getCurrentQALLMConfigVersion']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/llm-config-versions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Create QA LLM config version
-     * @description Stores a QA-owned reference to an AI Gateway model profile plus model and generation defaults. It does not store provider credentials.
-     */
-    post: operations['createQALLMConfigVersion']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/llm-connection-tests': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Create QA LLM connection test
-     * @description Tests a QA LLM configuration through AI Gateway. Responses must not include prompts, provider raw errors, provider credentials, or internal URLs.
-     */
-    post: operations['createQALLMConnectionTest']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/retrieval-test-runs': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Create QA retrieval test run
-     * @description Creates an administrator retrieval experience test for QA settings. Knowledge retrieval remains owned by the knowledge service; QA stores the test run and sanitized result snapshot.
-     */
-    post: operations['createQARetrievalTestRun']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/retrieval-test-runs/{testRunId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        testRunId: components['parameters']['TestRunId']
-      }
-      cookie?: never
-    }
-    /** Get QA retrieval test run */
-    get: operations['getQARetrievalTestRun']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-metrics/overview': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Get QA metrics overview */
-    get: operations['getQAMetricsOverview']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-metrics/trend': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** Get QA metrics trend */
-    get: operations['getQAMetricsTrend']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-metrics/top-queries': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List QA top queries */
-    get: operations['listQATopQueries']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/qa-metrics/intent-distribution': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** List QA intent distribution */
-    get: operations['listQAIntentDistribution']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Liveness check */
+        get: operations["getHealthz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/readyz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Readiness check */
+        get: operations["getReadyz"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create user */
+        post: operations["createUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create session */
+        post: operations["createSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/sessions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete current session */
+        delete: operations["deleteCurrentSession"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/users/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current user */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List knowledge bases */
+        get: operations["listKnowledgeBases"];
+        put?: never;
+        /** Create knowledge base */
+        post: operations["createKnowledgeBase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{knowledgeBaseId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        /** Get knowledge base */
+        get: operations["getKnowledgeBase"];
+        put?: never;
+        post?: never;
+        /** Delete knowledge base */
+        delete: operations["deleteKnowledgeBase"];
+        options?: never;
+        head?: never;
+        /**
+         * Update knowledge base
+         * @description Updating chunk or retrieval strategies may require reprocessing documents; reprocessing job behavior is owned by knowledge service.
+         */
+        patch: operations["updateKnowledgeBase"];
+        trace?: never;
+    };
+    "/api/v1/knowledge-bases/{knowledgeBaseId}/documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        /** List knowledge-base documents */
+        get: operations["listKnowledgeBaseDocuments"];
+        put?: never;
+        /**
+         * Upload a document to a knowledge base
+         * @description Gateway exposes the knowledge-base document upload workflow. Knowledge service owns the document resource, knowledge-base association, metadata, ingestion state, chunks, embeddings, and retrieval lifecycle, and may call file service internally for the raw file object. Report templates, report materials, and generated report files are separate document-owned resources and must not be modeled through this path.
+         */
+        post: operations["uploadKnowledgeBaseDocument"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{documentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        /** Get document processing details */
+        get: operations["getDocument"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete document
+         * @description Delete the knowledge-owned document resource. Knowledge service coordinates chunk/index cleanup and any underlying file reference cleanup through its document lifecycle.
+         */
+        delete: operations["deleteDocument"];
+        options?: never;
+        head?: never;
+        /**
+         * Update document tags
+         * @description Update knowledge-owned document metadata only. File service base object metadata and knowledge-owned processing fields are not mutated by this operation.
+         */
+        patch: operations["updateDocument"];
+        trace?: never;
+    };
+    "/api/v1/documents/{documentId}/chunks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        /** List document chunks */
+        get: operations["listDocumentChunks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/documents/{documentId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get original document content
+         * @description Return the original knowledge document content through gateway. Knowledge service owns the document content resource and may read the underlying bytes from file service internally.
+         */
+        get: operations["getDocumentContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/knowledge-queries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create knowledge query
+         * @description Run a resource-mode knowledge retrieval query. Query execution is modeled as creating a knowledge-query resource, not as an action-style search path.
+         */
+        post: operations["createKnowledgeQuery"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/model-profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List runtime model profiles */
+        get: operations["listAdminModelProfiles"];
+        put?: never;
+        /** Create runtime model profile */
+        post: operations["createAdminModelProfile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/model-profiles/{profileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        /** Get runtime model profile */
+        get: operations["getAdminModelProfile"];
+        put?: never;
+        post?: never;
+        /** Delete or disable runtime model profile */
+        delete: operations["deleteAdminModelProfile"];
+        options?: never;
+        head?: never;
+        /** Update runtime model profile */
+        patch: operations["updateAdminModelProfile"];
+        trace?: never;
+    };
+    "/api/v1/admin/parser-configs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List document parser configs */
+        get: operations["listAdminParserConfigs"];
+        put?: never;
+        /** Create document parser config */
+        post: operations["createAdminParserConfig"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/parser-configs/{parserConfigId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parserConfigId: components["parameters"]["ParserConfigId"];
+            };
+            cookie?: never;
+        };
+        /** Get document parser config */
+        get: operations["getAdminParserConfig"];
+        put?: never;
+        post?: never;
+        /** Delete or disable document parser config */
+        delete: operations["deleteAdminParserConfig"];
+        options?: never;
+        head?: never;
+        /** Update document parser config */
+        patch: operations["updateAdminParserConfig"];
+        trace?: never;
+    };
+    "/api/v1/report-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List report types */
+        get: operations["listReportTypes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List report templates */
+        get: operations["listReportTemplates"];
+        put?: never;
+        /** Create report template */
+        post: operations["createReportTemplate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-templates/{reportTemplateId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        /** Get report template */
+        get: operations["getReportTemplate"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete report template
+         * @description Prefer disabling or soft deleting templates that have been used by reports.
+         */
+        delete: operations["deleteReportTemplate"];
+        options?: never;
+        head?: never;
+        /** Update report template */
+        patch: operations["updateReportTemplate"];
+        trace?: never;
+    };
+    "/api/v1/report-templates/{reportTemplateId}/structure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        /** Get report template structure */
+        get: operations["getReportTemplateStructure"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update report template structure */
+        patch: operations["updateReportTemplateStructure"];
+        trace?: never;
+    };
+    "/api/v1/report-materials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List report materials */
+        get: operations["listReportMaterials"];
+        put?: never;
+        /** Create report material */
+        post: operations["createReportMaterial"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-materials/{materialId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                materialId: components["parameters"]["MaterialId"];
+            };
+            cookie?: never;
+        };
+        /** Get report material */
+        get: operations["getReportMaterial"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete report material
+         * @description Prefer soft deletion when material has been referenced by generation jobs.
+         */
+        delete: operations["deleteReportMaterial"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List reports */
+        get: operations["listReports"];
+        put?: never;
+        /** Create report */
+        post: operations["createReport"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        /** Get report */
+        get: operations["getReport"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete report
+         * @description Prefer soft deletion so historical jobs and generated files remain auditable.
+         */
+        delete: operations["deleteReport"];
+        options?: never;
+        head?: never;
+        /** Update report */
+        patch: operations["updateReport"];
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/outlines": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        /** List report outlines */
+        get: operations["listReportOutlines"];
+        put?: never;
+        /**
+         * Create report outline
+         * @description Manual outline saves create a new outline version. AI-created outlines are produced by report jobs.
+         */
+        post: operations["createReportOutline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/outlines/{outlineId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                outlineId: components["parameters"]["OutlineId"];
+            };
+            cookie?: never;
+        };
+        /** Get report outline */
+        get: operations["getReportOutline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update report outline */
+        patch: operations["updateReportOutline"];
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/outlines/{outlineId}/sections/{sectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                outlineId: components["parameters"]["OutlineId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete report outline section */
+        delete: operations["deleteReportOutlineSection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/sections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        /** List report sections */
+        get: operations["listReportSections"];
+        put?: never;
+        /** Create report section */
+        post: operations["createReportSection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/sections/{sectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        /** Get report section */
+        get: operations["getReportSection"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update report section */
+        patch: operations["updateReportSection"];
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/sections/{sectionId}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        /** List report section versions */
+        get: operations["listReportSectionVersions"];
+        put?: never;
+        /**
+         * Create report section version
+         * @description Creates a new section content version, including versions produced by AI regeneration.
+         */
+        post: operations["createReportSectionVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        /** List report jobs */
+        get: operations["listReportJobs"];
+        put?: never;
+        /**
+         * Create report job
+         * @description Creates long-running work for outline creation, content creation, section regeneration, or report file creation.
+         */
+        post: operations["createReportJob"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-jobs/{jobId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        /** Get report job */
+        get: operations["getReportJob"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-jobs/{jobId}/attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        /** List report job attempts */
+        get: operations["listReportJobAttempts"];
+        put?: never;
+        /**
+         * Create report job attempt
+         * @description Creates a new attempt for an existing failed or interrupted report job.
+         */
+        post: operations["createReportJobAttempt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/reports/{reportId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List report events
+         * @description Returns report workflow events for polling. A future SSE contract must be added explicitly before streaming clients rely on it.
+         */
+        get: operations["listReportEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List report files */
+        get: operations["listReportFiles"];
+        put?: never;
+        /**
+         * Create report file
+         * @description Creates generated report files such as DOCX without exposing storage internals to frontend clients. Document service owns report-file business metadata and should use file service for underlying object storage/content access instead of duplicating public file semantics.
+         */
+        post: operations["createReportFile"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-files/{reportFileId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportFileId: components["parameters"]["ReportFileId"];
+            };
+            cookie?: never;
+        };
+        /** Get report file */
+        get: operations["getReportFile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-files/{reportFileId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportFileId: components["parameters"]["ReportFileId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get report file content
+         * @description Returns generated file content. Error responses still use the standard gateway error envelope.
+         */
+        get: operations["getReportFileContent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-statistics/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get report statistics overview */
+        get: operations["getReportStatisticsOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-statistics/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List daily report statistics */
+        get: operations["listDailyReportStatistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-operation-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List report operation logs */
+        get: operations["listReportOperationLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/report-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get report generation settings
+         * @description Returns admin-visible report generation settings. Provider base URLs and API keys remain owned by AI Gateway model profiles and are never returned here.
+         */
+        get: operations["getReportSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update report generation settings */
+        patch: operations["updateReportSettings"];
+        trace?: never;
+    };
+    "/api/v1/qa-sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List QA sessions */
+        get: operations["listQASessions"];
+        put?: never;
+        /** Create QA session */
+        post: operations["createQASession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        /** Get QA session */
+        get: operations["getQASession"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete QA session
+         * @description Soft-deletes the QA session owned by the current user.
+         */
+        delete: operations["deleteQASession"];
+        options?: never;
+        head?: never;
+        /** Update QA session */
+        patch: operations["updateQASession"];
+        trace?: never;
+    };
+    "/api/v1/qa-sessions/{sessionId}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        /** List QA session messages */
+        get: operations["listQAMessages"];
+        put?: never;
+        /**
+         * Create QA message and answer
+         * @description Creates a user message and runs the QA Agent Host. JSON clients receive
+         *     the completed answer payload; clients that send `Accept: text/event-stream`
+         *     receive the same run as an SSE stream. QA owns the ReAct loop, calls AI
+         *     Gateway for OpenAI-compatible function-calling transport, and calls
+         *     approved MCP tools through QA/MCP Client.
+         */
+        post: operations["createQAMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-sessions/{sessionId}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List QA response stream events
+         * @description Returns short-lived persisted SSE events for reconnect recovery or debugging. This endpoint is a polling/replay resource and does not itself open an SSE stream.
+         */
+        get: operations["listQAStreamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/response-runs/{responseRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseRunId: components["parameters"]["ResponseRunId"];
+            };
+            cookie?: never;
+        };
+        /** Get QA response run */
+        get: operations["getQAResponseRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update QA response run
+         * @description The stable public mutation is cancellation by setting `status` to `cancelled`.
+         */
+        patch: operations["updateQAResponseRun"];
+        trace?: never;
+    };
+    "/api/v1/response-runs/{responseRunId}/tool-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseRunId: components["parameters"]["ResponseRunId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * List QA response run tool calls
+         * @description Returns sanitized tool-call summaries only. Raw MCP schemas, full arguments, raw tool results, prompts, internal URLs, object keys, and provider errors are not part of the public contract.
+         */
+        get: operations["listQAResponseRunToolCalls"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/messages/{messageId}/citations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        /** List QA message citations */
+        get: operations["listQAMessageCitations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/citations/{citationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                citationId: components["parameters"]["CitationId"];
+            };
+            cookie?: never;
+        };
+        /** Get QA citation detail */
+        get: operations["getQACitation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/citation-lookups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create QA citation lookup
+         * @description Creates a batch lookup for saved citation details. QA owns the saved citation snapshots and may call knowledge or file internally to enrich source availability, while gateway keeps the public response envelope stable.
+         */
+        post: operations["createQACitationLookup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-config-versions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get current QA config version */
+        get: operations["getCurrentQAConfigVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-config-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create QA config version
+         * @description Creates a versioned QA runtime configuration so historical answers remain traceable to the retrieval and Agent settings used at generation time.
+         */
+        post: operations["createQAConfigVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm-config-versions/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get current QA LLM config version
+         * @description Returns the active QA LLM settings. Provider base URLs and API keys remain owned by AI Gateway model profiles and are never returned here.
+         */
+        get: operations["getCurrentQALLMConfigVersion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm-config-versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create QA LLM config version
+         * @description Stores a QA-owned reference to an AI Gateway model profile plus model and generation defaults. It does not store provider credentials.
+         */
+        post: operations["createQALLMConfigVersion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm-connection-tests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create QA LLM connection test
+         * @description Tests a QA LLM configuration through AI Gateway. Responses must not include prompts, provider raw errors, provider credentials, or internal URLs.
+         */
+        post: operations["createQALLMConnectionTest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/retrieval-test-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create QA retrieval test run
+         * @description Creates an administrator retrieval experience test for QA settings. Knowledge retrieval remains owned by the knowledge service; QA stores the test run and sanitized result snapshot.
+         */
+        post: operations["createQARetrievalTestRun"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/retrieval-test-runs/{testRunId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                testRunId: components["parameters"]["TestRunId"];
+            };
+            cookie?: never;
+        };
+        /** Get QA retrieval test run */
+        get: operations["getQARetrievalTestRun"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-metrics/overview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get QA metrics overview */
+        get: operations["getQAMetricsOverview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-metrics/trend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get QA metrics trend */
+        get: operations["getQAMetricsTrend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-metrics/top-queries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List QA top queries */
+        get: operations["listQATopQueries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/qa-metrics/intent-distribution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List QA intent distribution */
+        get: operations["listQAIntentDistribution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
-export type webhooks = Record<string, never>
+export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    HealthResponse: {
-      data: {
-        /** @example ok */
-        status: string
-      }
-      requestId: string
-    }
-    ErrorResponse: {
-      error: components['schemas']['ErrorDetail']
-    }
-    ErrorDetail: {
-      /** @enum {string} */
-      code:
-        | 'validation_error'
-        | 'unauthorized'
-        | 'forbidden'
-        | 'not_found'
-        | 'conflict'
-        | 'rate_limited'
-        | 'dependency_error'
-        | 'internal_error'
-        | 'not_implemented'
-        | 'unsupported_intent'
-        | 'unsupported_mode'
-      message: string
-      requestId: string
-      fields?: {
-        [key: string]: string
-      }
-    }
-    CreateUserRequest: {
-      username: string
-      /** Format: password */
-      password: string
-    }
-    CreateSessionRequest: {
-      username: string
-      /** Format: password */
-      password: string
-    }
-    UserSummary: {
-      id: string
-      username: string
-      roles: string[]
-      permissions: string[]
-    }
-    SessionSummary: {
-      sessionId: string
-      /**
-       * @description Opaque bearer credential sent by the frontend on later requests. This token is not a JWT and must not be parsed for claims.
-       * @example tok_8Ywq7T2n4pQ9mR3xV6sL
-       */
-      accessToken: string
-      /**
-       * @default Bearer
-       * @enum {string}
-       */
-      tokenType: 'Bearer'
-      /** Format: date-time */
-      expiresAt: string
-    }
-    SessionResponse: {
-      data: {
-        user: components['schemas']['UserSummary']
-        session: components['schemas']['SessionSummary']
-      }
-      requestId: string
-    }
-    UserResponse: {
-      data: components['schemas']['UserSummary']
-      requestId: string
-    }
-    PageInfo: {
-      page: number
-      pageSize: number
-      total: number
-    }
-    JsonObject: {
-      [key: string]: unknown
-    }
-    ChunkStrategy: {
-      /** @example SEMANTIC_TEXT */
-      type?: string
-      /** @example 1600 */
-      chunkSize?: number
-      /** @example 200 */
-      overlap?: number
-      separators?: string[]
-    } & {
-      [key: string]: unknown
-    }
-    RetrievalStrategy: {
-      /** @example VECTOR */
-      mode?: string
-      /** @example 10 */
-      topK?: number
-      /** @example 0.35 */
-      scoreThreshold?: number
-      rerankTopN?: number | null
-    } & {
-      [key: string]: unknown
-    }
-    CreateKnowledgeBaseRequest: {
-      /** @description Optional client-supplied ID for import or local integration workflows. Gateway implementations may ignore this field and generate an ID. */
-      id?: string
-      name: string
-      /** @default  */
-      description: string
-      /** @example GENERAL */
-      docType?: string
-      chunkStrategy?: components['schemas']['ChunkStrategy']
-      retrievalStrategy?: components['schemas']['RetrievalStrategy']
-    }
-    UpdateKnowledgeBaseRequest: {
-      name?: string
-      description?: string
-      /** @example GENERAL */
-      docType?: string
-      chunkStrategy?: components['schemas']['ChunkStrategy']
-      retrievalStrategy?: components['schemas']['RetrievalStrategy']
-    }
-    KnowledgeBaseSummary: {
-      id: string
-      name: string
-      description: string
-      docType: string
-      chunkStrategy: components['schemas']['ChunkStrategy']
-      retrievalStrategy: components['schemas']['RetrievalStrategy']
-      documentCount: number
-      chunkCount: number
-      createdBy?: string
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt: string
-    }
-    KnowledgeBaseResponse: {
-      data: components['schemas']['KnowledgeBaseSummary']
-      requestId: string
-    }
-    KnowledgeBaseListResponse: {
-      data: components['schemas']['KnowledgeBaseSummary'][]
-      page: components['schemas']['PageInfo']
-      requestId: string
-    }
-    /** @enum {string} */
-    DocumentStatus: 'uploaded' | 'parsing' | 'chunking' | 'embedding' | 'ready' | 'failed'
-    DocumentSummary: {
-      id: string
-      /** @description Target knowledge base context for this document. */
-      knowledgeBaseId: string
-      name: string
-      contentType?: string | null
-      sizeBytes?: number
-      status: components['schemas']['DocumentStatus']
-      errorCode?: string | null
-      /** @description Processing failure summary. Must not include object keys, internal paths, SQL details, MinIO errors, or stack traces. */
-      errorMessage?: string | null
-      chunkCount: number
-      tags?: string[]
-      parserBackend?: string | null
-      createdBy?: string | null
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt?: string | null
-      /** @description Ingestion job ID when a request starts or observes a processing job. */
-      jobId?: string | null
-    }
-    UpdateDocumentRequest: {
-      tags?: string[]
-    }
-    DocumentResponse: {
-      data: components['schemas']['DocumentSummary']
-      requestId: string
-    }
-    DocumentListResponse: {
-      data: components['schemas']['DocumentSummary'][]
-      page: components['schemas']['PageInfo']
-      requestId: string
-    }
-    DocumentChunk: {
-      id: string
-      knowledgeBaseId: string
-      documentId: string
-      chunkIndex: number
-      sectionPath?: string | null
-      content: string
-      tokenCount: number
-      chunkType?: string | null
-      qdrantPointId?: string | null
-      embeddingProvider?: string | null
-      embeddingDimension?: number | null
-      embeddingPreview?: number[] | null
-      metadata?: components['schemas']['JsonObject']
-      /** Format: date-time */
-      createdAt: string
-    }
-    DocumentChunkListResponse: {
-      data: components['schemas']['DocumentChunk'][]
-      page: components['schemas']['PageInfo']
-      requestId: string
-    }
-    KnowledgeQueryRequest: {
-      query: string
-      knowledgeBaseIds?: string[]
-      /** @default 10 */
-      topK: number
-      /** @default 0 */
-      scoreThreshold: number
-      tags?: string[]
-      metadataFilter?: {
-        [key: string]: string
-      }
-      /** @default false */
-      rerank: boolean
-      rerankTopN?: number | null
-    }
-    KnowledgeQueryResult: {
-      score: number
-      pointId?: string
-      knowledgeBaseId: string
-      documentId: string
-      chunkId: string
-      documentName: string
-      sectionPath?: string | null
-      chunkIndex?: number | null
-      contentPreview: string
-      tags?: string[]
-    }
-    KnowledgeQueryTrace: {
-      embeddingProvider: string
-      embeddingModel: string
-      embeddingDimension: number
-      qdrantCollection: string
-      searchTopK: number
-      scoreThreshold: number
-      hitCount: number
-      rerank: boolean
-      rerankTopN?: number | null
-    }
-    KnowledgeQuerySummary: {
-      id: string
-      query: string
-      results: components['schemas']['KnowledgeQueryResult'][]
-      trace: components['schemas']['KnowledgeQueryTrace']
-    }
-    KnowledgeQueryResponse: {
-      data: components['schemas']['KnowledgeQuerySummary']
-      requestId: string
-    }
-    /** @enum {string} */
-    ModelPurpose: 'chat' | 'embedding' | 'rerank'
-    /** @enum {string} */
-    ModelProvider: 'openai_compatible' | 'siliconflow' | 'local_compatible'
-    ModelProfile: {
-      id: string
-      name: string
-      purpose: components['schemas']['ModelPurpose']
-      provider: components['schemas']['ModelProvider']
-      /**
-       * Format: uri
-       * @description Provider base URL returned only to authorized admin callers.
-       */
-      baseUrl: string
-      model: string
-      enabled: boolean
-      isDefault: boolean
-      timeoutMs: number
-      /** @description True when a provider credential exists. Raw API keys are never returned. */
-      apiKeyConfigured: boolean
-      supportsStreaming: boolean
-      /** @description Embedding vector dimension for embedding profiles. */
-      dimensions?: number | null
-      /** @description Default rerank result count for rerank profiles. */
-      topN?: number | null
-      /** @description Purpose-specific provider parameters such as temperature, top_p, max_tokens, or provider extensions not modeled as first-class fields. */
-      defaultParameters?: {
-        [key: string]: unknown
-      }
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt: string
-    }
-    CreateModelProfileRequest: {
-      name: string
-      purpose: components['schemas']['ModelPurpose']
-      provider: components['schemas']['ModelProvider']
-      /** Format: uri */
-      baseUrl: string
-      model: string
-      /**
-       * Format: password
-       * @description Write-only provider credential forwarded to ai-gateway. Gateway must never log or return this value.
-       */
-      apiKey: string
-      /** @default true */
-      enabled: boolean
-      /** @default false */
-      isDefault: boolean
-      /** @default 60000 */
-      timeoutMs: number
-      /** @default false */
-      supportsStreaming: boolean
-      /** @description Required by implementations that need an explicit embedding vector dimension. */
-      dimensions?: number | null
-      /** @description Default rerank result count for rerank profiles. */
-      topN?: number | null
-      defaultParameters?: {
-        [key: string]: unknown
-      }
-    }
-    UpdateModelProfileRequest: {
-      name?: string
-      provider?: components['schemas']['ModelProvider']
-      /** Format: uri */
-      baseUrl?: string
-      model?: string
-      /**
-       * Format: password
-       * @description Write-only provider credential for key rotation. Null or empty string does not mean clear key.
-       */
-      apiKey?: string
-      enabled?: boolean
-      isDefault?: boolean
-      timeoutMs?: number
-      supportsStreaming?: boolean
-      dimensions?: number | null
-      topN?: number | null
-      defaultParameters?: {
-        [key: string]: unknown
-      }
-    }
-    ModelProfileResponse: {
-      data: components['schemas']['ModelProfile']
-      requestId: string
-    }
-    ModelProfileListResponse: {
-      data: components['schemas']['ModelProfile'][]
-      requestId: string
-    }
-    /** @enum {string} */
-    ParserBackend: 'builtin' | 'tika' | 'unstructured' | 'local_ocr' | 'remote_compatible'
-    ParserConfig: {
-      id: string
-      name: string
-      backend: components['schemas']['ParserBackend']
-      enabled: boolean
-      isDefault: boolean
-      /** @description Maximum concurrent parser workers for this config. */
-      concurrency: number
-      supportedContentTypes?: string[]
-      /**
-       * Format: uri
-       * @description Optional internal endpoint for remote-compatible parser backends. Must not contain credentials.
-       */
-      endpointUrl?: string | null
-      defaultParameters?: {
-        [key: string]: unknown
-      }
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt: string
-    }
-    CreateParserConfigRequest: {
-      name: string
-      backend: components['schemas']['ParserBackend']
-      /** @default true */
-      enabled: boolean
-      /** @default false */
-      isDefault: boolean
-      concurrency: number
-      supportedContentTypes?: string[]
-      /** Format: uri */
-      endpointUrl?: string | null
-      defaultParameters?: {
-        [key: string]: unknown
-      }
-    }
-    UpdateParserConfigRequest: {
-      name?: string
-      backend?: components['schemas']['ParserBackend']
-      enabled?: boolean
-      isDefault?: boolean
-      concurrency?: number
-      supportedContentTypes?: string[]
-      /** Format: uri */
-      endpointUrl?: string | null
-      defaultParameters?: {
-        [key: string]: unknown
-      }
-    }
-    ParserConfigResponse: {
-      data: components['schemas']['ParserConfig']
-      requestId: string
-    }
-    ParserConfigListResponse: {
-      data: components['schemas']['ParserConfig'][]
-      requestId: string
-    }
-    PageMeta: {
-      page: number
-      pageSize: number
-      total: number
-    }
-    ReportType: {
-      /** @example summer_peak_inspection */
-      code: string
-      /** @example 迎峰度夏检查报告 */
-      name: string
-      description?: string
-      enabled: boolean
-      defaultTemplateId?: string
-    }
-    ReportTypeListResponse: {
-      data: components['schemas']['ReportType'][]
-      requestId: string
-    }
-    CreateReportTemplateRequest: {
-      /** Format: binary */
-      file: string
-      templateName: string
-      reportType: string
-      description?: string
-    }
-    UpdateReportTemplateRequest: {
-      templateName?: string
-      description?: string
-      enabled?: boolean
-    }
-    ReportTemplate: {
-      id: string
-      templateName: string
-      reportType: string
-      version: number
-      description?: string
-      enabled: boolean
-      filename?: string
-      /** Format: int64 */
-      fileSize?: number
-      createdBy?: string
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt?: string
-    }
-    ReportTemplateResponse: {
-      data: components['schemas']['ReportTemplate']
-      requestId: string
-    }
-    ReportTemplateListResponse: {
-      data: components['schemas']['ReportTemplate'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    ReportTemplateStructure: {
-      outlineSchema?: components['schemas']['ReportOutlineNode'][]
-      styleConfig?: {
-        [key: string]: unknown
-      }
-    }
-    ReportTemplateStructureRequest: components['schemas']['ReportTemplateStructure']
-    ReportTemplateStructureResponse: {
-      data: components['schemas']['ReportTemplateStructure']
-      requestId: string
-    }
-    CreateReportMaterialRequest: {
-      /** Format: binary */
-      file: string
-      materialName: string
-      materialType: string
-      category?: string
-      description?: string
-      tags?: string[]
-    }
-    ReportMaterial: {
-      id: string
-      materialName: string
-      materialType?: string
-      category?: string
-      description?: string
-      tags?: string[]
-      enabled: boolean
-      filename?: string
-      /** Format: int64 */
-      fileSize?: number
-      createdBy?: string
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt?: string
-    }
-    ReportMaterialResponse: {
-      data: components['schemas']['ReportMaterial']
-      requestId: string
-    }
-    ReportMaterialListResponse: {
-      data: components['schemas']['ReportMaterial'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    /** @enum {string} */
-    ReportStatus:
-      | 'draft'
-      | 'outline_generating'
-      | 'outline_generated'
-      | 'content_generating'
-      | 'generated'
-      | 'exporting'
-      | 'exported'
-      | 'failed'
-      | 'deleted'
-    CreateReportRequest: {
-      name: string
-      reportType: string
-      templateId: string
-      topic: string
-      specialty?: string
-      businessObject?: string
-      year?: number
-      extraContext?: {
-        [key: string]: unknown
-      }
-      /** @enum {string} */
-      source?: 'frontend' | 'admin' | 'mcp' | 'backend'
-    }
-    UpdateReportRequest: {
-      name?: string
-      templateId?: string
-      topic?: string
-      specialty?: string
-      businessObject?: string
-      year?: number
-      extraContext?: {
-        [key: string]: unknown
-      }
-    }
-    Report: {
-      id: string
-      name: string
-      reportType: string
-      templateId?: string
-      topic?: string
-      specialty?: string
-      businessObject?: string
-      year?: number
-      status: components['schemas']['ReportStatus']
-      extraContext?: {
-        [key: string]: unknown
-      }
-      creatorId?: string
-      creatorName?: string
-      source?: string
-      latestJobId?: string
-      latestReportFileId?: string
-      /** Format: date-time */
-      generatedAt?: string
-      /** Format: date-time */
-      exportedAt?: string
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt?: string
-    }
-    ReportResponse: {
-      data: components['schemas']['Report']
-      requestId: string
-    }
-    ReportListResponse: {
-      data: components['schemas']['Report'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    ReportOutlineNode: {
-      id?: string
-      clientSectionId?: string
-      title: string
-      level: number
-      numbering?: string
-      children?: components['schemas']['ReportOutlineNode'][]
-    }
-    CreateReportOutlineRequest: {
-      /** @enum {string} */
-      source: 'manual' | 'ai'
-      sections: components['schemas']['ReportOutlineNode'][]
-    }
-    UpdateReportOutlineRequest: {
-      sections?: components['schemas']['ReportOutlineNode'][]
-      manualEdited?: boolean
-    }
-    ReportOutline: {
-      id: string
-      reportId: string
-      version: number
-      sections: components['schemas']['ReportOutlineNode'][]
-      sourceJobId?: string
-      manualEdited?: boolean
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt?: string
-    }
-    ReportOutlineResponse: {
-      data: components['schemas']['ReportOutline']
-      requestId: string
-    }
-    ReportOutlineListResponse: {
-      data: components['schemas']['ReportOutline'][]
-      requestId: string
-    }
-    CreateReportSectionRequest: {
-      outlineNodeId?: string
-      parentId?: string
-      title: string
-      level?: number
-      numbering?: string
-      content?: string
-      tables?: {
-        [key: string]: unknown
-      }[]
-    }
-    UpdateReportSectionRequest: {
-      title?: string
-      content?: string
-      tables?: {
-        [key: string]: unknown
-      }[]
-      manualEdited?: boolean
-    }
-    ReportSection: {
-      id: string
-      reportId: string
-      parentId?: string
-      outlineNodeId?: string
-      title: string
-      level: number
-      sortOrder?: number
-      numbering?: string
-      /** @enum {string} */
-      sectionType?: 'text' | 'table' | 'image' | 'mixed'
-      content?: string
-      tables?: {
-        [key: string]: unknown
-      }[]
-      generationStatus: components['schemas']['ReportJobStatus']
-      /** @enum {string} */
-      contentSource?: 'ai' | 'manual' | 'mixed'
-      manualEdited?: boolean
-      version?: number
-      lastJobId?: string
-      /** Format: date-time */
-      generatedAt?: string
-      /** Format: date-time */
-      createdAt?: string
-      /** Format: date-time */
-      updatedAt?: string
-    }
-    ReportSectionResponse: {
-      data: components['schemas']['ReportSection']
-      requestId: string
-    }
-    ReportSectionListResponse: {
-      data: components['schemas']['ReportSection'][]
-      requestId: string
-    }
-    CreateReportSectionVersionRequest: {
-      /** @enum {string} */
-      source: 'manual' | 'ai'
-      requirements?: string
-      materialIds?: string[]
-      preserveManualEdits?: boolean
-    }
-    ReportSectionVersion: {
-      id: string
-      reportId: string
-      sectionId: string
-      version: number
-      /** @enum {string} */
-      source: 'manual' | 'ai'
-      content?: string
-      tables?: {
-        [key: string]: unknown
-      }[]
-      jobId?: string
-      /** Format: date-time */
-      createdAt: string
-    }
-    ReportSectionVersionResponse: {
-      data: components['schemas']['ReportSectionVersion']
-      requestId: string
-    }
-    ReportSectionVersionListResponse: {
-      data: components['schemas']['ReportSectionVersion'][]
-      requestId: string
-    }
-    /** @enum {string} */
-    ReportJobStatus:
-      'pending' | 'running' | 'succeeded' | 'partial_succeeded' | 'failed' | 'canceled'
-    /** @enum {string} */
-    ReportJobType:
-      | 'outline_generation'
-      | 'outline_regeneration'
-      | 'content_generation'
-      | 'content_regeneration'
-      | 'section_regeneration'
-      | 'report_file_creation'
-    CreateReportJobRequest: {
-      jobType: components['schemas']['ReportJobType']
-      target?: {
+    schemas: {
+        HealthResponse: {
+            data: {
+                /** @example ok */
+                status: string;
+            };
+            requestId: string;
+        };
+        ErrorResponse: {
+            error: components["schemas"]["ErrorDetail"];
+        };
+        ErrorDetail: {
+            /** @enum {string} */
+            code: "validation_error" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "dependency_error" | "internal_error" | "not_implemented" | "unsupported_intent" | "unsupported_mode";
+            message: string;
+            requestId: string;
+            fields?: {
+                [key: string]: string;
+            };
+        };
+        CreateUserRequest: {
+            username: string;
+            /** Format: password */
+            password: string;
+        };
+        CreateSessionRequest: {
+            username: string;
+            /** Format: password */
+            password: string;
+        };
+        UserSummary: {
+            id: string;
+            username: string;
+            roles: string[];
+            permissions: string[];
+        };
+        SessionSummary: {
+            sessionId: string;
+            /**
+             * @description Opaque bearer credential sent by the frontend on later requests. This token is not a JWT and must not be parsed for claims.
+             * @example tok_8Ywq7T2n4pQ9mR3xV6sL
+             */
+            accessToken: string;
+            /**
+             * @default Bearer
+             * @enum {string}
+             */
+            tokenType: "Bearer";
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        SessionResponse: {
+            data: {
+                user: components["schemas"]["UserSummary"];
+                session: components["schemas"]["SessionSummary"];
+            };
+            requestId: string;
+        };
+        UserResponse: {
+            data: components["schemas"]["UserSummary"];
+            requestId: string;
+        };
+        PageInfo: {
+            page: number;
+            pageSize: number;
+            total: number;
+        };
+        JsonObject: {
+            [key: string]: unknown;
+        };
+        ChunkStrategy: {
+            /** @example SEMANTIC_TEXT */
+            type?: string;
+            /** @example 1600 */
+            chunkSize?: number;
+            /** @example 200 */
+            overlap?: number;
+            separators?: string[];
+        } & {
+            [key: string]: unknown;
+        };
+        RetrievalStrategy: {
+            /** @example VECTOR */
+            mode?: string;
+            /** @example 10 */
+            topK?: number;
+            /** @example 0.35 */
+            scoreThreshold?: number;
+            rerankTopN?: number | null;
+        } & {
+            [key: string]: unknown;
+        };
+        CreateKnowledgeBaseRequest: {
+            /** @description Optional client-supplied ID for import or local integration workflows. Gateway implementations may ignore this field and generate an ID. */
+            id?: string;
+            name: string;
+            /** @default  */
+            description: string;
+            /** @example GENERAL */
+            docType?: string;
+            chunkStrategy?: components["schemas"]["ChunkStrategy"];
+            retrievalStrategy?: components["schemas"]["RetrievalStrategy"];
+        };
+        UpdateKnowledgeBaseRequest: {
+            name?: string;
+            description?: string;
+            /** @example GENERAL */
+            docType?: string;
+            chunkStrategy?: components["schemas"]["ChunkStrategy"];
+            retrievalStrategy?: components["schemas"]["RetrievalStrategy"];
+        };
+        KnowledgeBaseSummary: {
+            id: string;
+            name: string;
+            description: string;
+            docType: string;
+            chunkStrategy: components["schemas"]["ChunkStrategy"];
+            retrievalStrategy: components["schemas"]["RetrievalStrategy"];
+            documentCount: number;
+            chunkCount: number;
+            createdBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        KnowledgeBaseResponse: {
+            data: components["schemas"]["KnowledgeBaseSummary"];
+            requestId: string;
+        };
+        KnowledgeBaseListResponse: {
+            data: components["schemas"]["KnowledgeBaseSummary"][];
+            page: components["schemas"]["PageInfo"];
+            requestId: string;
+        };
         /** @enum {string} */
-        scope?: 'report' | 'outline' | 'section' | 'file'
-        sectionId?: string
-      }
-      requirements?: string
-      materialIds?: string[]
-      options?: {
-        [key: string]: unknown
-      }
-    }
-    ReportJob: {
-      id: string
-      reportId: string
-      templateId?: string
-      jobType: components['schemas']['ReportJobType']
-      targetType?: string
-      targetId?: string
-      status: components['schemas']['ReportJobStatus']
-      progress?: {
-        [key: string]: unknown
-      }
-      resultSummary?: string
-      error?: components['schemas']['ReportJobError']
-      /** Format: date-time */
-      startedAt?: string
-      /** Format: date-time */
-      finishedAt?: string
-      /** Format: date-time */
-      createdAt: string
-    }
-    ReportJobError: {
-      code?: string
-      message?: string
-    }
-    ReportJobResponse: {
-      data: components['schemas']['ReportJob']
-      requestId: string
-    }
-    ReportJobListResponse: {
-      data: components['schemas']['ReportJob'][]
-      requestId: string
-    }
-    CreateReportJobAttemptRequest: {
-      reason?: string
-      options?: {
-        [key: string]: unknown
-      }
-    }
-    ReportJobAttempt: {
-      id: string
-      jobId: string
-      attemptNumber?: number
-      status: components['schemas']['ReportJobStatus']
-      error?: components['schemas']['ReportJobError']
-      /** Format: date-time */
-      startedAt?: string
-      /** Format: date-time */
-      finishedAt?: string
-      /** Format: date-time */
-      createdAt: string
-    }
-    ReportJobAttemptResponse: {
-      data: components['schemas']['ReportJobAttempt']
-      requestId: string
-    }
-    ReportJobAttemptListResponse: {
-      data: components['schemas']['ReportJobAttempt'][]
-      requestId: string
-    }
-    ReportEvent: {
-      id: string
-      reportId: string
-      jobId?: string
-      eventType: string
-      message?: string
-      payload?: {
-        [key: string]: unknown
-      }
-      /** Format: date-time */
-      createdAt: string
-    }
-    ReportEventListResponse: {
-      data: components['schemas']['ReportEvent'][]
-      requestId: string
-    }
-    CreateReportFileRequest: {
-      reportId: string
-      /** @enum {string} */
-      format: 'docx'
-      templateId?: string
-      styleOptions?: {
-        [key: string]: unknown
-      }
-    }
-    ReportFile: {
-      id: string
-      reportId: string
-      jobId?: string
-      filename?: string
-      /** @enum {string} */
-      format: 'docx'
-      /** Format: int64 */
-      fileSize?: number
-      status: components['schemas']['ReportJobStatus']
-      /** @example /api/v1/report-files/rf_123/content */
-      contentPath?: string
-      createdBy?: string
-      /** Format: date-time */
-      createdAt: string
-    }
-    ReportFileResponse: {
-      data: components['schemas']['ReportFile']
-      requestId: string
-    }
-    ReportFileListResponse: {
-      data: components['schemas']['ReportFile'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    ReportStatisticsOverview: {
-      reportCount: number
-      templateCount: number
-      materialCount: number
-      jobStatusCounts?: {
-        [key: string]: number
-      }
-      recentDays?: number
-    }
-    ReportStatisticsOverviewResponse: {
-      data: components['schemas']['ReportStatisticsOverview']
-      requestId: string
-    }
-    ReportDailyStatistic: {
-      /** Format: date */
-      date: string
-      reportType?: string
-      createdCount: number
-      generatedCount: number
-      failedCount: number
-      exportedCount: number
-    }
-    ReportDailyStatisticsResponse: {
-      data: components['schemas']['ReportDailyStatistic'][]
-      requestId: string
-    }
-    ReportOperationLog: {
-      id: string
-      operatorId?: string
-      operatorName?: string
-      operationType: string
-      targetType: string
-      targetId: string
-      requestId?: string
-      requestSource?: string
-      toolName?: string
-      /** @description Sanitized parameter summary for MCP or API calls. Must not contain secrets, prompts, MinIO object keys, or full document content. */
-      parameterSummary?: {
-        [key: string]: unknown
-      }
-      operationResult: string
-      errorMessage?: string
-      /** @description Sanitized audit metadata for troubleshooting and filtering. */
-      metadata?: {
-        [key: string]: unknown
-      }
-      /** Format: date-time */
-      createdAt: string
-    }
-    ReportOperationLogListResponse: {
-      data: components['schemas']['ReportOperationLog'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    /** @description Report-generation model profile reference. Provider credentials and base URLs remain owned by AI Gateway model profiles. */
-    ReportSettingsModelConfig: {
-      /**
-       * @description Fixed to ai-gateway for the current gateway contract.
-       * @example ai-gateway
-       */
-      provider?: string
-      /** @description AI Gateway model profile id used for report generation. */
-      profileId?: string
-      model?: string
-      timeoutSeconds?: number
-    }
-    ReportSettingsFileDefaults: {
-      /** @enum {string} */
-      defaultFormat?: 'docx'
-      /**
-       * @description global is supported for the MVP.
-       * @enum {string}
-       */
-      defaultNumberingMode?: 'global' | 'by_chapter'
-      defaultStyleProfileId?: string
-    } & {
-      [key: string]: unknown
-    }
-    ReportSettings: {
-      llm?: components['schemas']['ReportSettingsModelConfig']
-      /** @description Map of reportType to default reportTemplateId. */
-      defaultTemplates?: {
-        [key: string]: string
-      }
-      file?: components['schemas']['ReportSettingsFileDefaults']
-    }
-    UpdateReportSettingsRequest: components['schemas']['ReportSettings']
-    ReportSettingsResponse: {
-      data: components['schemas']['ReportSettings']
-      requestId: string
-    }
-    ReportSettingsUpdateResponse: {
-      data: {
-        /** Format: date-time */
-        updatedAt: string
-      }
-      requestId: string
-    }
-    /** @enum {string} */
-    QASessionStatus: 'active' | 'archived'
-    QASession: {
-      id: string
-      title?: string
-      status: components['schemas']['QASessionStatus']
-      messageCount?: number
-      lastMessagePreview?: string
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      updatedAt: string
-    }
-    CreateQASessionRequest: {
-      title?: string
-    }
-    UpdateQASessionRequest: {
-      title?: string
-      status?: components['schemas']['QASessionStatus']
-    }
-    QASessionResponse: {
-      data: components['schemas']['QASession']
-      requestId: string
-    }
-    QASessionListResponse: {
-      data: components['schemas']['QASession'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    /** @enum {string} */
-    QAMessageRole: 'user' | 'assistant' | 'system'
-    /** @enum {string} */
-    QAMessageStatus: 'queued' | 'streaming' | 'completed' | 'stopped' | 'failed' | 'cancelled'
-    /**
-     * @description `data_analysis` is reserved; MVP implementations should return `unsupported_intent` instead of executing a data-analysis workflow.
-     * @enum {string}
-     */
-    QAIntent: 'knowledge_qa' | 'general_chat' | 'report_generation' | 'data_analysis' | 'unknown'
-    QAMessage: {
-      id: string
-      sessionId: string
-      role: components['schemas']['QAMessageRole']
-      sequenceNo?: number
-      status: components['schemas']['QAMessageStatus']
-      intent?: components['schemas']['QAIntent']
-      content: string
-      /** @description User-visible process summaries only. Must not contain private chain-of-thought, full prompts, full tool arguments, raw tool results, internal URLs, or storage object keys. */
-      thinking?: components['schemas']['QAThinkingStep'][]
-      citations?: components['schemas']['QACitation'][]
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      completedAt?: string | null
-    }
-    QAMessageListResponse: {
-      data: components['schemas']['QAMessage'][]
-      page: components['schemas']['PageMeta']
-      requestId: string
-    }
-    QAThinkingStep: {
-      /** @enum {string} */
-      type: 'agent_iteration' | 'tool_call' | 'tool_result' | 'generation' | 'citation' | 'verify'
-      label?: string
-      /** @enum {string} */
-      status: 'pending' | 'running' | 'done' | 'failed'
-      /** @description Sanitized user-visible detail. */
-      detail?: string
-    }
-    CreateQAMessageRequest: {
-      message: string
-      mode?: components['schemas']['QAIntent']
-      knowledgeBaseIds?: string[]
-      retrieval?: components['schemas']['QARetrievalOptions']
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `retrieval`; new clients should use `retrieval`.
-       */
-      params?: components['schemas']['QARetrievalOptions']
-      agent?: components['schemas']['QAAgentOptions']
-    }
-    QARetrievalOptions: {
-      topK?: number
-      scoreThreshold?: number
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `scoreThreshold`.
-       */
-      similarityThreshold?: number
-      enableRerank?: boolean
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `enableRerank`.
-       */
-      useRerank?: boolean
-      rerankThreshold?: number
-      rerankTopN?: number
-      tagFilters?: {
-        [key: string]: string[]
-      }
-    }
-    QAAgentOptions: {
-      enabledToolNames?: string[]
-      maxIterations?: number
-    }
-    QAAnswerResponse: {
-      data: {
-        userMessage: components['schemas']['QAMessage']
-        assistantMessage: components['schemas']['QAMessage']
-        responseRun: components['schemas']['QAResponseRun']
-        citations?: components['schemas']['QACitation'][]
-        reasoningSteps?: components['schemas']['QAThinkingStep'][]
-        /** @description For reserved unsupported intents, returns `unsupported_intent`. */
-        errorCode?: string | null
-      }
-      requestId: string
-    }
-    /** @enum {string} */
-    QAResponseRunStatus: 'queued' | 'running' | 'streaming' | 'completed' | 'failed' | 'cancelled'
-    QAResponseRun: {
-      id: string
-      sessionId: string
-      userMessageId?: string
-      assistantMessageId?: string
-      status: components['schemas']['QAResponseRunStatus']
-      currentIteration?: number
-      maxIterations?: number
-      /** @enum {string|null} */
-      terminationReason?:
-        | 'completed'
-        | 'max_iterations'
-        | 'timeout'
-        | 'cancelled'
-        | 'tool_error'
-        | 'model_error'
-        | 'policy_denied'
-        | null
-      totalTokens?: number
-      latencyMs?: number
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      completedAt?: string | null
-    }
-    QAResponseRunResponse: {
-      data: components['schemas']['QAResponseRun']
-      requestId: string
-    }
-    UpdateQAResponseRunRequest: {
-      /** @enum {string} */
-      status: 'cancelled'
-    }
-    QAAgentToolCall: {
-      id: string
-      responseRunId: string
-      modelInvocationId?: string
-      iterationNo?: number
-      toolCallId: string
-      toolName: string
-      argumentsSummary?: components['schemas']['JsonObject']
-      resultSummary?: components['schemas']['JsonObject']
-      /** @enum {string} */
-      status: 'running' | 'completed' | 'failed' | 'cancelled'
-      latencyMs?: number
-      /** Format: date-time */
-      startedAt?: string
-      /** Format: date-time */
-      finishedAt?: string | null
-    }
-    QAAgentToolCallListResponse: {
-      data: components['schemas']['QAAgentToolCall'][]
-      requestId: string
-    }
-    /** @enum {string} */
-    QASseEventType:
-      | 'message.created'
-      | 'agent.iteration.started'
-      | 'reasoning.step'
-      | 'tool.started'
-      | 'tool.completed'
-      | 'tool.failed'
-      | 'answer.delta'
-      | 'citation.delta'
-      | 'answer.completed'
-      | 'error'
-      | 'heartbeat'
-    QASseEvent: {
-      eventSeq: number
-      eventType: components['schemas']['QASseEventType']
-      payload: components['schemas']['JsonObject']
-      /** Format: date-time */
-      createdAt: string
-    }
-    QASseEventListResponse: {
-      data: components['schemas']['QASseEvent'][]
-      requestId: string
-    }
-    QACitation: {
-      id: string
-      messageId: string
-      citationNo?: number
-      documentId?: string
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `documentId`.
-       */
-      docId?: string
-      documentName?: string
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `documentName`.
-       */
-      docName?: string
-      knowledgeBaseId?: string
-      chunkId?: string
-      sectionPath?: string
-      /** @description Citation quote preview or saved quote text. */
-      text?: string
-      contentPreview?: string
-      context?: string
-      pageNumber?: number
-      score?: number
-      rerankScore?: number | null
-      chunkType?: string
-      isSourceAvailable?: boolean
-      metadata?: components['schemas']['JsonObject']
-    }
-    QACitationDetail: components['schemas']['QACitation'] & {
-      /** @description Saved citation snapshot or source excerpt available to the current user. */
-      content?: string
-      source?: {
-        available?: boolean
-        reason?: string
-        /** @description Gateway document content endpoint when the original source is available. */
-        downloadEndpoint?: string
-      }
-    }
-    QACitationListResponse: {
-      data: components['schemas']['QACitation'][]
-      requestId: string
-    }
-    QACitationResponse: {
-      data: components['schemas']['QACitationDetail']
-      requestId: string
-    }
-    CreateQACitationLookupRequest: {
-      citationIds: string[]
-    }
-    QACitationLookupResponse: {
-      data: components['schemas']['QACitationDetail'][]
-      requestId: string
-    }
-    QAConfigKnowledgeBase: {
-      id: string
-      type?: string
-      displayName?: string
-      sortOrder?: number
-    }
-    QAConfigVersion: {
-      id: string
-      versionNo: number
-      defaultKnowledgeBaseIds?: string[]
-      knowledgeBases?: components['schemas']['QAConfigKnowledgeBase'][]
-      retrieval?: components['schemas']['QARetrievalOptions']
-      maxIterations?: number
-      toolTimeoutSeconds?: number
-      modelTimeoutSeconds?: number
-      overallTimeoutSeconds?: number
-      enabledToolNames?: string[]
-      llm?: components['schemas']['QALLMConfigVersion']
-      agent?: components['schemas']['QAAgentConfig']
-      isActive: boolean
-      /** Format: date-time */
-      createdAt: string
-    }
-    QAAgentConfig: {
-      /** @default 5 */
-      maxIterations: number
-      /** @default 10 */
-      toolTimeoutSeconds: number
-      /** @default 60 */
-      modelTimeoutSeconds: number
-      /** @default 120 */
-      overallTimeoutSeconds: number
-      enabledToolNames?: string[]
-    }
-    CreateQAConfigVersionRequest: {
-      defaultKnowledgeBaseIds?: string[]
-      knowledgeBases?: components['schemas']['QAConfigKnowledgeBase'][]
-      retrieval?: components['schemas']['QARetrievalOptions']
-      maxIterations?: number
-      toolTimeoutSeconds?: number
-      modelTimeoutSeconds?: number
-      overallTimeoutSeconds?: number
-      enabledToolNames?: string[]
-      llm?: components['schemas']['CreateQALLMConfigVersionRequest']
-      agent?: components['schemas']['QAAgentConfig']
-      /** @default true */
-      activate: boolean
-    }
-    QAConfigVersionResponse: {
-      data: components['schemas']['QAConfigVersion']
-      requestId: string
-    }
-    QALLMConfigVersion: {
-      id: string
-      versionNo: number
-      /** @enum {string} */
-      provider: 'ai-gateway'
-      /** @description AI Gateway chat model profile id. */
-      profileId: string
-      modelName: string
-      timeoutSeconds?: number
-      temperature?: number
-      maxTokens?: number
-      isActive: boolean
-      /** Format: date-time */
-      createdAt: string
-    }
-    CreateQALLMConfigVersionRequest: {
-      /** @enum {string} */
-      provider: 'ai-gateway'
-      profileId: string
-      modelName: string
-      timeoutSeconds?: number
-      temperature?: number
-      maxTokens?: number
-      /** @default true */
-      activate: boolean
-    }
-    QALLMConfigVersionResponse: {
-      data: components['schemas']['QALLMConfigVersion']
-      requestId: string
-    }
-    CreateQALLMConnectionTestRequest: {
-      /** @enum {string} */
-      provider: 'ai-gateway'
-      profileId: string
-      modelName: string
-      timeoutSeconds?: number
-    }
-    QALLMConnectionTest: {
-      id: string
-      success: boolean
-      latencyMs?: number
-      modelName?: string
-      errorCode?: string
-      /** @description Sanitized failure summary only. */
-      errorMessage?: string
-      /** Format: date-time */
-      testedAt: string
-    }
-    QALLMConnectionTestResponse: {
-      data: components['schemas']['QALLMConnectionTest']
-      requestId: string
-    }
-    CreateQARetrievalTestRunRequest: {
-      question: string
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `question`.
-       */
-      query?: string
-      knowledgeBaseIds?: string[]
-      retrieval?: components['schemas']['QARetrievalOptions']
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `retrieval`.
-       */
-      overrides?: components['schemas']['QARetrievalOptions']
-    }
-    QARetrievalTestResult: {
-      rankNo: number
-      knowledgeBaseId?: string
-      documentId?: string
-      /** @deprecated */
-      docId?: string
-      documentName?: string
-      /** @deprecated */
-      docName?: string
-      chunkId?: string
-      sectionPath?: string
-      score?: number
-      vectorScore?: number
-      rerankScore?: number
-      contentPreview?: string
-      /**
-       * @deprecated
-       * @description Backward-compatible alias for `contentPreview`.
-       */
-      text?: string
-      metadata?: components['schemas']['JsonObject']
-    }
-    QARetrievalTestRun: {
-      id: string
-      question?: string
-      /** @deprecated */
-      query?: string
-      /** @enum {string} */
-      status: 'running' | 'completed' | 'failed'
-      results?: components['schemas']['QARetrievalTestResult'][]
-      /** Format: date-time */
-      createdAt: string
-      /** Format: date-time */
-      finishedAt?: string | null
-    }
-    QARetrievalTestRunResponse: {
-      data: components['schemas']['QARetrievalTestRun']
-      requestId: string
-    }
-    QAMetricsOverview: {
-      totalQaCount?: number
-      todayQaCount?: number
-      totalQuestionCount?: number
-      conversationCount?: number
-      avgLatencyMs?: number
-      activeUsersToday?: number
-      knowledgeBaseCount?: number
-      documentCount?: number
-    }
-    QAMetricsOverviewResponse: {
-      data: components['schemas']['QAMetricsOverview']
-      requestId: string
-    }
-    QAMetricsTrendPoint: {
-      /** Format: date */
-      date: string
-      count?: number
-      questionCount?: number
-    }
-    QAMetricsTrend: {
-      days: number
-      points: components['schemas']['QAMetricsTrendPoint'][]
-      /** @deprecated */
-      trend30d?: components['schemas']['QAMetricsTrendPoint'][]
-    }
-    QAMetricsTrendResponse: {
-      data: components['schemas']['QAMetricsTrend']
-      requestId: string
-    }
-    QATopQuery: {
-      query: string
-      count: number
-      avgLatencyMs?: number
-      /** Format: date-time */
-      lastAskedAt?: string
-    }
-    QATopQueryListResponse: {
-      data: components['schemas']['QATopQuery'][]
-      requestId: string
-    }
-    QAIntentDistributionItem: {
-      intent: components['schemas']['QAIntent']
-      label?: string
-      count: number
-      percent?: number
-    }
-    QAIntentDistributionResponse: {
-      data: components['schemas']['QAIntentDistributionItem'][]
-      requestId: string
-    }
-  }
-  responses: {
-    /** @description Error response. */
-    Error: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-  }
-  parameters: {
-    KnowledgeBaseId: string
-    DocumentId: string
-    ReportId: string
-    ReportTemplateId: string
-    MaterialId: string
-    OutlineId: string
-    SectionId: string
-    JobId: string
-    ReportFileId: string
-    ProfileId: string
-    ParserConfigId: string
-    SessionId: string
-    MessageId: string
-    ResponseRunId: string
-    CitationId: string
-    TestRunId: string
-    Page: number
-    PageSize: number
-  }
-  requestBodies: never
-  headers: never
-  pathItems: never
+        DocumentStatus: "uploaded" | "parsing" | "chunking" | "embedding" | "ready" | "failed";
+        DocumentSummary: {
+            id: string;
+            /** @description Target knowledge base context for this document. */
+            knowledgeBaseId: string;
+            name: string;
+            contentType?: string | null;
+            sizeBytes?: number;
+            status: components["schemas"]["DocumentStatus"];
+            errorCode?: string | null;
+            /** @description Processing failure summary. Must not include object keys, internal paths, SQL details, MinIO errors, or stack traces. */
+            errorMessage?: string | null;
+            chunkCount: number;
+            tags?: string[];
+            parserBackend?: string | null;
+            createdBy?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string | null;
+            /** @description Ingestion job ID when a request starts or observes a processing job. */
+            jobId?: string | null;
+        };
+        UpdateDocumentRequest: {
+            tags?: string[];
+        };
+        DocumentResponse: {
+            data: components["schemas"]["DocumentSummary"];
+            requestId: string;
+        };
+        DocumentListResponse: {
+            data: components["schemas"]["DocumentSummary"][];
+            page: components["schemas"]["PageInfo"];
+            requestId: string;
+        };
+        DocumentChunk: {
+            id: string;
+            knowledgeBaseId: string;
+            documentId: string;
+            chunkIndex: number;
+            sectionPath?: string | null;
+            content: string;
+            tokenCount: number;
+            chunkType?: string | null;
+            qdrantPointId?: string | null;
+            embeddingProvider?: string | null;
+            embeddingDimension?: number | null;
+            embeddingPreview?: number[] | null;
+            metadata?: components["schemas"]["JsonObject"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        DocumentChunkListResponse: {
+            data: components["schemas"]["DocumentChunk"][];
+            page: components["schemas"]["PageInfo"];
+            requestId: string;
+        };
+        KnowledgeQueryRequest: {
+            query: string;
+            knowledgeBaseIds?: string[];
+            /** @default 10 */
+            topK: number;
+            /** @default 0 */
+            scoreThreshold: number;
+            tags?: string[];
+            metadataFilter?: {
+                [key: string]: string;
+            };
+            /** @default false */
+            rerank: boolean;
+            rerankTopN?: number | null;
+        };
+        KnowledgeQueryResult: {
+            score: number;
+            pointId?: string;
+            knowledgeBaseId: string;
+            documentId: string;
+            chunkId: string;
+            documentName: string;
+            sectionPath?: string | null;
+            chunkIndex?: number | null;
+            contentPreview: string;
+            tags?: string[];
+        };
+        KnowledgeQueryTrace: {
+            embeddingProvider: string;
+            embeddingModel: string;
+            embeddingDimension: number;
+            qdrantCollection: string;
+            searchTopK: number;
+            scoreThreshold: number;
+            hitCount: number;
+            rerank: boolean;
+            rerankTopN?: number | null;
+        };
+        KnowledgeQuerySummary: {
+            id: string;
+            query: string;
+            results: components["schemas"]["KnowledgeQueryResult"][];
+            trace: components["schemas"]["KnowledgeQueryTrace"];
+        };
+        KnowledgeQueryResponse: {
+            data: components["schemas"]["KnowledgeQuerySummary"];
+            requestId: string;
+        };
+        /** @enum {string} */
+        ModelPurpose: "chat" | "embedding" | "rerank";
+        /** @enum {string} */
+        ModelProvider: "openai_compatible" | "siliconflow" | "local_compatible";
+        ModelProfile: {
+            id: string;
+            name: string;
+            purpose: components["schemas"]["ModelPurpose"];
+            provider: components["schemas"]["ModelProvider"];
+            /**
+             * Format: uri
+             * @description Provider base URL returned only to authorized admin callers.
+             */
+            baseUrl: string;
+            model: string;
+            enabled: boolean;
+            isDefault: boolean;
+            timeoutMs: number;
+            /** @description True when a provider credential exists. Raw API keys are never returned. */
+            apiKeyConfigured: boolean;
+            supportsStreaming: boolean;
+            /** @description Embedding vector dimension for embedding profiles. */
+            dimensions?: number | null;
+            /** @description Default rerank result count for rerank profiles. */
+            topN?: number | null;
+            /** @description Purpose-specific provider parameters such as temperature, top_p, max_tokens, or provider extensions not modeled as first-class fields. */
+            defaultParameters?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateModelProfileRequest: {
+            name: string;
+            purpose: components["schemas"]["ModelPurpose"];
+            provider: components["schemas"]["ModelProvider"];
+            /** Format: uri */
+            baseUrl: string;
+            model: string;
+            /**
+             * Format: password
+             * @description Write-only provider credential forwarded to ai-gateway. Gateway must never log or return this value.
+             */
+            apiKey: string;
+            /** @default true */
+            enabled: boolean;
+            /** @default false */
+            isDefault: boolean;
+            /** @default 60000 */
+            timeoutMs: number;
+            /** @default false */
+            supportsStreaming: boolean;
+            /** @description Required by implementations that need an explicit embedding vector dimension. */
+            dimensions?: number | null;
+            /** @description Default rerank result count for rerank profiles. */
+            topN?: number | null;
+            defaultParameters?: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateModelProfileRequest: {
+            name?: string;
+            provider?: components["schemas"]["ModelProvider"];
+            /** Format: uri */
+            baseUrl?: string;
+            model?: string;
+            /**
+             * Format: password
+             * @description Write-only provider credential for key rotation. Null or empty string does not mean clear key.
+             */
+            apiKey?: string;
+            enabled?: boolean;
+            isDefault?: boolean;
+            timeoutMs?: number;
+            supportsStreaming?: boolean;
+            dimensions?: number | null;
+            topN?: number | null;
+            defaultParameters?: {
+                [key: string]: unknown;
+            };
+        };
+        ModelProfileResponse: {
+            data: components["schemas"]["ModelProfile"];
+            requestId: string;
+        };
+        ModelProfileListResponse: {
+            data: components["schemas"]["ModelProfile"][];
+            requestId: string;
+        };
+        /** @enum {string} */
+        ParserBackend: "builtin" | "tika" | "unstructured" | "local_ocr" | "remote_compatible";
+        ParserConfig: {
+            id: string;
+            name: string;
+            backend: components["schemas"]["ParserBackend"];
+            enabled: boolean;
+            isDefault: boolean;
+            /** @description Maximum concurrent parser workers for this config. */
+            concurrency: number;
+            supportedContentTypes?: string[];
+            /**
+             * Format: uri
+             * @description Optional internal endpoint for remote-compatible parser backends. Must not contain credentials.
+             */
+            endpointUrl?: string | null;
+            defaultParameters?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateParserConfigRequest: {
+            name: string;
+            backend: components["schemas"]["ParserBackend"];
+            /** @default true */
+            enabled: boolean;
+            /** @default false */
+            isDefault: boolean;
+            concurrency: number;
+            supportedContentTypes?: string[];
+            /** Format: uri */
+            endpointUrl?: string | null;
+            defaultParameters?: {
+                [key: string]: unknown;
+            };
+        };
+        UpdateParserConfigRequest: {
+            name?: string;
+            backend?: components["schemas"]["ParserBackend"];
+            enabled?: boolean;
+            isDefault?: boolean;
+            concurrency?: number;
+            supportedContentTypes?: string[];
+            /** Format: uri */
+            endpointUrl?: string | null;
+            defaultParameters?: {
+                [key: string]: unknown;
+            };
+        };
+        ParserConfigResponse: {
+            data: components["schemas"]["ParserConfig"];
+            requestId: string;
+        };
+        ParserConfigListResponse: {
+            data: components["schemas"]["ParserConfig"][];
+            requestId: string;
+        };
+        PageMeta: {
+            page: number;
+            pageSize: number;
+            total: number;
+        };
+        ReportType: {
+            /** @example summer_peak_inspection */
+            code: string;
+            /** @example 迎峰度夏检查报告 */
+            name: string;
+            description?: string;
+            enabled: boolean;
+            defaultTemplateId?: string;
+        };
+        ReportTypeListResponse: {
+            data: components["schemas"]["ReportType"][];
+            requestId: string;
+        };
+        CreateReportTemplateRequest: {
+            /** Format: binary */
+            file: string;
+            templateName: string;
+            reportType: string;
+            description?: string;
+        };
+        UpdateReportTemplateRequest: {
+            templateName?: string;
+            description?: string;
+            enabled?: boolean;
+        };
+        ReportTemplate: {
+            id: string;
+            templateName: string;
+            reportType: string;
+            version: number;
+            description?: string;
+            enabled: boolean;
+            filename?: string;
+            /** Format: int64 */
+            fileSize?: number;
+            createdBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ReportTemplateResponse: {
+            data: components["schemas"]["ReportTemplate"];
+            requestId: string;
+        };
+        ReportTemplateListResponse: {
+            data: components["schemas"]["ReportTemplate"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        ReportTemplateStructure: {
+            outlineSchema?: components["schemas"]["ReportOutlineNode"][];
+            styleConfig?: {
+                [key: string]: unknown;
+            };
+        };
+        ReportTemplateStructureRequest: components["schemas"]["ReportTemplateStructure"];
+        ReportTemplateStructureResponse: {
+            data: components["schemas"]["ReportTemplateStructure"];
+            requestId: string;
+        };
+        CreateReportMaterialRequest: {
+            /** Format: binary */
+            file: string;
+            materialName: string;
+            materialType: string;
+            category?: string;
+            description?: string;
+            tags?: string[];
+        };
+        ReportMaterial: {
+            id: string;
+            materialName: string;
+            materialType?: string;
+            category?: string;
+            description?: string;
+            tags?: string[];
+            enabled: boolean;
+            filename?: string;
+            /** Format: int64 */
+            fileSize?: number;
+            createdBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ReportMaterialResponse: {
+            data: components["schemas"]["ReportMaterial"];
+            requestId: string;
+        };
+        ReportMaterialListResponse: {
+            data: components["schemas"]["ReportMaterial"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        /** @enum {string} */
+        ReportStatus: "draft" | "outline_generating" | "outline_generated" | "content_generating" | "generated" | "exporting" | "exported" | "failed" | "deleted";
+        CreateReportRequest: {
+            name: string;
+            reportType: string;
+            templateId: string;
+            topic: string;
+            specialty?: string;
+            businessObject?: string;
+            year?: number;
+            extraContext?: {
+                [key: string]: unknown;
+            };
+            /** @enum {string} */
+            source?: "frontend" | "admin" | "mcp" | "backend";
+        };
+        UpdateReportRequest: {
+            name?: string;
+            templateId?: string;
+            topic?: string;
+            specialty?: string;
+            businessObject?: string;
+            year?: number;
+            extraContext?: {
+                [key: string]: unknown;
+            };
+        };
+        Report: {
+            id: string;
+            name: string;
+            reportType: string;
+            templateId?: string;
+            topic?: string;
+            specialty?: string;
+            businessObject?: string;
+            year?: number;
+            status: components["schemas"]["ReportStatus"];
+            extraContext?: {
+                [key: string]: unknown;
+            };
+            creatorId?: string;
+            creatorName?: string;
+            source?: string;
+            latestJobId?: string;
+            latestReportFileId?: string;
+            /** Format: date-time */
+            generatedAt?: string;
+            /** Format: date-time */
+            exportedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ReportResponse: {
+            data: components["schemas"]["Report"];
+            requestId: string;
+        };
+        ReportListResponse: {
+            data: components["schemas"]["Report"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        ReportOutlineNode: {
+            id?: string;
+            clientSectionId?: string;
+            title: string;
+            level: number;
+            numbering?: string;
+            children?: components["schemas"]["ReportOutlineNode"][];
+        };
+        CreateReportOutlineRequest: {
+            /** @enum {string} */
+            source: "manual" | "ai";
+            sections: components["schemas"]["ReportOutlineNode"][];
+        };
+        UpdateReportOutlineRequest: {
+            sections?: components["schemas"]["ReportOutlineNode"][];
+            manualEdited?: boolean;
+        };
+        ReportOutline: {
+            id: string;
+            reportId: string;
+            version: number;
+            sections: components["schemas"]["ReportOutlineNode"][];
+            sourceJobId?: string;
+            manualEdited?: boolean;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ReportOutlineResponse: {
+            data: components["schemas"]["ReportOutline"];
+            requestId: string;
+        };
+        ReportOutlineListResponse: {
+            data: components["schemas"]["ReportOutline"][];
+            requestId: string;
+        };
+        CreateReportSectionRequest: {
+            outlineNodeId?: string;
+            parentId?: string;
+            title: string;
+            level?: number;
+            numbering?: string;
+            content?: string;
+            tables?: {
+                [key: string]: unknown;
+            }[];
+        };
+        UpdateReportSectionRequest: {
+            title?: string;
+            content?: string;
+            tables?: {
+                [key: string]: unknown;
+            }[];
+            manualEdited?: boolean;
+        };
+        ReportSection: {
+            id: string;
+            reportId: string;
+            parentId?: string;
+            outlineNodeId?: string;
+            title: string;
+            level: number;
+            sortOrder?: number;
+            numbering?: string;
+            /** @enum {string} */
+            sectionType?: "text" | "table" | "image" | "mixed";
+            content?: string;
+            tables?: {
+                [key: string]: unknown;
+            }[];
+            generationStatus: components["schemas"]["ReportJobStatus"];
+            /** @enum {string} */
+            contentSource?: "ai" | "manual" | "mixed";
+            manualEdited?: boolean;
+            version?: number;
+            lastJobId?: string;
+            /** Format: date-time */
+            generatedAt?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            updatedAt?: string;
+        };
+        ReportSectionResponse: {
+            data: components["schemas"]["ReportSection"];
+            requestId: string;
+        };
+        ReportSectionListResponse: {
+            data: components["schemas"]["ReportSection"][];
+            requestId: string;
+        };
+        CreateReportSectionVersionRequest: {
+            /** @enum {string} */
+            source: "manual" | "ai";
+            requirements?: string;
+            materialIds?: string[];
+            preserveManualEdits?: boolean;
+        };
+        ReportSectionVersion: {
+            id: string;
+            reportId: string;
+            sectionId: string;
+            version: number;
+            /** @enum {string} */
+            source: "manual" | "ai";
+            content?: string;
+            tables?: {
+                [key: string]: unknown;
+            }[];
+            jobId?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportSectionVersionResponse: {
+            data: components["schemas"]["ReportSectionVersion"];
+            requestId: string;
+        };
+        ReportSectionVersionListResponse: {
+            data: components["schemas"]["ReportSectionVersion"][];
+            requestId: string;
+        };
+        /** @enum {string} */
+        ReportJobStatus: "pending" | "running" | "succeeded" | "partial_succeeded" | "failed" | "canceled";
+        /** @enum {string} */
+        ReportJobType: "outline_generation" | "outline_regeneration" | "content_generation" | "content_regeneration" | "section_regeneration" | "report_file_creation";
+        CreateReportJobRequest: {
+            jobType: components["schemas"]["ReportJobType"];
+            target?: {
+                /** @enum {string} */
+                scope?: "report" | "outline" | "section" | "file";
+                sectionId?: string;
+            };
+            requirements?: string;
+            materialIds?: string[];
+            options?: {
+                [key: string]: unknown;
+            };
+        };
+        ReportJob: {
+            id: string;
+            reportId: string;
+            templateId?: string;
+            jobType: components["schemas"]["ReportJobType"];
+            targetType?: string;
+            targetId?: string;
+            status: components["schemas"]["ReportJobStatus"];
+            progress?: {
+                [key: string]: unknown;
+            };
+            resultSummary?: string;
+            error?: components["schemas"]["ReportJobError"];
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportJobError: {
+            code?: string;
+            message?: string;
+        };
+        ReportJobResponse: {
+            data: components["schemas"]["ReportJob"];
+            requestId: string;
+        };
+        ReportJobListResponse: {
+            data: components["schemas"]["ReportJob"][];
+            requestId: string;
+        };
+        CreateReportJobAttemptRequest: {
+            reason?: string;
+            options?: {
+                [key: string]: unknown;
+            };
+        };
+        ReportJobAttempt: {
+            id: string;
+            jobId: string;
+            attemptNumber?: number;
+            status: components["schemas"]["ReportJobStatus"];
+            error?: components["schemas"]["ReportJobError"];
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportJobAttemptResponse: {
+            data: components["schemas"]["ReportJobAttempt"];
+            requestId: string;
+        };
+        ReportJobAttemptListResponse: {
+            data: components["schemas"]["ReportJobAttempt"][];
+            requestId: string;
+        };
+        ReportEvent: {
+            id: string;
+            reportId: string;
+            jobId?: string;
+            eventType: string;
+            message?: string;
+            payload?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportEventListResponse: {
+            data: components["schemas"]["ReportEvent"][];
+            requestId: string;
+        };
+        CreateReportFileRequest: {
+            reportId: string;
+            /** @enum {string} */
+            format: "docx";
+            templateId?: string;
+            styleOptions?: {
+                [key: string]: unknown;
+            };
+        };
+        ReportFile: {
+            id: string;
+            reportId: string;
+            jobId?: string;
+            filename?: string;
+            /** @enum {string} */
+            format: "docx";
+            /** Format: int64 */
+            fileSize?: number;
+            status: components["schemas"]["ReportJobStatus"];
+            /** @example /api/v1/report-files/rf_123/content */
+            contentPath?: string;
+            createdBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportFileResponse: {
+            data: components["schemas"]["ReportFile"];
+            requestId: string;
+        };
+        ReportFileListResponse: {
+            data: components["schemas"]["ReportFile"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        ReportStatisticsOverview: {
+            reportCount: number;
+            templateCount: number;
+            materialCount: number;
+            jobStatusCounts?: {
+                [key: string]: number;
+            };
+            recentDays?: number;
+        };
+        ReportStatisticsOverviewResponse: {
+            data: components["schemas"]["ReportStatisticsOverview"];
+            requestId: string;
+        };
+        ReportDailyStatistic: {
+            /** Format: date */
+            date: string;
+            reportType?: string;
+            createdCount: number;
+            generatedCount: number;
+            failedCount: number;
+            exportedCount: number;
+        };
+        ReportDailyStatisticsResponse: {
+            data: components["schemas"]["ReportDailyStatistic"][];
+            requestId: string;
+        };
+        ReportOperationLog: {
+            id: string;
+            operatorId?: string;
+            operatorName?: string;
+            operationType: string;
+            targetType: string;
+            targetId: string;
+            requestId?: string;
+            requestSource?: string;
+            toolName?: string;
+            /** @description Sanitized parameter summary for MCP or API calls. Must not contain secrets, prompts, MinIO object keys, or full document content. */
+            parameterSummary?: {
+                [key: string]: unknown;
+            };
+            operationResult: string;
+            errorMessage?: string;
+            /** @description Sanitized audit metadata for troubleshooting and filtering. */
+            metadata?: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ReportOperationLogListResponse: {
+            data: components["schemas"]["ReportOperationLog"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        /** @description Report-generation model profile reference. Provider credentials and base URLs remain owned by AI Gateway model profiles. */
+        ReportSettingsModelConfig: {
+            /**
+             * @description Fixed to ai-gateway for the current gateway contract.
+             * @example ai-gateway
+             */
+            provider?: string;
+            /** @description AI Gateway model profile id used for report generation. */
+            profileId?: string;
+            model?: string;
+            timeoutSeconds?: number;
+        };
+        ReportSettingsFileDefaults: {
+            /** @enum {string} */
+            defaultFormat?: "docx";
+            /**
+             * @description global is supported for the MVP.
+             * @enum {string}
+             */
+            defaultNumberingMode?: "global" | "by_chapter";
+            defaultStyleProfileId?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        ReportSettings: {
+            llm?: components["schemas"]["ReportSettingsModelConfig"];
+            /** @description Map of reportType to default reportTemplateId. */
+            defaultTemplates?: {
+                [key: string]: string;
+            };
+            file?: components["schemas"]["ReportSettingsFileDefaults"];
+        };
+        UpdateReportSettingsRequest: components["schemas"]["ReportSettings"];
+        ReportSettingsResponse: {
+            data: components["schemas"]["ReportSettings"];
+            requestId: string;
+        };
+        ReportSettingsUpdateResponse: {
+            data: {
+                /** Format: date-time */
+                updatedAt: string;
+            };
+            requestId: string;
+        };
+        /** @enum {string} */
+        QASessionStatus: "active" | "archived";
+        QASession: {
+            id: string;
+            title?: string;
+            status: components["schemas"]["QASessionStatus"];
+            messageCount?: number;
+            lastMessagePreview?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        CreateQASessionRequest: {
+            title?: string;
+        };
+        UpdateQASessionRequest: {
+            title?: string;
+            status?: components["schemas"]["QASessionStatus"];
+        };
+        QASessionResponse: {
+            data: components["schemas"]["QASession"];
+            requestId: string;
+        };
+        QASessionListResponse: {
+            data: components["schemas"]["QASession"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        /** @enum {string} */
+        QAMessageRole: "user" | "assistant" | "system";
+        /** @enum {string} */
+        QAMessageStatus: "queued" | "streaming" | "completed" | "stopped" | "failed" | "cancelled";
+        /**
+         * @description `data_analysis` is reserved; MVP implementations should return `unsupported_intent` instead of executing a data-analysis workflow.
+         * @enum {string}
+         */
+        QAIntent: "knowledge_qa" | "general_chat" | "report_generation" | "data_analysis" | "unknown";
+        QAMessage: {
+            id: string;
+            sessionId: string;
+            role: components["schemas"]["QAMessageRole"];
+            sequenceNo?: number;
+            status: components["schemas"]["QAMessageStatus"];
+            intent?: components["schemas"]["QAIntent"];
+            content: string;
+            /** @description User-visible process summaries only. Must not contain private chain-of-thought, full prompts, full tool arguments, raw tool results, internal URLs, or storage object keys. */
+            thinking?: components["schemas"]["QAThinkingStep"][];
+            citations?: components["schemas"]["QACitation"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt?: string | null;
+        };
+        QAMessageListResponse: {
+            data: components["schemas"]["QAMessage"][];
+            page: components["schemas"]["PageMeta"];
+            requestId: string;
+        };
+        QAThinkingStep: {
+            /** @enum {string} */
+            type: "agent_iteration" | "tool_call" | "tool_result" | "generation" | "citation" | "verify";
+            label?: string;
+            /** @enum {string} */
+            status: "pending" | "running" | "done" | "failed";
+            /** @description Sanitized user-visible detail. */
+            detail?: string;
+        };
+        CreateQAMessageRequest: {
+            message: string;
+            mode?: components["schemas"]["QAIntent"];
+            knowledgeBaseIds?: string[];
+            retrieval?: components["schemas"]["QARetrievalOptions"];
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `retrieval`; new clients should use `retrieval`.
+             */
+            params?: components["schemas"]["QARetrievalOptions"];
+            agent?: components["schemas"]["QAAgentOptions"];
+        };
+        QARetrievalOptions: {
+            topK?: number;
+            scoreThreshold?: number;
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `scoreThreshold`.
+             */
+            similarityThreshold?: number;
+            enableRerank?: boolean;
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `enableRerank`.
+             */
+            useRerank?: boolean;
+            rerankThreshold?: number;
+            rerankTopN?: number;
+            tagFilters?: {
+                [key: string]: string[];
+            };
+        };
+        QAAgentOptions: {
+            enabledToolNames?: string[];
+            maxIterations?: number;
+        };
+        QAAnswerResponse: {
+            data: {
+                userMessage: components["schemas"]["QAMessage"];
+                assistantMessage: components["schemas"]["QAMessage"];
+                responseRun: components["schemas"]["QAResponseRun"];
+                citations?: components["schemas"]["QACitation"][];
+                reasoningSteps?: components["schemas"]["QAThinkingStep"][];
+                /** @description For reserved unsupported intents, returns `unsupported_intent`. */
+                errorCode?: string | null;
+            };
+            requestId: string;
+        };
+        /** @enum {string} */
+        QAResponseRunStatus: "queued" | "running" | "streaming" | "completed" | "failed" | "cancelled";
+        QAResponseRun: {
+            id: string;
+            sessionId: string;
+            userMessageId?: string;
+            assistantMessageId?: string;
+            status: components["schemas"]["QAResponseRunStatus"];
+            currentIteration?: number;
+            maxIterations?: number;
+            /** @enum {string|null} */
+            terminationReason?: "completed" | "max_iterations" | "timeout" | "cancelled" | "tool_error" | "model_error" | "policy_denied" | null;
+            totalTokens?: number;
+            latencyMs?: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            completedAt?: string | null;
+        };
+        QAResponseRunResponse: {
+            data: components["schemas"]["QAResponseRun"];
+            requestId: string;
+        };
+        UpdateQAResponseRunRequest: {
+            /** @enum {string} */
+            status: "cancelled";
+        };
+        QAAgentToolCall: {
+            id: string;
+            responseRunId: string;
+            modelInvocationId?: string;
+            iterationNo?: number;
+            toolCallId: string;
+            toolName: string;
+            argumentsSummary?: components["schemas"]["JsonObject"];
+            resultSummary?: components["schemas"]["JsonObject"];
+            /** @enum {string} */
+            status: "running" | "completed" | "failed" | "cancelled";
+            latencyMs?: number;
+            /** Format: date-time */
+            startedAt?: string;
+            /** Format: date-time */
+            finishedAt?: string | null;
+        };
+        QAAgentToolCallListResponse: {
+            data: components["schemas"]["QAAgentToolCall"][];
+            requestId: string;
+        };
+        /** @enum {string} */
+        QASseEventType: "message.created" | "agent.iteration.started" | "reasoning.step" | "tool.started" | "tool.completed" | "tool.failed" | "answer.delta" | "citation.delta" | "answer.completed" | "error" | "heartbeat";
+        QASseEvent: {
+            eventSeq: number;
+            eventType: components["schemas"]["QASseEventType"];
+            payload: components["schemas"]["JsonObject"];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        QASseEventListResponse: {
+            data: components["schemas"]["QASseEvent"][];
+            requestId: string;
+        };
+        QACitation: {
+            id: string;
+            messageId: string;
+            citationNo?: number;
+            documentId?: string;
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `documentId`.
+             */
+            docId?: string;
+            documentName?: string;
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `documentName`.
+             */
+            docName?: string;
+            knowledgeBaseId?: string;
+            chunkId?: string;
+            sectionPath?: string;
+            /** @description Citation quote preview or saved quote text. */
+            text?: string;
+            contentPreview?: string;
+            context?: string;
+            pageNumber?: number;
+            score?: number;
+            rerankScore?: number | null;
+            chunkType?: string;
+            isSourceAvailable?: boolean;
+            metadata?: components["schemas"]["JsonObject"];
+        };
+        QACitationDetail: components["schemas"]["QACitation"] & {
+            /** @description Saved citation snapshot or source excerpt available to the current user. */
+            content?: string;
+            source?: {
+                available?: boolean;
+                reason?: string;
+                /** @description Gateway document content endpoint when the original source is available. */
+                downloadEndpoint?: string;
+            };
+        };
+        QACitationListResponse: {
+            data: components["schemas"]["QACitation"][];
+            requestId: string;
+        };
+        QACitationResponse: {
+            data: components["schemas"]["QACitationDetail"];
+            requestId: string;
+        };
+        CreateQACitationLookupRequest: {
+            citationIds: string[];
+        };
+        QACitationLookupResponse: {
+            data: components["schemas"]["QACitationDetail"][];
+            requestId: string;
+        };
+        QAConfigKnowledgeBase: {
+            id: string;
+            type?: string;
+            displayName?: string;
+            sortOrder?: number;
+        };
+        QAConfigVersion: {
+            id: string;
+            versionNo: number;
+            defaultKnowledgeBaseIds?: string[];
+            knowledgeBases?: components["schemas"]["QAConfigKnowledgeBase"][];
+            retrieval?: components["schemas"]["QARetrievalOptions"];
+            maxIterations?: number;
+            toolTimeoutSeconds?: number;
+            modelTimeoutSeconds?: number;
+            overallTimeoutSeconds?: number;
+            enabledToolNames?: string[];
+            llm?: components["schemas"]["QALLMConfigVersion"];
+            agent?: components["schemas"]["QAAgentConfig"];
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        QAAgentConfig: {
+            /** @default 5 */
+            maxIterations: number;
+            /** @default 10 */
+            toolTimeoutSeconds: number;
+            /** @default 60 */
+            modelTimeoutSeconds: number;
+            /** @default 120 */
+            overallTimeoutSeconds: number;
+            enabledToolNames?: string[];
+        };
+        CreateQAConfigVersionRequest: {
+            defaultKnowledgeBaseIds?: string[];
+            knowledgeBases?: components["schemas"]["QAConfigKnowledgeBase"][];
+            retrieval?: components["schemas"]["QARetrievalOptions"];
+            maxIterations?: number;
+            toolTimeoutSeconds?: number;
+            modelTimeoutSeconds?: number;
+            overallTimeoutSeconds?: number;
+            enabledToolNames?: string[];
+            llm?: components["schemas"]["CreateQALLMConfigVersionRequest"];
+            agent?: components["schemas"]["QAAgentConfig"];
+            /** @default true */
+            activate: boolean;
+        };
+        QAConfigVersionResponse: {
+            data: components["schemas"]["QAConfigVersion"];
+            requestId: string;
+        };
+        QALLMConfigVersion: {
+            id: string;
+            versionNo: number;
+            /** @enum {string} */
+            provider: "ai-gateway";
+            /** @description AI Gateway chat model profile id. */
+            profileId: string;
+            modelName: string;
+            timeoutSeconds?: number;
+            temperature?: number;
+            maxTokens?: number;
+            isActive: boolean;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CreateQALLMConfigVersionRequest: {
+            /** @enum {string} */
+            provider: "ai-gateway";
+            profileId: string;
+            modelName: string;
+            timeoutSeconds?: number;
+            temperature?: number;
+            maxTokens?: number;
+            /** @default true */
+            activate: boolean;
+        };
+        QALLMConfigVersionResponse: {
+            data: components["schemas"]["QALLMConfigVersion"];
+            requestId: string;
+        };
+        CreateQALLMConnectionTestRequest: {
+            /** @enum {string} */
+            provider: "ai-gateway";
+            profileId: string;
+            modelName: string;
+            timeoutSeconds?: number;
+        };
+        QALLMConnectionTest: {
+            id: string;
+            success: boolean;
+            latencyMs?: number;
+            modelName?: string;
+            errorCode?: string;
+            /** @description Sanitized failure summary only. */
+            errorMessage?: string;
+            /** Format: date-time */
+            testedAt: string;
+        };
+        QALLMConnectionTestResponse: {
+            data: components["schemas"]["QALLMConnectionTest"];
+            requestId: string;
+        };
+        CreateQARetrievalTestRunRequest: {
+            question: string;
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `question`.
+             */
+            query?: string;
+            knowledgeBaseIds?: string[];
+            retrieval?: components["schemas"]["QARetrievalOptions"];
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `retrieval`.
+             */
+            overrides?: components["schemas"]["QARetrievalOptions"];
+        };
+        QARetrievalTestResult: {
+            rankNo: number;
+            knowledgeBaseId?: string;
+            documentId?: string;
+            /** @deprecated */
+            docId?: string;
+            documentName?: string;
+            /** @deprecated */
+            docName?: string;
+            chunkId?: string;
+            sectionPath?: string;
+            score?: number;
+            vectorScore?: number;
+            rerankScore?: number;
+            contentPreview?: string;
+            /**
+             * @deprecated
+             * @description Backward-compatible alias for `contentPreview`.
+             */
+            text?: string;
+            metadata?: components["schemas"]["JsonObject"];
+        };
+        QARetrievalTestRun: {
+            id: string;
+            question?: string;
+            /** @deprecated */
+            query?: string;
+            /** @enum {string} */
+            status: "running" | "completed" | "failed";
+            results?: components["schemas"]["QARetrievalTestResult"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            finishedAt?: string | null;
+        };
+        QARetrievalTestRunResponse: {
+            data: components["schemas"]["QARetrievalTestRun"];
+            requestId: string;
+        };
+        QAMetricsOverview: {
+            totalQaCount?: number;
+            todayQaCount?: number;
+            totalQuestionCount?: number;
+            conversationCount?: number;
+            avgLatencyMs?: number;
+            activeUsersToday?: number;
+            knowledgeBaseCount?: number;
+            documentCount?: number;
+        };
+        QAMetricsOverviewResponse: {
+            data: components["schemas"]["QAMetricsOverview"];
+            requestId: string;
+        };
+        QAMetricsTrendPoint: {
+            /** Format: date */
+            date: string;
+            count?: number;
+            questionCount?: number;
+        };
+        QAMetricsTrend: {
+            days: number;
+            points: components["schemas"]["QAMetricsTrendPoint"][];
+            /** @deprecated */
+            trend30d?: components["schemas"]["QAMetricsTrendPoint"][];
+        };
+        QAMetricsTrendResponse: {
+            data: components["schemas"]["QAMetricsTrend"];
+            requestId: string;
+        };
+        QATopQuery: {
+            query: string;
+            count: number;
+            avgLatencyMs?: number;
+            /** Format: date-time */
+            lastAskedAt?: string;
+        };
+        QATopQueryListResponse: {
+            data: components["schemas"]["QATopQuery"][];
+            requestId: string;
+        };
+        QAIntentDistributionItem: {
+            intent: components["schemas"]["QAIntent"];
+            label?: string;
+            count: number;
+            percent?: number;
+        };
+        QAIntentDistributionResponse: {
+            data: components["schemas"]["QAIntentDistributionItem"][];
+            requestId: string;
+        };
+    };
+    responses: {
+        /** @description Error response. */
+        Error: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+    };
+    parameters: {
+        KnowledgeBaseId: string;
+        DocumentId: string;
+        ReportId: string;
+        ReportTemplateId: string;
+        MaterialId: string;
+        OutlineId: string;
+        SectionId: string;
+        JobId: string;
+        ReportFileId: string;
+        ProfileId: string;
+        ParserConfigId: string;
+        SessionId: string;
+        MessageId: string;
+        ResponseRunId: string;
+        CitationId: string;
+        TestRunId: string;
+        Page: number;
+        PageSize: number;
+    };
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
-export type $defs = Record<string, never>
+export type $defs = Record<string, never>;
 export interface operations {
-  getHealthz: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Gateway process is alive. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HealthResponse']
-        }
-      }
-      429: components['responses']['Error']
-    }
-  }
-  getReadyz: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Gateway is ready to serve traffic. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['HealthResponse']
-        }
-      }
-      429: components['responses']['Error']
-      503: components['responses']['Error']
-    }
-  }
-  createUser: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateUserRequest']
-      }
-    }
-    responses: {
-      /** @description User and session created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['SessionResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createSession: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateSessionRequest']
-      }
-    }
-    responses: {
-      /** @description Session created. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['SessionResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-    }
-  }
-  deleteCurrentSession: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current session deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Error']
-    }
-  }
-  getCurrentUser: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current user. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['UserResponse']
-        }
-      }
-      401: components['responses']['Error']
-    }
-  }
-  listKnowledgeBases: {
-    parameters: {
-      query?: {
-        page?: number
-        pageSize?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Knowledge bases. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['KnowledgeBaseListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createKnowledgeBase: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateKnowledgeBaseRequest']
-      }
-    }
-    responses: {
-      /** @description Knowledge base created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['KnowledgeBaseResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getKnowledgeBase: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Knowledge base. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['KnowledgeBaseResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  deleteKnowledgeBase: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Knowledge base deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      404: components['responses']['Error']
-    }
-  }
-  updateKnowledgeBase: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateKnowledgeBaseRequest']
-      }
-    }
-    responses: {
-      /** @description Knowledge base updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['KnowledgeBaseResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  listKnowledgeBaseDocuments: {
-    parameters: {
-      query?: {
-        page?: number
-        pageSize?: number
-        status?: components['schemas']['DocumentStatus']
-      }
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Documents in the knowledge base. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['DocumentListResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  uploadKnowledgeBaseDocument: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        knowledgeBaseId: components['parameters']['KnowledgeBaseId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'multipart/form-data': {
-          /** Format: binary */
-          file: string
-          tags?: string[]
-        }
-      }
-    }
-    responses: {
-      /** @description Document accepted for processing. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['DocumentResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getDocument: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Document processing details. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['DocumentResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  deleteDocument: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Document deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      404: components['responses']['Error']
-    }
-  }
-  updateDocument: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateDocumentRequest']
-      }
-    }
-    responses: {
-      /** @description Document updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['DocumentResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  listDocumentChunks: {
-    parameters: {
-      query?: {
-        page?: number
-        pageSize?: number
-      }
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Document chunks. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['DocumentChunkListResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  getDocumentContent: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        documentId: components['parameters']['DocumentId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Original file stream. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/octet-stream': string
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createKnowledgeQuery: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['KnowledgeQueryRequest']
-      }
-    }
-    responses: {
-      /** @description Knowledge query result. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['KnowledgeQueryResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  listAdminModelProfiles: {
-    parameters: {
-      query?: {
-        purpose?: components['schemas']['ModelPurpose']
-        enabled?: boolean
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Runtime model profiles. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ModelProfileListResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-    }
-  }
-  createAdminModelProfile: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateModelProfileRequest']
-      }
-    }
-    responses: {
-      /** @description Runtime model profile created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ModelProfileResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  getAdminModelProfile: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        profileId: components['parameters']['ProfileId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Runtime model profile. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ModelProfileResponse']
-        }
-      }
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  deleteAdminModelProfile: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        profileId: components['parameters']['ProfileId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Runtime model profile deleted or disabled. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  updateAdminModelProfile: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        profileId: components['parameters']['ProfileId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateModelProfileRequest']
-      }
-    }
-    responses: {
-      /** @description Runtime model profile updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ModelProfileResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listAdminParserConfigs: {
-    parameters: {
-      query?: {
-        enabled?: boolean
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Document parser configs. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ParserConfigListResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-    }
-  }
-  createAdminParserConfig: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateParserConfigRequest']
-      }
-    }
-    responses: {
-      /** @description Document parser config created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ParserConfigResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  getAdminParserConfig: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        parserConfigId: components['parameters']['ParserConfigId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Document parser config. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ParserConfigResponse']
-        }
-      }
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  deleteAdminParserConfig: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        parserConfigId: components['parameters']['ParserConfigId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Document parser config deleted or disabled. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  updateAdminParserConfig: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        parserConfigId: components['parameters']['ParserConfigId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateParserConfigRequest']
-      }
-    }
-    responses: {
-      /** @description Document parser config updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ParserConfigResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listReportTypes: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report types. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTypeListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  listReportTemplates: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: components['parameters']['PageSize']
-        reportType?: string
-        enabled?: boolean
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report templates. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTemplateListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createReportTemplate: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'multipart/form-data': components['schemas']['CreateReportTemplateRequest']
-      }
-    }
-    responses: {
-      /** @description Report template created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTemplateResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getReportTemplate: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report template. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTemplateResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  deleteReportTemplate: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report template deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  updateReportTemplate: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateReportTemplateRequest']
-      }
-    }
-    responses: {
-      /** @description Report template updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTemplateResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  getReportTemplateStructure: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report template structure. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTemplateStructureResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  updateReportTemplateStructure: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportTemplateId: components['parameters']['ReportTemplateId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ReportTemplateStructureRequest']
-      }
-    }
-    responses: {
-      /** @description Report template structure updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportTemplateStructureResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  listReportMaterials: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: components['parameters']['PageSize']
-        category?: string
-        enabled?: boolean
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report materials. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportMaterialListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createReportMaterial: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'multipart/form-data': components['schemas']['CreateReportMaterialRequest']
-      }
-    }
-    responses: {
-      /** @description Report material created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportMaterialResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getReportMaterial: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        materialId: components['parameters']['MaterialId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report material. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportMaterialResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  deleteReportMaterial: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        materialId: components['parameters']['MaterialId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report material deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listReports: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: components['parameters']['PageSize']
-        reportType?: string
-        status?: string
-        keyword?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Reports. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createReport: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportRequest']
-      }
-    }
-    responses: {
-      /** @description Report created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getReport: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  deleteReport: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  updateReport: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateReportRequest']
-      }
-    }
-    responses: {
-      /** @description Report updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportResponse']
-        }
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listReportOutlines: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report outlines. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportOutlineListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createReportOutline: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportOutlineRequest']
-      }
-    }
-    responses: {
-      /** @description Report outline created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportOutlineResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  getReportOutline: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        outlineId: components['parameters']['OutlineId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report outline. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportOutlineResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  updateReportOutline: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        outlineId: components['parameters']['OutlineId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateReportOutlineRequest']
-      }
-    }
-    responses: {
-      /** @description Report outline updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportOutlineResponse']
-        }
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  deleteReportOutlineSection: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        outlineId: components['parameters']['OutlineId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report outline section deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listReportSections: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report sections. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSectionListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createReportSection: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportSectionRequest']
-      }
-    }
-    responses: {
-      /** @description Report section created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSectionResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  getReportSection: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report section. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSectionResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  updateReportSection: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateReportSectionRequest']
-      }
-    }
-    responses: {
-      /** @description Report section updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSectionResponse']
-        }
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listReportSectionVersions: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report section versions. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSectionVersionListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createReportSectionVersion: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-        sectionId: components['parameters']['SectionId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportSectionVersionRequest']
-      }
-    }
-    responses: {
-      /** @description Report section version created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSectionVersionResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  listReportJobs: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report jobs. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportJobListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createReportJob: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportJobRequest']
-      }
-    }
-    responses: {
-      /** @description Report job accepted. */
-      202: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportJobResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  getReportJob: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        jobId: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report job. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportJobResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  listReportJobAttempts: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        jobId: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report job attempts. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportJobAttemptListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createReportJobAttempt: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        jobId: components['parameters']['JobId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportJobAttemptRequest']
-      }
-    }
-    responses: {
-      /** @description Report job attempt accepted. */
-      202: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportJobAttemptResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listReportEvents: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportId: components['parameters']['ReportId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report events. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportEventListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  listReportFiles: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: components['parameters']['PageSize']
-        reportId?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report files. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportFileListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createReportFile: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateReportFileRequest']
-      }
-    }
-    responses: {
-      /** @description Report file accepted. */
-      202: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportFileResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  getReportFile: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportFileId: components['parameters']['ReportFileId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report file metadata. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportFileResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  getReportFileContent: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        reportFileId: components['parameters']['ReportFileId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Generated report file stream. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document': string
-          'application/octet-stream': string
-        }
-      }
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  getReportStatisticsOverview: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report statistics overview. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportStatisticsOverviewResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  listDailyReportStatistics: {
-    parameters: {
-      query?: {
-        days?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Daily report statistics. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportDailyStatisticsResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  listReportOperationLogs: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: components['parameters']['PageSize']
-        targetType?: string
-        targetId?: string
-        operationType?: string
-        requestId?: string
-        requestSource?: string
-        toolName?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report operation logs. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportOperationLogListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getReportSettings: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Report generation settings. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSettingsResponse']
-        }
-      }
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-    }
-  }
-  updateReportSettings: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateReportSettingsRequest']
-      }
-    }
-    responses: {
-      /** @description Report generation settings updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ReportSettingsUpdateResponse']
-        }
-      }
-      400: components['responses']['Error']
-      401: components['responses']['Error']
-      403: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listQASessions: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: components['parameters']['PageSize']
-        status?: 'active' | 'archived'
-        sort?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA sessions. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QASessionListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  createQASession: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['CreateQASessionRequest']
-      }
-    }
-    responses: {
-      /** @description QA session created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QASessionResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getQASession: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA session. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QASessionResponse']
-        }
-      }
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  deleteQASession: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA session deleted. */
-      204: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  updateQASession: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateQASessionRequest']
-      }
-    }
-    responses: {
-      /** @description QA session updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QASessionResponse']
-        }
-      }
-      400: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  listQAMessages: {
-    parameters: {
-      query?: {
-        page?: components['parameters']['Page']
-        pageSize?: number
-        includeThinking?: boolean
-        includeCitations?: boolean
-      }
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA messages. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAMessageListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createQAMessage: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateQAMessageRequest']
-      }
-    }
-    responses: {
-      /** @description QA answer or SSE stream. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAAnswerResponse']
-          'text/event-stream': string
-        }
-      }
-      400: components['responses']['Error']
-      403: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-      502: components['responses']['Error']
-    }
-  }
-  listQAStreamEvents: {
-    parameters: {
-      query: {
-        responseRunId: string
-        afterEventSeq?: number
-      }
-      header?: never
-      path: {
-        sessionId: components['parameters']['SessionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA stream events. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QASseEventListResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  getQAResponseRun: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        responseRunId: components['parameters']['ResponseRunId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA response run. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAResponseRunResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  updateQAResponseRun: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        responseRunId: components['parameters']['ResponseRunId']
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateQAResponseRunRequest']
-      }
-    }
-    responses: {
-      /** @description QA response run updated. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAResponseRunResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-      409: components['responses']['Error']
-    }
-  }
-  listQAResponseRunToolCalls: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        responseRunId: components['parameters']['ResponseRunId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA tool call summaries. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAAgentToolCallListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  listQAMessageCitations: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        messageId: components['parameters']['MessageId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA citations. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QACitationListResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  getQACitation: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        citationId: components['parameters']['CitationId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA citation detail. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QACitationResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createQACitationLookup: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateQACitationLookupRequest']
-      }
-    }
-    responses: {
-      /** @description QA citation lookup result. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QACitationLookupResponse']
-        }
-      }
-      400: components['responses']['Error']
-      404: components['responses']['Error']
-    }
-  }
-  getCurrentQAConfigVersion: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current QA config version. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAConfigVersionResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createQAConfigVersion: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateQAConfigVersionRequest']
-      }
-    }
-    responses: {
-      /** @description QA config version created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAConfigVersionResponse']
-        }
-      }
-      400: components['responses']['Error']
-      403: components['responses']['Error']
-    }
-  }
-  getCurrentQALLMConfigVersion: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current QA LLM config version. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QALLMConfigVersionResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  createQALLMConfigVersion: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateQALLMConfigVersionRequest']
-      }
-    }
-    responses: {
-      /** @description QA LLM config version created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QALLMConfigVersionResponse']
-        }
-      }
-      400: components['responses']['Error']
-      403: components['responses']['Error']
-    }
-  }
-  createQALLMConnectionTest: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateQALLMConnectionTestRequest']
-      }
-    }
-    responses: {
-      /** @description QA LLM connection test created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QALLMConnectionTestResponse']
-        }
-      }
-      400: components['responses']['Error']
-      502: components['responses']['Error']
-    }
-  }
-  createQARetrievalTestRun: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateQARetrievalTestRunRequest']
-      }
-    }
-    responses: {
-      /** @description QA retrieval test run created. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QARetrievalTestRunResponse']
-        }
-      }
-      400: components['responses']['Error']
-      403: components['responses']['Error']
-      502: components['responses']['Error']
-    }
-  }
-  getQARetrievalTestRun: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        testRunId: components['parameters']['TestRunId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA retrieval test run. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QARetrievalTestRunResponse']
-        }
-      }
-      404: components['responses']['Error']
-    }
-  }
-  getQAMetricsOverview: {
-    parameters: {
-      query?: {
-        days?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA metrics overview. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAMetricsOverviewResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  getQAMetricsTrend: {
-    parameters: {
-      query?: {
-        days?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA metrics trend. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAMetricsTrendResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  listQATopQueries: {
-    parameters: {
-      query?: {
-        days?: number
-        limit?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA top queries. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QATopQueryListResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
-  listQAIntentDistribution: {
-    parameters: {
-      query?: {
-        days?: number
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description QA intent distribution. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['QAIntentDistributionResponse']
-        }
-      }
-      400: components['responses']['Error']
-    }
-  }
+    getHealthz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gateway process is alive. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            429: components["responses"]["Error"];
+        };
+    };
+    getReadyz: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gateway is ready to serve traffic. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            429: components["responses"]["Error"];
+            503: components["responses"]["Error"];
+        };
+    };
+    createUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description User and session created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateSessionRequest"];
+            };
+        };
+        responses: {
+            /** @description Session created. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+        };
+    };
+    deleteCurrentSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current session deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    listKnowledgeBases: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Knowledge bases. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createKnowledgeBase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateKnowledgeBaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Knowledge base created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getKnowledgeBase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Knowledge base. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteKnowledgeBase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Knowledge base deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateKnowledgeBase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateKnowledgeBaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Knowledge base updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeBaseResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listKnowledgeBaseDocuments: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+                status?: components["schemas"]["DocumentStatus"];
+            };
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Documents in the knowledge base. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    uploadKnowledgeBaseDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                knowledgeBaseId: components["parameters"]["KnowledgeBaseId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    tags?: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Document accepted for processing. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document processing details. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateDocument: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateDocumentRequest"];
+            };
+        };
+        responses: {
+            /** @description Document updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    listDocumentChunks: {
+        parameters: {
+            query?: {
+                page?: number;
+                pageSize?: number;
+            };
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document chunks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocumentChunkListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    getDocumentContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                documentId: components["parameters"]["DocumentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Original file stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createKnowledgeQuery: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KnowledgeQueryRequest"];
+            };
+        };
+        responses: {
+            /** @description Knowledge query result. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["KnowledgeQueryResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listAdminModelProfiles: {
+        parameters: {
+            query?: {
+                purpose?: components["schemas"]["ModelPurpose"];
+                enabled?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runtime model profiles. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createAdminModelProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateModelProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Runtime model profile created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getAdminModelProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runtime model profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteAdminModelProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Runtime model profile deleted or disabled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    updateAdminModelProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: components["parameters"]["ProfileId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateModelProfileRequest"];
+            };
+        };
+        responses: {
+            /** @description Runtime model profile updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelProfileResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listAdminParserConfigs: {
+        parameters: {
+            query?: {
+                enabled?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document parser configs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParserConfigListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createAdminParserConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateParserConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Document parser config created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParserConfigResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getAdminParserConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parserConfigId: components["parameters"]["ParserConfigId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document parser config. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParserConfigResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteAdminParserConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parserConfigId: components["parameters"]["ParserConfigId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Document parser config deleted or disabled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    updateAdminParserConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                parserConfigId: components["parameters"]["ParserConfigId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateParserConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description Document parser config updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ParserConfigResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listReportTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report types. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTypeListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    listReportTemplates: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+                reportType?: string;
+                enabled?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report templates. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplateListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createReportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CreateReportTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Report template created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplateResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getReportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report template. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplateResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteReportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report template deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    updateReportTemplate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReportTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description Report template updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplateResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    getReportTemplateStructure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report template structure. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplateStructureResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateReportTemplateStructure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportTemplateId: components["parameters"]["ReportTemplateId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReportTemplateStructureRequest"];
+            };
+        };
+        responses: {
+            /** @description Report template structure updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportTemplateStructureResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    listReportMaterials: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+                category?: string;
+                enabled?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report materials. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMaterialListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createReportMaterial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["CreateReportMaterialRequest"];
+            };
+        };
+        responses: {
+            /** @description Report material created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMaterialResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getReportMaterial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                materialId: components["parameters"]["MaterialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report material. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportMaterialResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteReportMaterial: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                materialId: components["parameters"]["MaterialId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report material deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listReports: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+                reportType?: string;
+                status?: string;
+                keyword?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Reports. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Report created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    updateReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReportRequest"];
+            };
+        };
+        responses: {
+            /** @description Report updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listReportOutlines: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report outlines. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOutlineListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createReportOutline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportOutlineRequest"];
+            };
+        };
+        responses: {
+            /** @description Report outline created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOutlineResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    getReportOutline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                outlineId: components["parameters"]["OutlineId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report outline. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOutlineResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateReportOutline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                outlineId: components["parameters"]["OutlineId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReportOutlineRequest"];
+            };
+        };
+        responses: {
+            /** @description Report outline updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOutlineResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    deleteReportOutlineSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                outlineId: components["parameters"]["OutlineId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report outline section deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listReportSections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report sections. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSectionListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createReportSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportSectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Report section created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSectionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    getReportSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report section. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSectionResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateReportSection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReportSectionRequest"];
+            };
+        };
+        responses: {
+            /** @description Report section updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSectionResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listReportSectionVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report section versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSectionVersionListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createReportSectionVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+                sectionId: components["parameters"]["SectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportSectionVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description Report section version created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSectionVersionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listReportJobs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportJobListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createReportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportJobRequest"];
+            };
+        };
+        responses: {
+            /** @description Report job accepted. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportJobResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getReportJob: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report job. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportJobResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    listReportJobAttempts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report job attempts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportJobAttemptListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createReportJobAttempt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                jobId: components["parameters"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportJobAttemptRequest"];
+            };
+        };
+        responses: {
+            /** @description Report job attempt accepted. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportJobAttemptResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listReportEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportId: components["parameters"]["ReportId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportEventListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    listReportFiles: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+                reportId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report files. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFileListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createReportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateReportFileRequest"];
+            };
+        };
+        responses: {
+            /** @description Report file accepted. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFileResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getReportFile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportFileId: components["parameters"]["ReportFileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report file metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportFileResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    getReportFileContent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reportFileId: components["parameters"]["ReportFileId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Generated report file stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": string;
+                    "application/octet-stream": string;
+                };
+            };
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    getReportStatisticsOverview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report statistics overview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportStatisticsOverviewResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    listDailyReportStatistics: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Daily report statistics. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportDailyStatisticsResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    listReportOperationLogs: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+                targetType?: string;
+                targetId?: string;
+                operationType?: string;
+                requestId?: string;
+                requestSource?: string;
+                toolName?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report operation logs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportOperationLogListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getReportSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Report generation settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSettingsResponse"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    updateReportSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateReportSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Report generation settings updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReportSettingsUpdateResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listQASessions: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: components["parameters"]["PageSize"];
+                status?: "active" | "archived";
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA sessions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QASessionListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    createQASession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CreateQASessionRequest"];
+            };
+        };
+        responses: {
+            /** @description QA session created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QASessionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getQASession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA session. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QASessionResponse"];
+                };
+            };
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteQASession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA session deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    updateQASession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateQASessionRequest"];
+            };
+        };
+        responses: {
+            /** @description QA session updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QASessionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listQAMessages: {
+        parameters: {
+            query?: {
+                page?: components["parameters"]["Page"];
+                pageSize?: number;
+                includeThinking?: boolean;
+                includeCitations?: boolean;
+            };
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA messages. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAMessageListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createQAMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQAMessageRequest"];
+            };
+        };
+        responses: {
+            /** @description QA answer or SSE stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAAnswerResponse"];
+                    "text/event-stream": string;
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+        };
+    };
+    listQAStreamEvents: {
+        parameters: {
+            query: {
+                responseRunId: string;
+                afterEventSeq?: number;
+            };
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA stream events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QASseEventListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    getQAResponseRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseRunId: components["parameters"]["ResponseRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA response run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAResponseRunResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    updateQAResponseRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseRunId: components["parameters"]["ResponseRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateQAResponseRunRequest"];
+            };
+        };
+        responses: {
+            /** @description QA response run updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAResponseRunResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+        };
+    };
+    listQAResponseRunToolCalls: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                responseRunId: components["parameters"]["ResponseRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA tool call summaries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAAgentToolCallListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    listQAMessageCitations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                messageId: components["parameters"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA citations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QACitationListResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    getQACitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                citationId: components["parameters"]["CitationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA citation detail. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QACitationResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createQACitationLookup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQACitationLookupRequest"];
+            };
+        };
+        responses: {
+            /** @description QA citation lookup result. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QACitationLookupResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    getCurrentQAConfigVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current QA config version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAConfigVersionResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createQAConfigVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQAConfigVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description QA config version created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAConfigVersionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    getCurrentQALLMConfigVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current QA LLM config version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QALLMConfigVersionResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    createQALLMConfigVersion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQALLMConfigVersionRequest"];
+            };
+        };
+        responses: {
+            /** @description QA LLM config version created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QALLMConfigVersionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createQALLMConnectionTest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQALLMConnectionTestRequest"];
+            };
+        };
+        responses: {
+            /** @description QA LLM connection test created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QALLMConnectionTestResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+        };
+    };
+    createQARetrievalTestRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateQARetrievalTestRunRequest"];
+            };
+        };
+        responses: {
+            /** @description QA retrieval test run created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QARetrievalTestRunResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            502: components["responses"]["Error"];
+        };
+    };
+    getQARetrievalTestRun: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                testRunId: components["parameters"]["TestRunId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA retrieval test run. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QARetrievalTestRunResponse"];
+                };
+            };
+            404: components["responses"]["Error"];
+        };
+    };
+    getQAMetricsOverview: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA metrics overview. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAMetricsOverviewResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    getQAMetricsTrend: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA metrics trend. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAMetricsTrendResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    listQATopQueries: {
+        parameters: {
+            query?: {
+                days?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA top queries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QATopQueryListResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
+    listQAIntentDistribution: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description QA intent distribution. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QAIntentDistributionResponse"];
+                };
+            };
+            400: components["responses"]["Error"];
+        };
+    };
 }

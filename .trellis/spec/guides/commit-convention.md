@@ -62,7 +62,7 @@ files. If checks cannot be run, record that explicitly in the final response.
 ## Examples
 
 ```
-feat(auth): add JWT refresh token endpoint
+feat(auth): add opaque session endpoint
 
 fix(db): handle null pointer in user query
 

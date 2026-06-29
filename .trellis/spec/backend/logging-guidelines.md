@@ -6,9 +6,9 @@
 
 ## Overview
 
-Backend services should use structured logs. The exact logging library is not
-fixed yet; standard-library `slog` is the default recommendation for new Go
-services unless a service has a documented reason to use another library.
+Backend services must use structured logs with Go standard-library `log/slog`.
+Production output defaults to JSON unless a service documents a reason to
+diverge in `docs/architecture/technology-decisions.md` and the service README.
 
 Logs must help operators answer:
 

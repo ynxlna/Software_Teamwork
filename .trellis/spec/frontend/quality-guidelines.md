@@ -96,6 +96,10 @@ Streaming UIs should handle:
 ## Required Patterns
 
 - Use generated API types where backend contracts exist.
+- Generate those types from `docs/services/gateway/api/openapi.yaml`; browser
+  code must not call internal service OpenAPI contracts directly.
+- Normalize gateway success and error envelopes through `apps/web/src/api/client.ts`
+  and do not extend the old `{ code, message, data }` client shape.
 - Use Zod for user input and runtime validation at trust boundaries.
 - Use `AbortController` for cancellable streams and uploads when possible.
 - Keep destructive actions behind confirmation.

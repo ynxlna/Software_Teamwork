@@ -18,6 +18,7 @@ services/file/
 services/qa/
 services/knowledge/
 services/document/
+services/ai-gateway/
 deploy/docker-compose.yml
 ```
 
@@ -94,6 +95,7 @@ services/file/
 services/qa/
 services/knowledge/
 services/document/
+services/ai-gateway/
 ```
 
 Required service-local checks:
@@ -121,6 +123,7 @@ service:
   - qa
   - knowledge
   - document
+  - ai-gateway
 ```
 
 ---
@@ -137,6 +140,7 @@ services/file/Dockerfile
 services/qa/Dockerfile
 services/knowledge/Dockerfile
 services/document/Dockerfile
+services/ai-gateway/Dockerfile
 ```
 
 Rules:
@@ -163,6 +167,7 @@ Compose must include:
 - qa,
 - knowledge,
 - document,
+- ai-gateway,
 - postgres,
 - redis,
 - qdrant,
@@ -189,7 +194,7 @@ GitHub Actions secrets should be scoped by environment:
 Never commit:
 
 - database passwords,
-- JWT signing secrets,
+- session, service-token, or signing secrets,
 - MinIO access keys or secret keys,
 - API keys,
 - SSH private keys,

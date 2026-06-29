@@ -44,7 +44,10 @@ changed service.
 - Keep service dependencies explicit in constructors.
 - Keep business workflows in `internal/service/`.
 - Keep persistence in `internal/repository/`.
-- Use stable JSON response shapes for API success and error responses.
+- Use stable API response shapes: project-owned JSON APIs use
+  `{ data, requestId }` / `{ error }`; AI Gateway model invocation success
+  responses use OpenAI-compatible shapes as documented in
+  `docs/services/ai-gateway/api/openapi.yaml`.
 - Add or update tests for changed business logic.
 
 ---
@@ -72,7 +75,8 @@ Test naming:
 
 ## Configuration Quality
 
-- Read configuration from environment variables in `internal/config`.
+- Read configuration from environment variables in `internal/config` using an
+  `envconfig`-style structured loader.
 - Validate all required variables at startup.
 - Keep defaults safe for local development only.
 - Do not read environment variables throughout business logic.

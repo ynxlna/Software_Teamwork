@@ -82,12 +82,24 @@ Build the first usable frontend around these flows:
 
 Frontend and backend should converge early on:
 
-- Authentication: prefer HttpOnly cookie session for the management UI unless backend chooses JWT explicitly.
+- Authentication: use `Authorization: Bearer <accessToken>` with an opaque
+  token returned by gateway auth/session responses. Frontend must not parse the
+  token as JWT.
 - API documentation: backend publishes OpenAPI; frontend uses generated types/clients.
-- Pagination shape: `page`, `pageSize`, `total`, `items`.
-- Error shape: `code`, `message`, optional `details`.
+- Type generation source: `docs/services/gateway/api/openapi.yaml` only.
+  `docs/services/ai-gateway/api/openapi.yaml` is an internal backend contract
+  and must not generate browser clients.
+- Pagination shape: list payloads return `data` as the item array plus a
+  `page` object containing `page`, `pageSize`, and `total`.
+- Success envelope: `{ data, requestId }`; paginated envelope:
+  `{ data, page, requestId }`; error envelope: `{ error }`.
+- Error shape inside the envelope: `code`, `message`, `requestId`, optional
+  `fields`.
 - Uploads: `multipart/form-data`; backend returns document/template IDs and processing status.
 - Long tasks: document parsing, vectorization, and report generation expose task status consistently.
-- SSE events: use explicit event types such as `start`, `delta`, `citation`, `reasoning`, `progress`, `done`, and `error`.
+- QA SSE events: handle `message.created`, `agent.iteration.started`,
+  `reasoning.step`, `tool.started`, `tool.completed`, `tool.failed`,
+  `answer.delta`, `citation.delta`, `answer.completed`, `error`, and optional
+  `heartbeat`.
 - Permissions: frontend hides unauthorized UI, backend enforces authorization.
 - Downloads: original documents and generated DOCX files are downloaded through backend endpoints.

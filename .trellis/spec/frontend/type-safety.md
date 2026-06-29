@@ -13,9 +13,18 @@
 ## API Types
 
 - Store generated clients/types under `apps/web/src/api/generated/`.
+- Generate gateway types from `docs/services/gateway/api/openapi.yaml`.
+- Do not generate frontend clients from `docs/services/ai-gateway/api/openapi.yaml`
+  or any internal `/internal/v1/**` service contract.
 - Do not manually edit generated files.
-- Wrap generated calls in feature-level functions when UI needs domain naming, query keys, or response normalization.
+- Wrap generated calls in feature-level functions when UI needs domain naming,
+  query keys, or response normalization.
 - Keep frontend DTO mapping explicit when backend response shape is not UI-ready.
+- Gateway project JSON responses use `{ data, requestId }` for success,
+  `{ data, page, requestId }` for paginated lists, and `{ error }` for failures.
+  Do not extend the old `{ code, message, data }` client shape.
+- Access tokens returned by auth/session responses are opaque Bearer tokens.
+  Type them as strings and never decode them as JWT payloads.
 
 ## Zod Schemas
 
@@ -90,5 +99,7 @@ type UploadItemState =
 - `any` for API responses, form values, route params, or event payloads.
 - Blind `as` assertions to force types through compile errors.
 - Duplicating backend DTO types by hand when generated types exist.
+- Duplicating gateway OpenAPI types by hand or importing internal AI Gateway
+  types into browser code.
 - Allowing untyped search params into query keys.
 - Treating streamed JSON chunks as trusted without parsing and validation.

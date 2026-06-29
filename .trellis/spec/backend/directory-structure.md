@@ -29,7 +29,8 @@ services/
 ├── file/
 ├── qa/
 ├── knowledge/
-└── document/
+├── document/
+└── ai-gateway/
 deploy/
 └── docker-compose.yml
 ```
@@ -89,7 +90,7 @@ Directory responsibilities:
 
 ## Naming Conventions
 
-- Service directories use short lowercase names: `gateway`, `auth`, `file`, `qa`, `knowledge`, `document`.
+- Service directories use short lowercase names: `gateway`, `auth`, `file`, `qa`, `knowledge`, `document`, `ai-gateway`.
 - Go packages use lowercase names with no underscores.
 - File names use lowercase words separated by underscores only when readability requires it, for example `user_repository.go`.
 - HTTP handler files should be named by resource or workflow, for example `knowledge_handler.go`.

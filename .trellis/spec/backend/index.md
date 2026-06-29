@@ -21,6 +21,7 @@ Backend services:
 | QA | `services/qa/` | AI question answering over retrieved knowledge |
 | Knowledge | `services/knowledge/` | Knowledge ingestion, indexing, retrieval coordination |
 | Document | `services/document/` | Report and document generation workflows |
+| AI Gateway | `services/ai-gateway/` | Internal model profiles, provider credentials, OpenAI-compatible chat/embedding/rerank APIs |
 
 Infrastructure dependencies:
 
@@ -49,6 +50,8 @@ Infrastructure dependencies:
 Before changing backend code:
 
 - [ ] Identify the affected service under `services/<service>/`.
+- [ ] Read `docs/architecture/service-boundaries.md` before changing a service boundary, gateway route, model invocation flow, or data owner.
+- [ ] Read `docs/architecture/technology-decisions.md` before selecting or changing backend infrastructure, libraries, queueing, auth, logging, or testing tools.
 - [ ] Read [Directory Structure](./directory-structure.md) for service layout rules.
 - [ ] Read [Database Guidelines](./database-guidelines.md) if data, cache, vector search, or object storage is touched.
 - [ ] Read [API Contracts](./api-contracts.md) if gateway routes, frontend-facing DTOs, or cross-service HTTP contracts are touched.

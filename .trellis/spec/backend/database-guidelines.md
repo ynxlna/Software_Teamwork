@@ -10,15 +10,18 @@ Each backend service owns its persistence concerns. A service may use
 PostgreSQL, Redis, Qdrant, or MinIO only through service-local repository or
 platform packages. Handlers must not talk directly to infrastructure clients.
 
-Preferred Go database stack:
+Confirmed Go infrastructure stack:
 
-- PostgreSQL: `pgx` or `sqlx` with explicit SQL.
-- Redis: official Go Redis client or a thin wrapper selected per service.
-- Qdrant: official Qdrant Go client or generated HTTP client.
+- PostgreSQL: `pgx` + `sqlc`.
+- Migrations: `goose`.
+- Redis cache/session access: `go-redis`.
+- Redis queues: `asynq`.
+- Qdrant: a short-term hand-written HTTP client until usage justifies an official or generated client.
 - MinIO: official MinIO Go SDK.
 
 Do not introduce an ORM by default. If a service needs one, document the reason
-in that service README and update this spec.
+in that service README, update `docs/architecture/technology-decisions.md`,
+and then update this spec.
 
 ---
 
@@ -28,6 +31,9 @@ in that service README and update this spec.
 - Do not let one service write another service's tables.
 - Cross-service data needs should go through HTTP APIs, events, or explicit read-model decisions.
 - Table schemas must be represented by migrations under `services/<service>/migrations/`.
+- Services that use PostgreSQL must keep service-local `sqlc.yaml`, query files,
+  generated `sqlc` code, and `goose` migrations. Generated query structs must
+  not leak into HTTP handlers.
 
 Use PostgreSQL for:
 
@@ -80,8 +86,9 @@ func (r *UserRepository) FindByID(ctx context.Context, id UserID) (User, error) 
 
 ## Migrations
 
-- Store migrations in `services/<service>/migrations/`.
-- Use forward-only migrations unless rollback is explicitly supported by the migration tool.
+- Store `goose` migrations in `services/<service>/migrations/`.
+- Use forward-only migrations for the first implementation slice unless rollback
+  is explicitly supported and verified by the service.
 - Name migrations with an ordered prefix and action summary:
 
 ```text
@@ -119,8 +126,8 @@ Use Redis for short-lived data only:
 
 - sessions or token deny-lists,
 - cache entries,
-- short-lived job state,
-- lightweight queues when reliable delivery requirements are modest.
+- short-lived coordination,
+- `asynq` queues.
 
 Rules:
 
@@ -128,6 +135,10 @@ Rules:
 - Every cache entry must have an explicit TTL unless it is intentionally persistent.
 - Redis must not be the only source of durable business truth.
 - Cache invalidation must be owned by the service that owns the underlying data.
+- Queued task payloads must be JSON and include traceable fields such as
+  `requestId`, `jobId`, and `userId` when available. PostgreSQL remains the
+  authority for durable job state, final status, failure summary, and retry
+  count.
 
 ---
 
@@ -142,6 +153,8 @@ Rules:
 - Keep Qdrant payload fields minimal and retrieval-oriented.
 - Version embedding models and collection names or metadata when the embedding shape changes.
 - Do not let `qa` mutate Qdrant collections directly; it should retrieve through `knowledge` or a documented retrieval API.
+- Do not let `ai-gateway` write Qdrant collections; model generation and vector
+  persistence remain separate service responsibilities.
 
 ---
 

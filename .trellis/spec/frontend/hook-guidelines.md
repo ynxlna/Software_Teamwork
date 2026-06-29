@@ -35,10 +35,21 @@ features/knowledge/
 ## SSE and Streaming
 
 - Put shared stream handling in `lib/sse.ts`.
-- Use explicit event types: `start`, `delta`, `citation`, `reasoning`, `progress`, `done`, `error`.
+- Use `fetch` stream readers plus `AbortController`; do not use native
+  `EventSource` for the main QA POST streaming path.
+- QA streaming uses gateway `POST /api/v1/qa-sessions/{sessionId}/messages`
+  with `Accept: text/event-stream`.
+- Handle the current QA event names:
+  `message.created`, `agent.iteration.started`, `reasoning.step`,
+  `tool.started`, `tool.completed`, `tool.failed`, `answer.delta`,
+  `citation.delta`, `answer.completed`, `error`, and optional `heartbeat`.
+- Use `GET /api/v1/qa-sessions/{sessionId}/events?responseRunId=...` for
+  short-term event replay and disconnect recovery.
 - Streaming hooks must support cancellation through `AbortController`.
 - Streaming hooks must expose enough state for UI: `status`, `content`, `progress`, `error`, and domain-specific payloads such as `citations` or generated sections.
 - Never assume a stream completes successfully. Handle partial content and user cancellation.
+- Never expose or cache private chain-of-thought, full prompts, raw MCP tool
+  parameters/results, provider raw errors, internal URLs, or storage object keys.
 
 ## Form Hooks
 

@@ -4,13 +4,29 @@
 
 ---
 
+## Documentation Authority
+
+`docs/` is the source of truth for project contracts. When this Trellis spec and
+`docs/` disagree, inspect and follow these files first, then update this spec:
+
+- `docs/architecture/service-boundaries.md`
+- `docs/architecture/frontend-backend-contract.md`
+- `docs/architecture/technology-decisions.md`
+- `docs/services/gateway/api/openapi.yaml`
+- `docs/services/<service>/README.md`
+- `docs/services/<service>/api/openapi.yaml` or
+  `docs/services/<service>/api/*.openapi.yaml`
+
+Do not implement or generate frontend/backend clients from Trellis examples that
+contradict the current `docs/` contracts.
+
 ## Scenario: Gateway Contract-First API
 
 ### 1. Scope / Trigger
 
 - Trigger: any new or changed frontend-facing gateway endpoint, gateway
   response envelope, frontend API client DTO, or cross-service route ownership.
-- Applies to `services/gateway/`, browser API clients under `apps/frontend/`,
+- Applies to `services/gateway/`, browser API clients under `apps/web/`,
   and the domain service that owns the endpoint's business state.
 
 ### 2. Signatures
@@ -18,7 +34,7 @@
 Gateway public endpoints are documented in:
 
 ```text
-docs/api/gateway.openapi.yaml
+docs/services/gateway/api/openapi.yaml
 ```
 
 Public routes use these prefixes:
@@ -124,9 +140,9 @@ prompts, vector payloads, or internal URLs to the frontend.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: add a gateway route to `docs/api/gateway.openapi.yaml`, mark
+- Good: add a gateway route to `docs/services/gateway/api/openapi.yaml`, mark
   `x-owner-service`, use the standard envelope, and update
-  `docs/service-boundaries.md` if ownership is new.
+  `docs/architecture/service-boundaries.md` if ownership is new.
 - Base: proxy a domain-service route through gateway without changing the
   domain response shape, but still normalize errors to the gateway envelope.
 - Bad: add a frontend call directly to `services/knowledge` or embed Qdrant,
@@ -146,7 +162,7 @@ When implementation exists:
 
 For documentation-only contract changes:
 
-- Run an OpenAPI linter against `docs/api/gateway.openapi.yaml`.
+- Run an OpenAPI linter against `docs/services/gateway/api/openapi.yaml`.
 - Parse the YAML and verify `$ref` targets resolve.
 - Check route prefix consistency: health routes stay unversioned, public API
   routes use `/api/v1/**`.
@@ -172,8 +188,8 @@ gateway -> normalized KnowledgeQueryResponse or ErrorResponse
 
 ## Related Documents
 
-- `docs/services/gateway.md`
-- `docs/api/gateway.openapi.yaml`
+- `docs/services/gateway/README.md`
+- `docs/services/gateway/api/openapi.yaml`
 - `docs/architecture/service-boundaries.md`
 - `docs/architecture/frontend-backend-contract.md`
 
@@ -183,9 +199,10 @@ gateway -> normalized KnowledgeQueryResponse or ErrorResponse
 
 - Trigger: adding or changing an internal service-to-service HTTP API, including
   model invocation APIs owned by `ai-gateway`.
-- Applies to `docs/接口契约/openapi/<service>.openapi.yaml`,
-  `services/<service>/api/openapi.yaml`, service interface docs, and matching
-  service-boundary documentation.
+- Applies to `docs/services/<service>/api/openapi.yaml` or
+  `docs/services/<service>/api/*.openapi.yaml`,
+  `services/<service>/api/openapi.yaml` when implementation exists, service
+  interface docs, and matching service-boundary documentation.
 
 ### 2. Signatures
 
@@ -222,8 +239,14 @@ envelope:
 { "error": { "code": "validation_error", "message": "request validation failed", "requestId": "req_123" } }
 ```
 
-AI Gateway chat completion and embedding APIs use OpenAI-compatible request,
-success response, streaming chunk, function-calling, and error body shapes.
+AI Gateway model profile APIs must treat provider credentials as write-only:
+requests may include `apiKey` for create/update, but responses, logs, errors,
+and frontend-visible gateway admin responses may only expose `apiKeyConfigured`
+and non-secret provider/model metadata.
+
+AI Gateway chat completion, embedding, and rerank APIs use OpenAI-compatible or
+OpenAI-style request, success response, streaming chunk, function-calling, and
+error body shapes.
 They must not wrap successful model responses in the project `data/requestId`
 envelope. The request id is carried through `X-Request-Id` response headers and
 logs.
@@ -321,26 +344,29 @@ qa owns messages, MCP tool calls, citations, and public SSE event shape
 
 - Trigger: a downstream service such as `knowledge`, `qa`, `document`, or an
   aggregation surface has not finalized its frontend/backend contract yet.
-- Applies to `docs/api/gateway.openapi.yaml`, `docs/gateway.md`,
-  `docs/service-boundaries.md`, and `docs/frontend-backend-contract.md`.
+- Applies to `docs/services/gateway/api/openapi.yaml`,
+  `docs/services/gateway/README.md`,
+  `docs/architecture/service-boundaries.md`, and
+  `docs/architecture/frontend-backend-contract.md`.
 
 ### 2. Signatures
 
 Unfinalized endpoints must not be added as active `paths` operations in:
 
 ```text
-docs/api/gateway.openapi.yaml
+docs/services/gateway/api/openapi.yaml
 ```
 
 Instead, list them under the OpenAPI root extension:
 
 ```yaml
 x-missing-contracts:
-  - service: knowledge
+  - service: gateway
     status: missing
-    reason: Frontend/backend contract is not finalized yet.
+    reason: Management overview aggregation fields are not finalized yet.
     placeholderOperations:
-      - GET /api/v1/knowledge-bases
+      - GET /api/v1/admin-overview
+      - GET /api/v1/admin-metrics
 ```
 
 ### 3. Contracts
@@ -363,22 +389,24 @@ placeholder operations are TODO markers only:
 
 ### 5. Good/Base/Bad Cases
 
-- Good: keep `POST /api/v1/knowledge-bases/{knowledgeBaseId}/documents` active
-  for file upload, while marking `GET /api/v1/knowledge-bases/{knowledgeBaseId}/documents`
-  missing for the future knowledge-owned list contract.
-- Base: mention future `qa` routes in prose and mark resource paths such as
-  `/api/v1/qa-sessions/{sessionId}/messages` missing until message and SSE
-  event shapes are agreed.
-- Bad: add full `knowledge`, `qa`, or `document` schemas to OpenAPI as if they
-  were stable just to reserve routes.
+- Good: keep management overview and cross-service metric aggregation under
+  `x-missing-contracts` until request, response, owner, and aggregation source
+  fields are finalized.
+- Base: keep only management overview or metric aggregation placeholders in
+  `x-missing-contracts` until their sources and display fields are finalized.
+  Do not mark QA, document, knowledge, auth, or admin runtime configuration
+  routes missing once they are active paths in the gateway OpenAPI.
+- Bad: add placeholder management overview schemas to OpenAPI active `paths`
+  just to reserve routes.
 
 ### 6. Tests Required
 
 For documentation-only contract changes:
 
-- Parse `docs/api/gateway.openapi.yaml`.
+- Parse `docs/services/gateway/api/openapi.yaml`.
 - Verify every active `/api/v1/**` operation has an allowed finalized owner.
-- Verify missing downstream areas are present in `x-missing-contracts`.
+- Verify only genuinely unfinalized downstream areas are present in
+  `x-missing-contracts`.
 - Check broad placeholders do not contradict active operations.
 - Check Markdown links resolve.
 
@@ -387,15 +415,15 @@ For documentation-only contract changes:
 #### Wrong
 
 ```text
-OpenAPI paths include POST /api/v1/qa-sessions/{sessionId}/messages:stream
-even though QA message and SSE event contracts are not agreed.
+OpenAPI paths include GET /api/v1/admin-overview with made-up fields even
+though management overview aggregation is still listed as missing.
 ```
 
 #### Correct
 
 ```text
-x-missing-contracts lists resource placeholders such as
-GET /api/v1/qa-sessions/{sessionId}/events as missing until the QA contract is finalized.
+x-missing-contracts lists only placeholders such as
+GET /api/v1/admin-overview and GET /api/v1/admin-metrics until those contracts are finalized.
 ```
 
 ## Scenario: Domain Service Interface Documents
@@ -403,7 +431,7 @@ GET /api/v1/qa-sessions/{sessionId}/events as missing until the QA contract is f
 ### 1. Scope / Trigger
 
 - Trigger: adding or changing a service-level interface document such as
-  `docs/auth.md` or `docs/file.md`.
+  `docs/services/auth/README.md` or `docs/services/file/README.md`.
 - Applies when gateway-facing routes depend on an internal domain service
   contract, even if the service code has not been implemented yet.
 
@@ -423,7 +451,8 @@ it separate from the public gateway contract.
 ### 3. Contracts
 
 Document request and response fields using the same public IDs, timestamps,
-envelopes, and error shapes defined in `docs/api/gateway.openapi.yaml`.
+envelopes, and error shapes defined in
+`docs/services/gateway/api/openapi.yaml`.
 Binary success responses, such as file content, may omit the JSON envelope,
 but error responses must still use the standard error shape.
 
@@ -436,18 +465,18 @@ For each documented endpoint, separate:
 
 ### 5. Good/Base/Bad Cases
 
-- Good: `docs/file.md` documents file-owned routes, notes knowledge-owned
+- Good: `docs/services/file/README.md` documents file-owned routes, notes knowledge-owned
   related routes, and calls out that object keys must not reach the frontend.
 - Base: a service document summarizes the gateway OpenAPI without adding
   implementation-only behavior.
 - Bad: a service document declares a new frontend-facing status code or field
-  as stable without updating `docs/api/gateway.openapi.yaml`.
+  as stable without updating `docs/services/gateway/api/openapi.yaml`.
 
 ### 6. Tests Required
 
 For documentation-only changes:
 
-- Parse `docs/api/gateway.openapi.yaml`.
+- Parse `docs/services/gateway/api/openapi.yaml`.
 - Verify documented public paths exist in the OpenAPI file.
 - Check Markdown links resolve.
 
@@ -459,15 +488,15 @@ status codes, envelopes, request id propagation, and context headers.
 #### Wrong
 
 ```text
-docs/file.md declares GET /api/v1/files/{id}/download as stable
-gateway.openapi.yaml has no matching public path
+docs/services/file/README.md declares GET /api/v1/files/{id}/download as stable
+docs/services/gateway/api/openapi.yaml has no matching public path
 ```
 
 #### Correct
 
 ```text
-docs/file.md references /api/v1/documents/{documentId}/content
-gateway.openapi.yaml owns the same public path and owner-service marker
+docs/services/file/README.md references /api/v1/documents/{documentId}/content
+docs/services/gateway/api/openapi.yaml owns the same public path and owner-service marker
 ```
 
 ## Scenario: Internal Domain Service APIs
@@ -477,7 +506,8 @@ gateway.openapi.yaml owns the same public path and owner-service marker
 - Trigger: implementing a domain service HTTP API that gateway or another backend
   service will call directly, even when the public gateway contract is unchanged.
 - Applies to `services/<service>/api/openapi.yaml`, `services/<service>/internal/http/`,
-  service README files, and matching domain docs such as `docs/file.md`.
+  service README files, and matching domain docs such as
+  `docs/services/file/README.md`.
 
 ### 2. Signatures
 
@@ -491,7 +521,8 @@ GET /readyz
 
 Business routes under `/internal/v1/**` must remain RESTful and resource-oriented.
 They may be close to public gateway paths, but they are not public frontend
-contracts unless the same operation is active in `docs/api/gateway.openapi.yaml`.
+contracts unless the same operation is active in
+`docs/services/gateway/api/openapi.yaml`.
 
 ### 3. Contracts
 
@@ -543,8 +574,8 @@ Domain services must accept gateway context headers when present:
 
 - Good: file service adds `GET /internal/v1/documents/{documentId}` for
   file-owned metadata and documents it in `services/file/api/openapi.yaml`,
-  while public `GET /api/v1/documents/{documentId}` remains a knowledge-owned
-  missing contract.
+  while public `GET /api/v1/documents/{documentId}` remains knowledge-owned and
+  exposes only knowledge document fields.
 - Base: gateway proxies an active public route to a matching internal route and
   normalizes any service-owned extra fields before returning to frontend.
 - Bad: a domain service adds a public-looking `/api/v1/**` route or exposes raw
@@ -578,17 +609,19 @@ response includes objectKey: documents/doc_123
 ```text
 services/file exposes GET /internal/v1/documents/{documentId}
 response includes contentType and sizeBytes, but no objectKey
-public GET /api/v1/documents/{documentId} stays missing until knowledge contract is finalized
+public GET /api/v1/documents/{documentId} stays knowledge-owned and does not expose objectKey
 ```
+
 ## Scenario: Gateway Redis Session Cache
 
 ### 1. Scope / Trigger
 
 - Trigger: adding or changing user creation, session creation, current session
   deletion, current-user behavior, auth middleware, or session identity fields.
-- Applies to `services/gateway/`, `services/auth/`, `docs/auth.md`,
-  `docs/gateway.md`, `docs/frontend-backend-contract.md`, and
-  `docs/api/gateway.openapi.yaml`.
+- Applies to `services/gateway/`, `services/auth/`,
+  `docs/services/auth/README.md`, `docs/services/gateway/README.md`,
+  `docs/architecture/frontend-backend-contract.md`, and
+  `docs/services/gateway/api/openapi.yaml`.
 
 ### 2. Signatures
 
@@ -618,6 +651,13 @@ Auth success responses must include `data.user` and `data.session`.
 - `accessToken`
 - `tokenType`
 - `expiresAt`
+
+`accessToken` is an opaque random Bearer token, not a JWT. Gateway, frontend,
+and downstream services must not parse claims from it.
+
+Auth stores password credentials with `argon2id` and stores access-token hashes,
+not raw access tokens. Gateway Redis cache keys use the token hash and must not
+log raw tokens or hashes.
 
 Gateway must store the runtime session in Redis using:
 
@@ -667,7 +707,7 @@ When implementation exists:
 
 For documentation-only changes:
 
-- Parse `docs/api/gateway.openapi.yaml`.
+- Parse `docs/services/gateway/api/openapi.yaml`.
 - Verify `SessionResponse` requires `user` and `session`.
 - Verify docs mention `gateway:session:<accessTokenHash>` and Redis TTL.
 

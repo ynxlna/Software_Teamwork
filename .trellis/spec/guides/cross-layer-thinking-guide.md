@@ -17,6 +17,23 @@ Common cross-layer bugs:
 
 ## Before Implementing Cross-Layer Features
 
+### Step 0: Load Project Contract Sources
+
+For this repository, `docs/` is the contract source of truth. Before changing a
+gateway route, frontend API client, service interface, model invocation flow, or
+cross-service ownership rule, read the relevant source document:
+
+- Service ownership: `docs/architecture/service-boundaries.md`
+- Gateway/frontend contract: `docs/architecture/frontend-backend-contract.md`
+- Technology choices: `docs/architecture/technology-decisions.md`
+- Public gateway API: `docs/services/gateway/api/openapi.yaml`
+- Internal service APIs: `docs/services/<service>/api/openapi.yaml` or
+  `docs/services/<service>/api/*.openapi.yaml`
+- Service-specific behavior: `docs/services/<service>/README.md`
+
+If Trellis specs disagree with these documents, follow `docs/` and update the
+Trellis spec before or alongside implementation.
+
 ### Step 1: Map the Data Flow
 
 Draw out how data moves:

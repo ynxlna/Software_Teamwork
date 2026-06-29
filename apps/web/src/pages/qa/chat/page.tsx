@@ -26,10 +26,7 @@ function nextId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-function toSessionListItem(
-  s: QASession,
-  messages: QAMessage[],
-): QASessionListItem {
+function toSessionListItem(s: QASession, messages: QAMessage[]): QASessionListItem {
   const last = messages[messages.length - 1]
   return {
     id: s.id,
@@ -80,10 +77,7 @@ export function ChatPage() {
   const messagesBySession = useChatStore((s) => s.messagesBySession)
 
   // ── React Query: messages for active session (loaded separately from QASession) ──
-  const {
-    data: serverMessages,
-    isError: messagesError,
-  } = useSessionMessages(activeId ?? '')
+  const { data: serverMessages, isError: messagesError } = useSessionMessages(activeId ?? '')
 
   // ── Local input text ──
   const [inputText, setInputText] = useState('')
@@ -217,11 +211,7 @@ export function ChatPage() {
       try {
         await renameSessionMut.mutateAsync({ sessionId, title: newTitle })
         const current = useChatStore.getState().sessions
-        setSessions(
-          current.map((s) =>
-            s.id === sessionId ? { ...s, title: newTitle } : s,
-          ),
-        )
+        setSessions(current.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s)))
       } catch {
         setError('重命名会话失败')
       }
@@ -342,160 +332,150 @@ export function ChatPage() {
       let firstToken = false
 
       // ③ Initiate SSE stream
-      const { abort } = streamChat(
-        uid,
-        trimmed,
-        {
-          onMessageCreated(data) {
-            if (!verifySeq(data.seq)) return
-            // Capture the real message id and responseRunId from the server
-            const serverMsgId = data.messageId as string | undefined
-            if (serverMsgId) {
-              patchAssistant({ id: serverMsgId })
-            }
-            const runId = data.responseRunId as string | undefined
-            if (runId) responseRunIdRef.current = runId
-          },
-          onAgentIterationStarted(data) {
-            if (!verifySeq(data.seq)) return
-            const iterationNo = data.iterationNo as number | undefined
-            const label = iterationNo != null ? `Agent 迭代 ${iterationNo}` : 'Agent 分析中'
-            const ex = steps.find(
-              (s) => s.type === 'agent_iteration' && s.status === 'running',
-            )
-            if (!ex) {
-              steps.push({
-                type: 'agent_iteration',
-                label,
-                status: 'running',
-              })
-            }
-            patchAssistant({ thinking: [...steps] })
-          },
-          onReasoningStep(data) {
-            if (!verifySeq(data.seq)) return
-            const step = (data as Record<string, unknown>).step as QAThinkingStep | undefined
-            if (!step) return
-            const idx = steps.findIndex((s) => s.type === step.type)
-            if (idx >= 0) {
-              steps[idx] = step
-            } else {
-              steps.push(step)
-            }
-            patchAssistant({ thinking: [...steps] })
-          },
-          onToolStarted(data) {
-            if (!verifySeq(data.seq)) return
-            const toolName = (data.toolName as string) ?? '工具调用'
+      const { abort } = streamChat(uid, trimmed, {
+        onMessageCreated(data) {
+          if (!verifySeq(data.seq)) return
+          // Capture the real message id and responseRunId from the server
+          const serverMsgId = data.messageId as string | undefined
+          if (serverMsgId) {
+            patchAssistant({ id: serverMsgId })
+          }
+          const runId = data.responseRunId as string | undefined
+          if (runId) responseRunIdRef.current = runId
+        },
+        onAgentIterationStarted(data) {
+          if (!verifySeq(data.seq)) return
+          const iterationNo = data.iterationNo as number | undefined
+          const label = iterationNo != null ? `Agent 迭代 ${iterationNo}` : 'Agent 分析中'
+          const ex = steps.find((s) => s.type === 'agent_iteration' && s.status === 'running')
+          if (!ex) {
             steps.push({
-              type: 'tool_call',
-              label: `调用: ${toolName}`,
+              type: 'agent_iteration',
+              label,
               status: 'running',
             })
-            patchAssistant({ thinking: [...steps] })
-          },
-          onToolCompleted(data) {
-            if (!verifySeq(data.seq)) return
-            const toolName = (data.toolName as string) ?? '工具'
-            // Mark running tool_call step as done
-            const idx = steps.findIndex(
-              (s) => s.type === 'tool_call' && s.status === 'running',
-            )
-            if (idx >= 0) {
-              steps[idx] = {
-                ...steps[idx],
-                status: 'done' as const,
-                label: `${toolName} 完成`,
-              } as QAThinkingStep
-            }
-            patchAssistant({ thinking: [...steps] })
-          },
-          onToolFailed(data) {
-            if (!verifySeq(data.seq)) return
-            const toolName = (data.toolName as string) ?? '工具'
-            const idx = steps.findIndex(
-              (s) => s.type === 'tool_call' && s.status === 'running',
-            )
-            if (idx >= 0) {
-              steps[idx] = {
-                ...steps[idx],
-                status: 'failed' as const,
-                label: `${toolName} 失败`,
-              } as QAThinkingStep
-            }
-            patchAssistant({ thinking: [...steps] })
-          },
-          onAnswerDelta(data) {
-            if (!verifySeq(data.seq)) return
-            if (!firstToken) {
-              firstToken = true
-              patchAssistant({ status: 'streaming' })
-            }
-            content += (data.content as string) ?? ''
-            patchAssistant({ content })
-          },
-          onCitationDelta(data) {
-            if (!verifySeq(data.seq)) return
-            const citation = (data as Record<string, unknown>).citation as QACitation | undefined
-            if (citation) {
-              cites.push(citation)
-              patchAssistant({ citations: [...cites] })
-            }
-          },
-          onAnswerCompleted(data) {
-            setStreaming(false)
-            abortRef.current = null
-            const runId = data.responseRunId as string | undefined
-            if (runId) responseRunIdRef.current = runId
-            patchAssistant({
-              content,
-              thinking: [...steps],
-              citations: [...cites],
-              status: 'completed',
-            })
-          },
-          onError(sseErr) {
-            if (!verifySeq(sseErr.seq)) return
-            if (sseErr.fatal) {
-              setStreaming(false)
-              abortRef.current = null
-              setError(sseErr.message || '请求失败')
-              setLastFailedMsg(trimmed)
-              patchAssistant({
-                content,
-                thinking: [...steps],
-                citations: [...cites],
-                status: 'failed',
-              })
-              abort()
-            } else {
-              // Non-fatal error: attempt event replay to recover missed events
-              console.warn(`[SSE] Non-fatal error: ${sseErr.code} - ${sseErr.message}`)
-              const runId = responseRunIdRef.current
-              if (runId) {
-                replayEvents(uid, runId)
-                  .then((events) => {
-                    console.warn(`[SSE] Replayed ${events.length} events for run ${runId}`)
-                    // Future: replay events into the conversation state
-                  })
-                  .catch((err) => {
-                    console.error('[SSE] Event replay failed:', err)
-                  })
-              }
-            }
-          },
-          onAbort() {
-            setStreaming(false)
-            abortRef.current = null
-            patchAssistant({
-              content,
-              thinking: [...steps],
-              citations: [...cites],
-              status: 'stopped',
-            })
-          },
+          }
+          patchAssistant({ thinking: [...steps] })
         },
-      )
+        onReasoningStep(data) {
+          if (!verifySeq(data.seq)) return
+          const step = (data as Record<string, unknown>).step as QAThinkingStep | undefined
+          if (!step) return
+          const idx = steps.findIndex((s) => s.type === step.type)
+          if (idx >= 0) {
+            steps[idx] = step
+          } else {
+            steps.push(step)
+          }
+          patchAssistant({ thinking: [...steps] })
+        },
+        onToolStarted(data) {
+          if (!verifySeq(data.seq)) return
+          const toolName = (data.toolName as string) ?? '工具调用'
+          steps.push({
+            type: 'tool_call',
+            label: `调用: ${toolName}`,
+            status: 'running',
+          })
+          patchAssistant({ thinking: [...steps] })
+        },
+        onToolCompleted(data) {
+          if (!verifySeq(data.seq)) return
+          const toolName = (data.toolName as string) ?? '工具'
+          // Mark running tool_call step as done
+          const idx = steps.findIndex((s) => s.type === 'tool_call' && s.status === 'running')
+          if (idx >= 0) {
+            steps[idx] = {
+              ...steps[idx],
+              status: 'done' as const,
+              label: `${toolName} 完成`,
+            } as QAThinkingStep
+          }
+          patchAssistant({ thinking: [...steps] })
+        },
+        onToolFailed(data) {
+          if (!verifySeq(data.seq)) return
+          const toolName = (data.toolName as string) ?? '工具'
+          const idx = steps.findIndex((s) => s.type === 'tool_call' && s.status === 'running')
+          if (idx >= 0) {
+            steps[idx] = {
+              ...steps[idx],
+              status: 'failed' as const,
+              label: `${toolName} 失败`,
+            } as QAThinkingStep
+          }
+          patchAssistant({ thinking: [...steps] })
+        },
+        onAnswerDelta(data) {
+          if (!verifySeq(data.seq)) return
+          if (!firstToken) {
+            firstToken = true
+            patchAssistant({ status: 'streaming' })
+          }
+          content += (data.content as string) ?? ''
+          patchAssistant({ content })
+        },
+        onCitationDelta(data) {
+          if (!verifySeq(data.seq)) return
+          const citation = (data as Record<string, unknown>).citation as QACitation | undefined
+          if (citation) {
+            cites.push(citation)
+            patchAssistant({ citations: [...cites] })
+          }
+        },
+        onAnswerCompleted(data) {
+          setStreaming(false)
+          abortRef.current = null
+          const runId = data.responseRunId as string | undefined
+          if (runId) responseRunIdRef.current = runId
+          patchAssistant({
+            content,
+            thinking: [...steps],
+            citations: [...cites],
+            status: 'completed',
+          })
+        },
+        onError(sseErr) {
+          if (!verifySeq(sseErr.seq)) return
+          if (sseErr.fatal) {
+            setStreaming(false)
+            abortRef.current = null
+            setError(sseErr.message || '请求失败')
+            setLastFailedMsg(trimmed)
+            patchAssistant({
+              content,
+              thinking: [...steps],
+              citations: [...cites],
+              status: 'failed',
+            })
+            abort()
+          } else {
+            // Non-fatal error: attempt event replay to recover missed events
+            console.warn(`[SSE] Non-fatal error: ${sseErr.code} - ${sseErr.message}`)
+            const runId = responseRunIdRef.current
+            if (runId) {
+              replayEvents(uid, runId)
+                .then((events) => {
+                  console.warn(`[SSE] Replayed ${events.length} events for run ${runId}`)
+                  // Future: replay events into the conversation state
+                })
+                .catch((err) => {
+                  console.error('[SSE] Event replay failed:', err)
+                })
+            }
+          }
+        },
+        onAbort() {
+          setStreaming(false)
+          abortRef.current = null
+          patchAssistant({
+            content,
+            thinking: [...steps],
+            citations: [...cites],
+            status: 'stopped',
+          })
+        },
+      })
 
       abortRef.current = abort
     },

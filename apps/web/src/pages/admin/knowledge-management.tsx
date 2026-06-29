@@ -1,4 +1,13 @@
-import { BookOpen, ChevronLeft, ChevronRight, Edit, Loader2, Plus, Search, Trash2 } from 'lucide-react'
+import {
+  BookOpen,
+  ChevronLeft,
+  ChevronRight,
+  Edit,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+} from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { Badge } from '@/components/ui/badge'
@@ -142,12 +151,9 @@ export function KnowledgeManagement() {
 
   // ── Handlers ──
 
-  const updateField = useCallback(
-    (field: keyof FormData, value: string) => {
-      setForm((prev) => ({ ...prev, [field]: value }))
-    },
-    [],
-  )
+  const updateField = useCallback((field: keyof FormData, value: string) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
 
   const openCreate = useCallback(() => {
     setForm(EMPTY_FORM)
@@ -228,21 +234,15 @@ export function KnowledgeManagement() {
     })
   }, [deletingKb, deleteMutation])
 
-  const handleSearch = useCallback(
-    (value: string) => {
-      setKeyword(value)
-      setPage(1)
-    },
-    [],
-  )
+  const handleSearch = useCallback((value: string) => {
+    setKeyword(value)
+    setPage(1)
+  }, [])
 
-  const handleDocTypeFilter = useCallback(
-    (value: string) => {
-      setDocTypeFilter(value)
-      setPage(1)
-    },
-    [],
-  )
+  const handleDocTypeFilter = useCallback((value: string) => {
+    setDocTypeFilter(value)
+    setPage(1)
+  }, [])
 
   // ── Derived ──
 
@@ -330,6 +330,13 @@ export function KnowledgeManagement() {
             </select>
           </div>
 
+          {/* Filter limitation notice */}
+          {(keyword || docTypeFilter) && data?.filteredLocally && (
+            <p className="text-xs text-muted-foreground">
+              搜索仅过滤当前页，其他页的匹配项不会显示。建议使用准确关键词，或切换到更大页码查看。
+            </p>
+          )}
+
           {/* Empty state */}
           {isEmpty && (
             <div className="rounded-lg border border-dashed border-border p-12 text-center">
@@ -383,10 +390,7 @@ export function KnowledgeManagement() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {data.items.map((kb) => (
-                      <tr
-                        key={kb.id}
-                        className="transition-colors hover:bg-muted/30"
-                      >
+                      <tr key={kb.id} className="transition-colors hover:bg-muted/30">
                         <td className="max-w-40 truncate px-4 py-2.5 font-medium text-foreground">
                           {kb.name}
                         </td>
@@ -405,14 +409,12 @@ export function KnowledgeManagement() {
                         </td>
                         <td className="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">
                           {kb.retrievalStrategy?.mode
-                            ? RETRIEVAL_MODE_LABELS[kb.retrievalStrategy.mode] ??
-                              kb.retrievalStrategy.mode
+                            ? (RETRIEVAL_MODE_LABELS[kb.retrievalStrategy.mode] ??
+                              kb.retrievalStrategy.mode)
                             : '-'}
                         </td>
                         <td className="hidden whitespace-nowrap px-4 py-2.5 text-muted-foreground lg:table-cell">
-                          {kb.createdAt
-                            ? new Date(kb.createdAt).toLocaleDateString('zh-CN')
-                            : '-'}
+                          {kb.createdAt ? new Date(kb.createdAt).toLocaleDateString('zh-CN') : '-'}
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center justify-end gap-1">
@@ -691,7 +693,8 @@ export function KnowledgeManagement() {
           <DialogHeader>
             <DialogTitle>确认删除</DialogTitle>
             <DialogDescription>
-              确定要删除知识库 "{deletingKb?.name}" 吗？此操作不可撤销，知识库中的所有文档也将被删除。
+              确定要删除知识库 "{deletingKb?.name}"
+              吗？此操作不可撤销，知识库中的所有文档也将被删除。
             </DialogDescription>
           </DialogHeader>
 

@@ -889,8 +889,7 @@ export function ReportGeneratePage() {
                   onClick={handleCancel}
                   title="任务取消暂不支持（Gateway 契约待补齐）"
                   disabled={
-                    cancelJobMutation.isPending ||
-                    Boolean(effectiveJob.id.startsWith('local-'))
+                    cancelJobMutation.isPending || Boolean(effectiveJob.id.startsWith('local-'))
                   }
                 >
                   {cancelJobMutation.isPending && <Loader2 className="size-3 animate-spin" />}
@@ -915,20 +914,21 @@ export function ReportGeneratePage() {
             <section className="rounded-lg border border-border bg-card p-4">
               <h2 className="text-sm font-semibold">事件日志</h2>
               <div className="mt-3 max-h-48 space-y-2 overflow-auto">
-                {eventsQuery.data.slice(-10).reverse().map((event) => (
-                  <div
-                    key={event.id}
-                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
-                  >
-                    <div className="flex justify-between text-muted-foreground">
-                      <span className="font-medium">{event.eventType}</span>
-                      <span>{formatDate(event.createdAt)}</span>
+                {eventsQuery.data
+                  .slice(-10)
+                  .reverse()
+                  .map((event) => (
+                    <div
+                      key={event.id}
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-xs"
+                    >
+                      <div className="flex justify-between text-muted-foreground">
+                        <span className="font-medium">{event.eventType}</span>
+                        <span>{formatDate(event.createdAt)}</span>
+                      </div>
+                      {event.message && <p className="mt-1 text-foreground">{event.message}</p>}
                     </div>
-                    {event.message && (
-                      <p className="mt-1 text-foreground">{event.message}</p>
-                    )}
-                  </div>
-                ))}
+                  ))}
               </div>
             </section>
           )}

@@ -94,7 +94,8 @@ export type UpdateParserConfigRequest = components['schemas']['UpdateParserConfi
 
 // ── QA Config / LLM Config ──
 export type QALLMConfigVersion = components['schemas']['QALLMConfigVersion']
-export type CreateQALLMConfigVersionRequest = components['schemas']['CreateQALLMConfigVersionRequest']
+export type CreateQALLMConfigVersionRequest =
+  components['schemas']['CreateQALLMConfigVersionRequest']
 export type QAAgentConfig = components['schemas']['QAAgentConfig']
 export type QAConfigKnowledgeBase = components['schemas']['QAConfigKnowledgeBase']
 export type QAConfigVersion = components['schemas']['QAConfigVersion']

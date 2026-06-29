@@ -104,19 +104,18 @@ export function ReportTemplatesPage() {
   const handleSaveEdit = () => {
     try {
       const parsed = JSON.parse(editJson) as Record<string, unknown>
-      if (
-        typeof parsed !== 'object' ||
-        parsed === null ||
-        Array.isArray(parsed)
-      ) {
+      if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         setJsonError('模板结构必须是一个 JSON 对象')
         return
       }
       setJsonError(null)
-      updateStructureMutation.mutate(parsed as Parameters<typeof updateStructureMutation.mutate>[0], {
-        onSuccess: () => setEditMode(false),
-        onError: () => setJsonError('保存失败，请重试'),
-      })
+      updateStructureMutation.mutate(
+        parsed as Parameters<typeof updateStructureMutation.mutate>[0],
+        {
+          onSuccess: () => setEditMode(false),
+          onError: () => setJsonError('保存失败，请重试'),
+        },
+      )
     } catch {
       setJsonError('JSON 格式无效，请检查语法')
     }
@@ -194,10 +193,7 @@ export function ReportTemplatesPage() {
           </div>
           <div className="divide-y divide-border">
             {templates.map((template) => (
-              <div
-                key={template.id}
-                className="flex items-center justify-between gap-4 p-4"
-              >
+              <div key={template.id} className="flex items-center justify-between gap-4 p-4">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{template.templateName}</p>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -257,7 +253,10 @@ export function ReportTemplatesPage() {
       </div>
 
       {/* Template structure viewer / editor dialog */}
-      <Dialog open={Boolean(structureTarget)} onOpenChange={(open) => !open && handleCloseStructure()}>
+      <Dialog
+        open={Boolean(structureTarget)}
+        onOpenChange={(open) => !open && handleCloseStructure()}
+      >
         <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>
@@ -266,7 +265,9 @@ export function ReportTemplatesPage() {
                 : '模板结构'}
             </DialogTitle>
             <DialogDescription>
-              {editMode ? '编辑模板的 outlineSchema 和 styleConfig 配置。' : '模板的 JSON 结构定义。'}
+              {editMode
+                ? '编辑模板的 outlineSchema 和 styleConfig 配置。'
+                : '模板的 JSON 结构定义。'}
             </DialogDescription>
           </DialogHeader>
 
@@ -295,9 +296,7 @@ export function ReportTemplatesPage() {
                     }}
                     placeholder='{"outlineSchema": [...], "styleConfig": {...}}'
                   />
-                  {jsonError && (
-                    <p className="text-xs text-destructive">{jsonError}</p>
-                  )}
+                  {jsonError && <p className="text-xs text-destructive">{jsonError}</p>}
                 </div>
               ) : (
                 <pre className="max-h-96 overflow-auto rounded-lg bg-muted p-4 font-mono text-xs leading-relaxed">
@@ -324,10 +323,7 @@ export function ReportTemplatesPage() {
                 <Button variant="outline" onClick={handleCancelEdit}>
                   取消
                 </Button>
-                <Button
-                  onClick={handleSaveEdit}
-                  disabled={updateStructureMutation.isPending}
-                >
+                <Button onClick={handleSaveEdit} disabled={updateStructureMutation.isPending}>
                   {updateStructureMutation.isPending ? '保存中...' : '保存'}
                 </Button>
               </>

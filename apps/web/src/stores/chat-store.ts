@@ -98,10 +98,7 @@ export const useChatStore = create<ChatState>()(
         set((state) => ({
           messagesBySession: {
             ...state.messagesBySession,
-            [sessionId]: [
-              ...(state.messagesBySession[sessionId] ?? []),
-              ...messages,
-            ],
+            [sessionId]: [...(state.messagesBySession[sessionId] ?? []), ...messages],
           },
         })),
 

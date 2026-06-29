@@ -43,12 +43,7 @@ export const knowledgeBaseKeys = {
  * in the return value, which is `true` whenever a filter is active and the
  * current page may not represent the full filtered dataset.
  */
-export function useKnowledgeBases(
-  page = 1,
-  pageSize = 10,
-  keyword?: string,
-  docType?: string,
-) {
+export function useKnowledgeBases(page = 1, pageSize = 10, keyword?: string, docType?: string) {
   const hasFilter = Boolean(keyword || docType)
 
   return useQuery({
@@ -110,10 +105,7 @@ export function useUpdateKnowledgeBase() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({
-      id,
-      ...params
-    }: { id: string } & UpdateKnowledgeBaseRequest) =>
+    mutationFn: ({ id, ...params }: { id: string } & UpdateKnowledgeBaseRequest) =>
       updateKnowledgeBase(id, params),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

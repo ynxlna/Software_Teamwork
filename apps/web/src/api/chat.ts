@@ -11,7 +11,13 @@
  *   error            heartbeat
  */
 
-import type { KnowledgeQueryRequest, KnowledgeQuerySummary, QAMessage, QASseEvent, QASseEventType } from '@/lib/types'
+import type {
+  KnowledgeQueryRequest,
+  KnowledgeQuerySummary,
+  QAMessage,
+  QASseEvent,
+  QASseEventType,
+} from '@/lib/types'
 
 import { apiClient, buildQuery, gatewayRequest } from './client'
 
@@ -247,17 +253,11 @@ export function streamChat(
  * @param message    User message text (required body field)
  * @returns The created QAMessage
  */
-export async function sendMessage(
-  sessionId: string,
-  message: string,
-): Promise<QAMessage> {
-  return gatewayRequest<QAMessage>(
-    `/qa-sessions/${encodeURIComponent(sessionId)}/messages`,
-    {
-      method: 'POST',
-      body: { message },
-    },
-  )
+export async function sendMessage(sessionId: string, message: string): Promise<QAMessage> {
+  return gatewayRequest<QAMessage>(`/qa-sessions/${encodeURIComponent(sessionId)}/messages`, {
+    method: 'POST',
+    body: { message },
+  })
 }
 
 // ---------------------------------------------------------------------------

@@ -273,10 +273,10 @@ function prepareBody(body: RequestBody | undefined): { body?: BodyInit; hasJsonB
 function isGatewayErrorEnvelope(value: unknown): value is GatewayErrorEnvelope {
   return Boolean(
     value &&
-      typeof value === 'object' &&
-      'error' in value &&
-      (value as { error?: unknown }).error &&
-      typeof (value as { error: { message?: unknown } }).error.message === 'string',
+    typeof value === 'object' &&
+    'error' in value &&
+    (value as { error?: unknown }).error &&
+    typeof (value as { error: { message?: unknown } }).error.message === 'string',
   )
 }
 

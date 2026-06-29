@@ -35,9 +35,7 @@ function CitationTooltip({ c }: { c: QACitation }) {
       <PopoverContent className="w-72">
         <div className="text-sm font-medium">{docName}</div>
         <div className="mt-1 text-sm italic text-muted-foreground">「{text}」</div>
-        <div className="mt-1 text-xs text-muted-foreground">
-          相关度: {Math.round(score * 100)}%
-        </div>
+        <div className="mt-1 text-xs text-muted-foreground">相关度: {Math.round(score * 100)}%</div>
       </PopoverContent>
     </Popover>
   )
@@ -86,9 +84,7 @@ function ThinkPanel({ steps, done }: { steps: QAThinkingStep[]; done: boolean })
             {s.status === 'running' && (
               <span className="animate-pulse text-xs text-primary">...</span>
             )}
-            {s.status === 'failed' && (
-              <span className="text-xs text-red-500">失败</span>
-            )}
+            {s.status === 'failed' && <span className="text-xs text-red-500">失败</span>}
           </div>
         ))}
       </CollapsibleContent>

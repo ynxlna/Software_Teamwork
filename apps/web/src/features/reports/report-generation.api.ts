@@ -156,9 +156,7 @@ export function deleteReport(reportId: string): Promise<void> {
   })
 }
 
-export function getReportTemplateStructure(
-  templateId: string,
-): Promise<ReportTemplateStructure> {
+export function getReportTemplateStructure(templateId: string): Promise<ReportTemplateStructure> {
   return gatewayRequest<ReportTemplateStructure>(
     `/report-templates/${encodeURIComponent(templateId)}/structure`,
   )

@@ -269,11 +269,14 @@ export function useReportEvents(reportId: string | null) {
     enabled: Boolean(reportId),
     refetchInterval: (query) => {
       const events = query.state.data
-      if (!events || events.length === 0) return false
+      // Keep polling until a terminal event is received; empty list is normal
+      // at job start and should not stop polling.
+      if (!events || events.length === 0) return 5000
       const latest = events[events.length - 1]
-      return latest?.eventType === 'job.completed' || latest?.eventType === 'job.failed'
-        ? false
-        : 5000
+      if (latest?.eventType === 'job.completed' || latest?.eventType === 'job.failed') {
+        return false
+      }
+      return 5000
     },
     select: (data) => data,
   })

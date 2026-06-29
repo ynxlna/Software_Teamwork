@@ -103,12 +103,9 @@ export function SystemSettings() {
     },
   })
 
-  const updateField = useCallback(
-    (field: keyof FormData, value: string | number) => {
-      setForm((prev) => ({ ...prev, [field]: value }))
-    },
-    [],
-  )
+  const updateField = useCallback((field: keyof FormData, value: string | number) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
 
   const handleSave = () => {
     saveMutation.mutate(form)

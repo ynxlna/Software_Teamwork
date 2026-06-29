@@ -97,23 +97,17 @@ export async function runRetrievalTest(
 
 /** GET /qa-metrics/overview?days=N */
 export function getQAMetricsOverview(days?: number): Promise<QAMetricsOverview> {
-  return gatewayRequest<QAMetricsOverview>(
-    `/qa-metrics/overview${buildQuery({ days })}`,
-  )
+  return gatewayRequest<QAMetricsOverview>(`/qa-metrics/overview${buildQuery({ days })}`)
 }
 
 /** GET /qa-metrics/trend?days=N */
 export function getQAMetricsTrend(days?: number): Promise<QAMetricsTrend> {
-  return gatewayRequest<QAMetricsTrend>(
-    `/qa-metrics/trend${buildQuery({ days: days ?? 30 })}`,
-  )
+  return gatewayRequest<QAMetricsTrend>(`/qa-metrics/trend${buildQuery({ days: days ?? 30 })}`)
 }
 
 /** GET /qa-metrics/top-queries?limit=N&days=N */
 export async function getQATopQueries(limit?: number, days?: number): Promise<QATopQuery[]> {
-  return gatewayRequest<QATopQuery[]>(
-    `/qa-metrics/top-queries${buildQuery({ limit, days })}`,
-  )
+  return gatewayRequest<QATopQuery[]>(`/qa-metrics/top-queries${buildQuery({ limit, days })}`)
 }
 
 /** GET /qa-metrics/intent-distribution?days=N */
@@ -133,9 +127,10 @@ export interface ListKnowledgeBasesParams {
   pageSize?: number
 }
 
-export async function listKnowledgeBases(
-  params: ListKnowledgeBasesParams = {},
-): Promise<{ items: KnowledgeBaseSummary[]; page: { page: number; pageSize: number; total: number } }> {
+export async function listKnowledgeBases(params: ListKnowledgeBasesParams = {}): Promise<{
+  items: KnowledgeBaseSummary[]
+  page: { page: number; pageSize: number; total: number }
+}> {
   return gatewayPageRequest<KnowledgeBaseSummary>(
     `/knowledge-bases${buildQuery({ page: params.page, pageSize: params.pageSize })}`,
   )
@@ -152,9 +147,7 @@ export async function createKnowledgeBase(
 }
 
 /** GET /knowledge-bases/{knowledgeBaseId} */
-export async function getKnowledgeBase(
-  knowledgeBaseId: string,
-): Promise<KnowledgeBaseSummary> {
+export async function getKnowledgeBase(knowledgeBaseId: string): Promise<KnowledgeBaseSummary> {
   return gatewayRequest<KnowledgeBaseSummary>(
     `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}`,
   )

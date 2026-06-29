@@ -88,7 +88,7 @@ function formToCreateRequest(form: FormData): CreateModelProfileRequest {
     model: form.model,
     apiKey: form.apiKey,
     timeoutMs: form.timeoutMs,
-    defaultParameters: { maxTokens: form.maxTokens },
+    defaultParameters: { max_tokens: form.maxTokens },
     enabled: true,
     isDefault: false,
     supportsStreaming: false,
@@ -106,7 +106,7 @@ function formToUpdateRequest(form: FormData) {
   if (form.apiKey) {
     params.apiKey = form.apiKey
   }
-  params.defaultParameters = { maxTokens: form.maxTokens }
+  params.defaultParameters = { max_tokens: form.maxTokens }
   return params
 }
 
@@ -197,7 +197,7 @@ export function ModelProfilesPage() {
       model: profile.model,
       apiKey: '',
       timeoutMs: profile.timeoutMs,
-      maxTokens: (profile.defaultParameters?.maxTokens as number) ?? 0,
+      maxTokens: (profile.defaultParameters?.max_tokens as number) ?? 0,
     })
     setEditOpen(true)
   }, [])

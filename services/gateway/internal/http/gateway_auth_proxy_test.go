@@ -119,7 +119,7 @@ func TestProxyInjectsAuthenticatedContextHeaders(t *testing.T) {
 
 	var captured http.Header
 	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/knowledge-bases" {
+		if r.URL.Path != "/internal/v1/knowledge-bases" {
 			t.Fatalf("downstream path = %q", r.URL.Path)
 		}
 		captured = r.Header.Clone()
@@ -247,6 +247,82 @@ func TestAuthClientErrorIsSanitized(t *testing.T) {
 		body.Error.Message != "request validation failed" ||
 		body.Error.RequestID != "req_auth_sanitized" {
 		t.Fatalf("error = %+v", body.Error)
+	}
+}
+
+func TestProxyMapsGatewayPathsToOwnerServiceNamespaces(t *testing.T) {
+	hasher := testHasher(t)
+	store := newMemorySessionStore()
+	accessToken := "valid-token"
+	store.putToken(t, hasher, accessToken, service.SessionCacheEntry{
+		SessionID:   "sess_1",
+		UserID:      "usr_1",
+		Username:    "alice",
+		Roles:       []string{"admin"},
+		Permissions: []string{"knowledge:read", "qa:read", "document:read"},
+		TokenType:   "Bearer",
+		ExpiresAt:   time.Now().Add(time.Hour).UTC(),
+	})
+
+	cases := []struct {
+		name     string
+		owner    string
+		method   string
+		path     string
+		expected string
+	}{
+		{
+			name:     "knowledge internal namespace",
+			owner:    "knowledge",
+			method:   http.MethodGet,
+			path:     "/api/v1/knowledge-bases/kb_1",
+			expected: "/internal/v1/knowledge-bases/kb_1",
+		},
+		{
+			name:     "document service root namespace",
+			owner:    "document",
+			method:   http.MethodGet,
+			path:     "/api/v1/report-types",
+			expected: "/report-types",
+		},
+		{
+			name:     "qa internal namespace",
+			owner:    "qa",
+			method:   http.MethodGet,
+			path:     "/api/v1/qa-sessions/sess_1/messages",
+			expected: "/internal/v1/qa-sessions/sess_1/messages",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var capturedPath string
+			downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				capturedPath = r.URL.Path
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"data":{},"requestId":"req_proxy"}`))
+			}))
+			defer downstream.Close()
+
+			server := newGatewayTestServer(t, gatewayDeps{
+				store:         store,
+				hasher:        hasher,
+				ownerBaseURLs: map[string]string{tc.owner: downstream.URL},
+			})
+			req := httptest.NewRequest(tc.method, tc.path, nil)
+			req.Header.Set("Authorization", "Bearer "+accessToken)
+			req.Header.Set("X-Request-Id", "req_proxy")
+			res := httptest.NewRecorder()
+
+			server.ServeHTTP(res, req)
+
+			if res.Code != http.StatusOK {
+				t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
+			}
+			if capturedPath != tc.expected {
+				t.Fatalf("downstream path = %q, want %q", capturedPath, tc.expected)
+			}
+		})
 	}
 }
 

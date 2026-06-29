@@ -107,9 +107,36 @@ func (s *Server) writeDownstreamError(w http.ResponseWriter, r *http.Request, ro
 
 func (route routeSpec) downstreamPath(r *http.Request) string {
 	if strings.TrimSpace(route.DownstreamPattern) == "" {
-		return r.URL.Path
+		return route.defaultDownstreamPath(r.URL.Path)
 	}
 	return renderPathTemplate(route.DownstreamPattern, r)
+}
+
+func (route routeSpec) defaultDownstreamPath(path string) string {
+	suffix, ok := publicAPISuffix(path)
+	if !ok {
+		return path
+	}
+	switch route.Owner {
+	case "knowledge", "qa":
+		return "/internal/v1" + suffix
+	case "document":
+		return suffix
+	default:
+		return path
+	}
+}
+
+func publicAPISuffix(path string) (string, bool) {
+	normalized := "/" + strings.TrimLeft(path, "/")
+	switch {
+	case normalized == "/api/v1":
+		return "/", true
+	case strings.HasPrefix(normalized, "/api/v1/"):
+		return strings.TrimPrefix(normalized, "/api/v1"), true
+	default:
+		return normalized, false
+	}
 }
 
 func renderPathTemplate(template string, r *http.Request) string {

@@ -1,47 +1,37 @@
-﻿import { requestJson } from './client'
-import type { components } from './generated/gateway'
+/**
+ * Citation endpoints — Gateway OpenAPI qa-citations paths.
+ *
+ * getCitation      GET  /citations/{citationId}
+ * lookupCitations  POST /citation-lookups
+ */
 
-type QACitationDetail = components['schemas']['QACitationDetail']
+import type { QACitationDetail } from '@/lib/types'
 
-export interface CitationDetail {
-  chunk_id: string
-  doc_id: string
-  doc_name: string
-  text: string
-  context_before: string
-  context_after: string
-  page_number: number
-  score: number
+import { gatewayRequest } from './client'
+
+// ---------------------------------------------------------------------------
+// GET /citations/{citationId}
+// ---------------------------------------------------------------------------
+
+/**
+ * Retrieve full citation detail including source availability
+ * for a single citation.
+ */
+export async function getCitation(citationId: string): Promise<QACitationDetail> {
+  return gatewayRequest<QACitationDetail>(`/citations/${encodeURIComponent(citationId)}`)
 }
 
-interface BatchCitationsRequest {
-  chunk_ids: string[]
-}
+// ---------------------------------------------------------------------------
+// POST /citation-lookups
+// ---------------------------------------------------------------------------
 
-function toCitationDetail(citation: QACitationDetail): CitationDetail {
-  return {
-    chunk_id: citation.chunkId ?? '',
-    doc_id: citation.documentId ?? citation.docId ?? '',
-    doc_name: citation.documentName ?? citation.docName ?? '',
-    text: citation.content ?? citation.text ?? citation.contentPreview ?? '',
-    context_before: citation.context ?? '',
-    context_after: '',
-    page_number: citation.pageNumber ?? 0,
-    score: citation.score ?? 0,
-  }
-}
-
-export async function getCitation(chunkId: string): Promise<CitationDetail> {
-  const citation = await requestJson<QACitationDetail>(`/citations/${encodeURIComponent(chunkId)}`)
-  return toCitationDetail(citation)
-}
-
-export async function batchGetCitations(chunkIds: string[]): Promise<CitationDetail[]> {
-  const citations = await requestJson<QACitationDetail[]>('/citation-lookups', {
+/**
+ * Batch lookup citation details by citation IDs.
+ */
+export async function lookupCitations(citationIds: string[]): Promise<QACitationDetail[]> {
+  return gatewayRequest<QACitationDetail[]>('/citation-lookups', {
     method: 'POST',
-    body: {
-      citationIds: chunkIds,
-    } satisfies components['schemas']['CreateQACitationLookupRequest'],
+    body: JSON.stringify({ citationIds }),
   })
   return citations.map(toCitationDetail)
 }

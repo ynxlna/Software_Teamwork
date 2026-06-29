@@ -2,15 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
-import { getLLMConfig, testLLMConnection, updateLLMConfig } from '@/api/admin'
+import { createLLMConfigVersion, getCurrentLLMConfig, testLLMConnection } from '@/api/admin'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
 interface FormData {
-  api_url: string
-  api_key: string
-  model_name: string
-  timeout: number
+  profileId: string
+  modelName: string
+  timeoutSeconds: number
+  temperature: number
+  maxTokens: number
 }
 
 interface NotificationState {
@@ -25,16 +26,17 @@ export function SystemSettings() {
 
   // Draft form state
   const [form, setForm] = useState<FormData>({
-    api_url: '',
-    api_key: '',
-    model_name: '',
-    timeout: 30,
+    profileId: '',
+    modelName: '',
+    timeoutSeconds: 30,
+    temperature: 0.7,
+    maxTokens: 4096,
   })
 
   // Fetch current config
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['admin', 'llm-config'],
-    queryFn: getLLMConfig,
+    queryFn: getCurrentLLMConfig,
     staleTime: 30_000,
   })
 
@@ -42,10 +44,11 @@ export function SystemSettings() {
   useEffect(() => {
     if (data && !formInitialized) {
       setForm({
-        api_url: data.api_url ?? '',
-        api_key: data.api_key ?? '',
-        model_name: data.model_name ?? '',
-        timeout: data.timeout ?? 30,
+        profileId: data.profileId ?? '',
+        modelName: data.modelName ?? '',
+        timeoutSeconds: data.timeoutSeconds ?? 30,
+        temperature: data.temperature ?? 0.7,
+        maxTokens: data.maxTokens ?? 4096,
       })
       setFormInitialized(true)
     }
@@ -60,7 +63,16 @@ export function SystemSettings() {
 
   // Save mutation
   const saveMutation = useMutation({
-    mutationFn: (payload: FormData) => updateLLMConfig(payload),
+    mutationFn: (payload: FormData) =>
+      createLLMConfigVersion({
+        provider: 'ai-gateway',
+        profileId: payload.profileId,
+        modelName: payload.modelName,
+        timeoutSeconds: payload.timeoutSeconds,
+        temperature: payload.temperature,
+        maxTokens: payload.maxTokens,
+        activate: true,
+      }),
     onSuccess: () => {
       setNotification({ type: 'success', text: '配置已保存' })
       queryClient.invalidateQueries({ queryKey: ['admin', 'llm-config'] })
@@ -72,12 +84,18 @@ export function SystemSettings() {
 
   // Test connection mutation
   const testMutation = useMutation({
-    mutationFn: (payload: { api_url: string; api_key: string; model_name: string }) =>
-      testLLMConnection(payload),
+    mutationFn: (payload: { profileId: string; modelName: string }) =>
+      testLLMConnection({
+        provider: 'ai-gateway',
+        profileId: payload.profileId,
+        modelName: payload.modelName,
+      }),
     onSuccess: (res) => {
       setNotification({
         type: 'success',
-        text: `连接成功！延迟 ${res.latency_ms}ms，模型 ${res.model}`,
+        text: res.success
+          ? `连接成功！延迟 ${res.latencyMs ?? '?'}ms，模型 ${res.modelName ?? '未知'}`
+          : `连接失败: ${res.errorMessage ?? '未知错误'}`,
       })
     },
     onError: (err: Error) => {
@@ -85,9 +103,12 @@ export function SystemSettings() {
     },
   })
 
-  const updateField = useCallback((field: keyof FormData, value: string | number) => {
-    setForm((prev) => ({ ...prev, [field]: value }))
-  }, [])
+  const updateField = useCallback(
+    (field: keyof FormData, value: string | number) => {
+      setForm((prev) => ({ ...prev, [field]: value }))
+    },
+    [],
+  )
 
   const handleSave = () => {
     saveMutation.mutate(form)
@@ -95,9 +116,8 @@ export function SystemSettings() {
 
   const handleTest = () => {
     testMutation.mutate({
-      api_url: form.api_url,
-      api_key: form.api_key,
-      model_name: form.model_name,
+      profileId: form.profileId,
+      modelName: form.modelName,
     })
   }
 
@@ -168,20 +188,20 @@ export function SystemSettings() {
         <h4 className="mb-5 text-lg font-semibold text-foreground">LLM 配置</h4>
 
         <div className="grid grid-cols-2 gap-4">
-          {/* API URL */}
+          {/* Profile ID */}
           <div>
             <label
-              htmlFor="llm-api-url"
+              htmlFor="llm-profile-id"
               className="mb-1.5 block text-sm font-medium text-foreground"
             >
-              API 地址
+              AI Gateway 模型配置 ID
             </label>
             <Input
-              id="llm-api-url"
+              id="llm-profile-id"
               type="text"
-              placeholder="https://api.openai.com/v1"
-              value={form.api_url}
-              onChange={(e) => updateField('api_url', e.target.value)}
+              placeholder="model-profile-id"
+              value={form.profileId}
+              onChange={(e) => updateField('profileId', e.target.value)}
             />
           </div>
 
@@ -197,25 +217,8 @@ export function SystemSettings() {
               id="llm-model-name"
               type="text"
               placeholder="gpt-4o"
-              value={form.model_name}
-              onChange={(e) => updateField('model_name', e.target.value)}
-            />
-          </div>
-
-          {/* API Key */}
-          <div>
-            <label
-              htmlFor="llm-api-key"
-              className="mb-1.5 block text-sm font-medium text-foreground"
-            >
-              API 密钥
-            </label>
-            <Input
-              id="llm-api-key"
-              type="password"
-              placeholder="sk-••••••••"
-              value={form.api_key}
-              onChange={(e) => updateField('api_key', e.target.value)}
+              value={form.modelName}
+              onChange={(e) => updateField('modelName', e.target.value)}
             />
           </div>
 
@@ -233,8 +236,47 @@ export function SystemSettings() {
               placeholder="30"
               min={1}
               max={300}
-              value={form.timeout}
-              onChange={(e) => updateField('timeout', Number(e.target.value))}
+              value={form.timeoutSeconds}
+              onChange={(e) => updateField('timeoutSeconds', Number(e.target.value))}
+            />
+          </div>
+
+          {/* Temperature */}
+          <div>
+            <label
+              htmlFor="llm-temperature"
+              className="mb-1.5 block text-sm font-medium text-foreground"
+            >
+              温度
+            </label>
+            <Input
+              id="llm-temperature"
+              type="number"
+              placeholder="0.7"
+              min={0}
+              max={2}
+              step={0.1}
+              value={form.temperature}
+              onChange={(e) => updateField('temperature', Number(e.target.value))}
+            />
+          </div>
+
+          {/* Max Tokens */}
+          <div className="col-span-2">
+            <label
+              htmlFor="llm-max-tokens"
+              className="mb-1.5 block text-sm font-medium text-foreground"
+            >
+              最大 Token 数
+            </label>
+            <Input
+              id="llm-max-tokens"
+              type="number"
+              placeholder="4096"
+              min={1}
+              max={128000}
+              value={form.maxTokens}
+              onChange={(e) => updateField('maxTokens', Number(e.target.value))}
             />
           </div>
         </div>

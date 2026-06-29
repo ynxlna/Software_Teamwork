@@ -1,45 +1,45 @@
 import { useQuery } from '@tanstack/react-query'
 import { BarChart3, Database, FileText, MessageSquare, Timer, Users } from 'lucide-react'
 
-import { getStatsOverview } from '@/api/admin'
-import type { StatsOverview } from '@/lib/types'
+import { getQAMetricsOverview } from '@/api/admin'
+import type { QAMetricsOverview } from '@/lib/types'
 
 const statCards = [
   {
-    key: 'total_qa_count' as const,
+    key: 'totalQaCount' as const,
     label: '总问答次数',
     icon: MessageSquare,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number | undefined) => (v ?? 0).toLocaleString(),
   },
   {
-    key: 'today_qa_count' as const,
+    key: 'todayQaCount' as const,
     label: '今日问答',
     icon: BarChart3,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number | undefined) => (v ?? 0).toLocaleString(),
   },
   {
-    key: 'avg_latency_ms' as const,
+    key: 'avgLatencyMs' as const,
     label: '平均延迟',
     icon: Timer,
-    format: (v: number) => `${Math.round(v)} ms`,
+    format: (v: number | undefined) => `${Math.round(v ?? 0)} ms`,
   },
   {
-    key: 'active_users_today' as const,
+    key: 'activeUsersToday' as const,
     label: '今日活跃用户',
     icon: Users,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number | undefined) => (v ?? 0).toLocaleString(),
   },
   {
-    key: 'knowledge_base_count' as const,
+    key: 'knowledgeBaseCount' as const,
     label: '知识库数量',
     icon: Database,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number | undefined) => (v ?? 0).toLocaleString(),
   },
   {
-    key: 'document_count' as const,
+    key: 'documentCount' as const,
     label: '文档总数',
     icon: FileText,
-    format: (v: number) => v.toLocaleString(),
+    format: (v: number | undefined) => (v ?? 0).toLocaleString(),
   },
 ] as const
 
@@ -73,9 +73,9 @@ function StatCard({
 }
 
 export function StatsOverviewPage() {
-  const { data, isLoading, isError, error } = useQuery<StatsOverview>({
-    queryKey: ['admin', 'stats-overview'],
-    queryFn: getStatsOverview,
+  const { data, isLoading, isError, error } = useQuery<QAMetricsOverview>({
+    queryKey: ['admin', 'qa-metrics-overview'],
+    queryFn: () => getQAMetricsOverview(),
     staleTime: 60_000,
     refetchInterval: 300_000,
   })
@@ -100,7 +100,12 @@ export function StatsOverviewPage() {
           ? Array.from({ length: 6 }).map((_, i) => <StatCardSkeleton key={i} />)
           : data &&
             statCards.map(({ key, label, icon, format }) => (
-              <StatCard key={key} label={label} value={format(data[key])} icon={icon} />
+              <StatCard
+                key={key}
+                label={label}
+                value={format(data[key] as number | undefined)}
+                icon={icon}
+              />
             ))}
       </div>
 

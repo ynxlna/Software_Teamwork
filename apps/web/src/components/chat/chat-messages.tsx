@@ -5,7 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import type { Citation, Message, ThinkingStep } from '@/lib/types'
+import type { QACitation, QAMessage, QAThinkingStep } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -13,8 +13,14 @@ import { cn } from '@/lib/utils'
 // ══════════════════════════════════════════════════════════════════════════════
 
 /* ── Citation tooltip ── */
-function CitationTooltip({ c }: { c: Citation }) {
+function CitationTooltip({ c }: { c: QACitation }) {
   const [open, setOpen] = useState(false)
+
+  // Resolve display fields (id is always present; docId/docName are deprecated aliases)
+  const displayId = c.citationNo != null ? `[${c.citationNo}]` : c.id
+  const docName = c.documentName ?? c.docName ?? '未知文档'
+  const text = c.text ?? c.contentPreview ?? ''
+  const score = c.score ?? 0
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -24,13 +30,13 @@ function CitationTooltip({ c }: { c: Citation }) {
           e.stopPropagation()
         }}
       >
-        [{c.id}]
+        {displayId}
       </PopoverTrigger>
       <PopoverContent className="w-72">
-        <div className="text-sm font-medium">{c.doc_name}</div>
-        <div className="mt-1 text-sm italic text-muted-foreground">「{c.text}」</div>
+        <div className="text-sm font-medium">{docName}</div>
+        <div className="mt-1 text-sm italic text-muted-foreground">「{text}」</div>
         <div className="mt-1 text-xs text-muted-foreground">
-          相关度: {Math.round(c.score * 100)}%
+          相关度: {Math.round(score * 100)}%
         </div>
       </PopoverContent>
     </Popover>
@@ -38,7 +44,7 @@ function CitationTooltip({ c }: { c: Citation }) {
 }
 
 /* ── Thinking panel ── */
-function ThinkPanel({ steps, done }: { steps: ThinkingStep[]; done: boolean }) {
+function ThinkPanel({ steps, done }: { steps: QAThinkingStep[]; done: boolean }) {
   const [open, setOpen] = useState(!done)
 
   useEffect(() => {
@@ -72,12 +78,16 @@ function ThinkPanel({ steps, done }: { steps: ThinkingStep[]; done: boolean }) {
                 s.status === 'done' && 'bg-green-500',
                 s.status === 'running' && 'bg-primary animate-pulse',
                 s.status === 'pending' && 'bg-muted-foreground/40 animate-pulse',
+                s.status === 'failed' && 'bg-red-500',
               )}
             />
-            <span className="flex-1">{s.label}</span>
+            <span className="flex-1">{s.label ?? s.type}</span>
             {s.status === 'done' && <Check className="size-3 shrink-0 text-green-500" />}
             {s.status === 'running' && (
               <span className="animate-pulse text-xs text-primary">...</span>
+            )}
+            {s.status === 'failed' && (
+              <span className="text-xs text-red-500">失败</span>
             )}
           </div>
         ))}
@@ -155,10 +165,10 @@ const markdownComponents = {
 }
 
 /* ── Status label for assistant messages ── */
-function StatusLabel({ status }: { status: Message['status'] }) {
+function StatusLabel({ status }: { status: QAMessage['status'] }) {
   if (!status || status === 'completed') return null
   if (status === 'streaming') return null
-  if (status === 'stopped') {
+  if (status === 'stopped' || status === 'cancelled') {
     return (
       <span className="ml-2 text-xs text-muted-foreground" aria-label="回复已停止">
         已停止
@@ -176,18 +186,19 @@ function StatusLabel({ status }: { status: Message['status'] }) {
 }
 
 /* ── Single message bubble ── */
-function MessageBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolean }) {
+function MessageBubble({ msg, isStreaming }: { msg: QAMessage; isStreaming: boolean }) {
   const isUser = msg.role === 'user'
   const hasThinking = msg.thinking && msg.thinking.length > 0
   const hasCitations = msg.citations && msg.citations.length > 0
 
-  // Determine effective streaming state (support both old and new data)
+  // Determine effective streaming state
   const effectiveStreaming = msg.status === 'streaming' || (!msg.status && isStreaming)
 
   // Determine thinking done state
   const thinkingDone =
     msg.status === 'completed' ||
     msg.status === 'stopped' ||
+    msg.status === 'cancelled' ||
     msg.status === 'failed' ||
     (!msg.status && !isStreaming)
 
@@ -239,7 +250,7 @@ function MessageBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolea
               </span>
               <StatusLabel status={msg.status} />
             </span>
-          ) : msg.status === 'stopped' || msg.status === 'failed' ? (
+          ) : msg.status === 'stopped' || msg.status === 'cancelled' || msg.status === 'failed' ? (
             <span>
               <span className="italic text-muted-foreground">（无内容）</span>
               <StatusLabel status={msg.status} />
@@ -252,7 +263,7 @@ function MessageBubble({ msg, isStreaming }: { msg: Message; isStreaming: boolea
         {/* Citations (assistant only) */}
         {hasCitations && (
           <div className="mt-4 border-t border-border/50 pt-2">
-            <p className="mb-1 text-xs font-semibold text-muted-foreground">📎 引用来源</p>
+            <p className="mb-1 text-xs font-semibold text-muted-foreground">引用来源</p>
             <div className="flex flex-wrap gap-1">
               {msg.citations!.map((c) => (
                 <CitationTooltip key={c.id} c={c} />
@@ -283,7 +294,7 @@ function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => voi
 // ══════════════════════════════════════════════════════════════════════════════
 
 type ChatMessagesProps = {
-  messages: Message[]
+  messages: QAMessage[]
   streaming: boolean
   error: string | null
   suggestedPrompts: string[]

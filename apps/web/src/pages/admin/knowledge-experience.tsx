@@ -2,17 +2,17 @@ import { useMutation } from '@tanstack/react-query'
 import { Loader2, Search } from 'lucide-react'
 import { useState } from 'react'
 
-import { ragTest } from '@/api/admin'
+import { queryKnowledge } from '@/api/chat'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import type { RAGSearchResult } from '@/lib/types'
+import type { KnowledgeQueryResult } from '@/lib/types'
 
 export function KnowledgeExperience() {
   const [query, setQuery] = useState('')
 
   const searchMutation = useMutation({
-    mutationFn: (searchQuery: string) => ragTest({ query: searchQuery }),
+    mutationFn: (searchQuery: string) => queryKnowledge({ query: searchQuery }),
   })
 
   const handleSearch = () => {
@@ -27,9 +27,8 @@ export function KnowledgeExperience() {
     }
   }
 
-  const results: RAGSearchResult[] = searchMutation.data?.results ?? []
-  const totalHits = searchMutation.data?.total_hits ?? 0
-  const tookMs = searchMutation.data?.took_ms ?? 0
+  const results: KnowledgeQueryResult[] = searchMutation.data?.results ?? []
+  const totalHits = searchMutation.data?.trace.hitCount ?? 0
 
   return (
     <div>
@@ -82,11 +81,6 @@ export function KnowledgeExperience() {
               <span>
                 共找到 <span className="font-semibold text-foreground">{totalHits}</span> 条结果
               </span>
-              {tookMs > 0 && (
-                <span>
-                  耗时 <span className="font-semibold text-foreground">{tookMs}ms</span>
-                </span>
-              )}
             </div>
 
             {/* Result list */}
@@ -96,27 +90,28 @@ export function KnowledgeExperience() {
               </div>
             ) : (
               <div className="space-y-3">
-                {results.map((result) => (
+                {results.map((result, index) => (
                   <div
-                    key={`${result.chunk_id}-${result.rank}`}
+                    key={`${result.chunkId}-${index}`}
                     className="rounded-lg border border-border bg-background p-4"
                   >
                     {/* Header: rank, doc, score */}
                     <div className="mb-2 flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary">#{result.rank}</Badge>
-                      <span className="text-sm font-medium text-foreground">{result.doc_name}</span>
-                      <Badge variant="outline">向量得分: {result.vector_score.toFixed(4)}</Badge>
-                      {result.rerank_score != null && (
-                        <Badge variant="outline">重排序: {result.rerank_score.toFixed(4)}</Badge>
-                      )}
-                      {result.page_number != null && (
+                      <Badge variant="secondary">#{index + 1}</Badge>
+                      <span className="text-sm font-medium text-foreground">
+                        {result.documentName}
+                      </span>
+                      <Badge variant="outline">相关度: {result.score.toFixed(4)}</Badge>
+                      {result.chunkIndex != null && (
                         <span className="text-xs text-muted-foreground">
-                          第{result.page_number}页
+                          第{result.chunkIndex + 1}块
                         </span>
                       )}
                     </div>
                     {/* Text snippet */}
-                    <p className="text-sm leading-relaxed text-muted-foreground">{result.text}</p>
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {result.contentPreview}
+                    </p>
                   </div>
                 ))}
               </div>

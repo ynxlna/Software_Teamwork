@@ -179,6 +179,18 @@ const adminStatsRoute = createRoute({
   component: StatsOverviewPage,
 })
 
+const adminReportRecordsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'reports/records',
+  component: ReportRecordsPage,
+})
+
+const adminReportTemplatesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'reports/templates',
+  component: ReportTemplatesPage,
+})
+
 // ── Route tree ──────────────────────────────────────────────
 const routeTree = rootRoute.addChildren([
   indexRoute,
@@ -204,6 +216,8 @@ const routeTree = rootRoute.addChildren([
     adminKnowledgeConfigRoute,
     adminSettingsRoute,
     adminStatsRoute,
+    adminReportRecordsRoute,
+    adminReportTemplatesRoute,
   ]),
 ])
 

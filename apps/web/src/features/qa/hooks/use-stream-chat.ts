@@ -4,15 +4,16 @@
  * Wraps the low-level `streamChat` API with React-friendly state management.
  * Handlers are kept in refs so the SSE callbacks always see the latest props
  * without re-subscribing the stream.
+ *
+ * Signature: streamChat(sessionId, message, handlers, signal?)
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import type { SSEHandlers } from '@/api/chat'
+import type { ChatStreamHandlers } from '@/api/chat'
 import { streamChat } from '@/api/chat'
-import type { ChatStreamRequest } from '@/lib/types'
 
-export function useStreamChat(handlers: SSEHandlers) {
+export function useStreamChat(handlers: ChatStreamHandlers) {
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<(() => void) | null>(null)
   const handlersRef = useRef(handlers)
@@ -27,29 +28,41 @@ export function useStreamChat(handlers: SSEHandlers) {
     }
   }, [])
 
-  const sendMessage = useCallback((params: ChatStreamRequest) => {
+  const sendMessage = useCallback((sessionId: string, message: string) => {
     // Cancel any in-flight stream
     abortRef.current?.()
 
     setIsStreaming(true)
 
-    const { abort } = streamChat(params, {
-      onIntentStatus: (data) => {
-        handlersRef.current.onIntentStatus?.(data)
+    const { abort } = streamChat(sessionId, message, {
+      onMessageCreated: (data) => {
+        handlersRef.current.onMessageCreated?.(data)
       },
-      onThinkingStep: (data) => {
-        handlersRef.current.onThinkingStep?.(data)
+      onAgentIterationStarted: (data) => {
+        handlersRef.current.onAgentIterationStarted?.(data)
       },
-      onToken: (data) => {
-        handlersRef.current.onToken?.(data)
+      onReasoningStep: (data) => {
+        handlersRef.current.onReasoningStep?.(data)
       },
-      onCitation: (data) => {
-        handlersRef.current.onCitation?.(data)
+      onToolStarted: (data) => {
+        handlersRef.current.onToolStarted?.(data)
       },
-      onDone: (data) => {
+      onToolCompleted: (data) => {
+        handlersRef.current.onToolCompleted?.(data)
+      },
+      onToolFailed: (data) => {
+        handlersRef.current.onToolFailed?.(data)
+      },
+      onAnswerDelta: (data) => {
+        handlersRef.current.onAnswerDelta?.(data)
+      },
+      onCitationDelta: (data) => {
+        handlersRef.current.onCitationDelta?.(data)
+      },
+      onAnswerCompleted: (data) => {
         setIsStreaming(false)
         abortRef.current = null
-        handlersRef.current.onDone?.(data)
+        handlersRef.current.onAnswerCompleted?.(data)
       },
       onError: (data) => {
         if (data.fatal) {
@@ -57,6 +70,11 @@ export function useStreamChat(handlers: SSEHandlers) {
           abortRef.current = null
         }
         handlersRef.current.onError?.(data)
+      },
+      onAbort: () => {
+        setIsStreaming(false)
+        abortRef.current = null
+        handlersRef.current.onAbort?.()
       },
     })
 

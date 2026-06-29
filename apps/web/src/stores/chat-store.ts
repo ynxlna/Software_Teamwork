@@ -1,7 +1,7 @@
 /**
- * Chat UI state — sessions cache, streaming flag, error tracking.
+ * Chat UI state — sessions metadata, per-session messages, streaming flag, error tracking.
  *
- * Full session objects live in memory only (they come from the server).
+ * QASession does NOT embed messages — they are stored separately in `messagesBySession`.
  * Only session IDs are persisted to localStorage so the sidebar can
  * restore the session list across page reloads.
  */
@@ -9,11 +9,11 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-import type { Conversation, Message } from '@/lib/types'
+import type { QAMessage, QASession } from '@/lib/types'
 
 export interface ChatState {
-  /** Full session objects (in-memory, fetched from server or created locally). */
-  sessions: Conversation[]
+  /** Full session metadata objects (in-memory, fetched from server or created locally). */
+  sessions: QASession[]
   /** Session IDs persisted to localStorage for session recovery. */
   sessionIds: string[]
   /** Currently selected session. */
@@ -24,19 +24,23 @@ export interface ChatState {
   error: string | null
   /** The user message that triggered a fatal error (for retry). */
   lastFailedMsg: string | null
+  /** Messages keyed by sessionId (QASession does not embed messages). */
+  messagesBySession: Record<string, QAMessage[]>
 
   // ── Actions ──
 
-  /** Bulk-set sessions (used when syncing from server). */
-  setSessions: (sessions: Conversation[]) => void
+  /** Bulk-set session metadata (used when syncing from server). */
+  setSessions: (sessions: QASession[]) => void
   setSessionIds: (ids: string[]) => void
   setActiveId: (id: string | null) => void
-  /** Prepend a new session, deduping by id. Also updates persisted sessionIds. */
-  addSession: (session: Conversation) => void
-  /** Remove a session and its persisted id. Clears activeId if it matches. */
-  removeSession: (id: string) => void
+  /** Prepend a new session metadata, deduping by sessionId. Also updates persisted sessionIds. */
+  addSession: (session: QASession) => void
+  /** Remove a session, its messages, and its persisted id. Clears activeId if it matches. */
+  removeSession: (sessionId: string) => void
   /** Replace the messages array for a given session. */
-  updateSessionMessages: (id: string, messages: Message[]) => void
+  updateSessionMessages: (sessionId: string, messages: QAMessage[]) => void
+  /** Prepend a new message to a session's message list. */
+  appendSessionMessages: (sessionId: string, messages: QAMessage[]) => void
   setStreaming: (streaming: boolean) => void
   setError: (error: string | null) => void
   setLastFailedMsg: (msg: string | null) => void
@@ -52,6 +56,7 @@ export const useChatStore = create<ChatState>()(
       streaming: false,
       error: null,
       lastFailedMsg: null,
+      messagesBySession: {},
 
       setSessions: (sessions) => set({ sessions }),
 
@@ -70,16 +75,34 @@ export const useChatStore = create<ChatState>()(
           }
         }),
 
-      removeSession: (id) =>
+      removeSession: (sessionId) =>
+        set((state) => {
+          const { [sessionId]: _removed, ...restMessages } = state.messagesBySession
+          return {
+            sessions: state.sessions.filter((s) => s.id !== sessionId),
+            sessionIds: state.sessionIds.filter((sid) => sid !== sessionId),
+            activeId: state.activeId === sessionId ? null : state.activeId,
+            messagesBySession: restMessages,
+          }
+        }),
+
+      updateSessionMessages: (sessionId, messages) =>
         set((state) => ({
-          sessions: state.sessions.filter((s) => s.id !== id),
-          sessionIds: state.sessionIds.filter((sid) => sid !== id),
-          activeId: state.activeId === id ? null : state.activeId,
+          messagesBySession: {
+            ...state.messagesBySession,
+            [sessionId]: messages,
+          },
         })),
 
-      updateSessionMessages: (id, messages) =>
+      appendSessionMessages: (sessionId, messages) =>
         set((state) => ({
-          sessions: state.sessions.map((s) => (s.id === id ? { ...s, messages } : s)),
+          messagesBySession: {
+            ...state.messagesBySession,
+            [sessionId]: [
+              ...(state.messagesBySession[sessionId] ?? []),
+              ...messages,
+            ],
+          },
         })),
 
       setStreaming: (streaming) => set({ streaming }),

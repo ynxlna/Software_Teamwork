@@ -33,7 +33,7 @@ export const sessionKeys = {
 export function useSessions(page = 1, pageSize = 20) {
   return useQuery({
     queryKey: sessionKeys.list(page, pageSize),
-    queryFn: () => listSessions(page, pageSize),
+    queryFn: () => listSessions({ page, pageSize }),
     placeholderData: (prev) => prev,
   })
 }

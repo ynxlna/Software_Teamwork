@@ -26,9 +26,8 @@ const menuItems: AdminMenuItem[] = [
     key: 'reports',
     label: '报告生成',
     children: [
-      { key: 'report-generate', label: '生成向导', path: '/reports/generate' },
-      { key: 'report-records', label: '报告记录', path: '/reports/records' },
-      { key: 'report-templates', label: '模板素材', path: '/reports/templates' },
+      { key: 'report-records', label: '报告记录', path: '/admin/reports/records' },
+      { key: 'report-templates', label: '模板素材', path: '/admin/reports/templates' },
     ],
   },
   {

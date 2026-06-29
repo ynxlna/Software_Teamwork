@@ -7,15 +7,15 @@ import {
   useCreateSession,
   useDeleteSession,
   useRenameSession,
-  useSession,
+  useSessionMessages,
   useSessions,
 } from '@/features/qa'
 import type {
-  Citation,
-  Conversation,
-  ConversationListItem,
-  Message,
-  ThinkingStep,
+  QACitation,
+  QAMessage,
+  QASession,
+  QASessionListItem,
+  QAThinkingStep,
 } from '@/lib/types'
 import { useChatStore } from '@/stores/chat-store'
 
@@ -27,15 +27,19 @@ function nextId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2)
 }
 
-function toSessionListItem(s: Conversation): ConversationListItem {
-  const last = s.messages[s.messages.length - 1]
+function toSessionListItem(
+  s: QASession,
+  messages: QAMessage[],
+): QASessionListItem {
+  const last = messages[messages.length - 1]
   return {
     id: s.id,
     title: s.title,
-    message_count: s.messages.length,
-    last_message_preview: last ? last.content.slice(0, 50) : '',
-    created_at: s.created_at,
-    updated_at: s.updated_at,
+    status: s.status,
+    messageCount: messages.length,
+    lastMessagePreview: last ? last.content.slice(0, 50) : '',
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
   }
 }
 
@@ -73,9 +77,14 @@ export function ChatPage() {
   const addSession = useChatStore((s) => s.addSession)
   const removeSession = useChatStore((s) => s.removeSession)
   const updateSessionMessages = useChatStore((s) => s.updateSessionMessages)
+  const appendSessionMessages = useChatStore((s) => s.appendSessionMessages)
+  const messagesBySession = useChatStore((s) => s.messagesBySession)
 
-  // ── React Query: active session detail ──
-  const { data: sessionDetail, isError: sessionDetailError } = useSession(activeId ?? '')
+  // ── React Query: messages for active session (loaded separately from QASession) ──
+  const {
+    data: serverMessages,
+    isError: messagesError,
+  } = useSessionMessages(activeId ?? '')
 
   // ── Local input text ──
   const [inputText, setInputText] = useState('')
@@ -95,18 +104,20 @@ export function ChatPage() {
   useEffect(() => {
     if (sessionsData?.items) {
       const currentSessions = useChatStore.getState().sessions
-      const merged: Conversation[] = sessionsData.items.map((item) => {
+      const merged: QASession[] = sessionsData.items.map((item) => {
         const existing = currentSessions.find((s) => s.id === item.id)
         if (existing) {
-          // Preserve in-memory messages; update metadata from server
-          return { ...existing, title: item.title, updated_at: item.updated_at }
+          // Preserve existing metadata; update title/status/updatedAt from server
+          return { ...existing, title: item.title, status: item.status, updatedAt: item.updatedAt }
         }
         return {
           id: item.id,
           title: item.title,
-          messages: [] as Message[],
-          created_at: item.created_at,
-          updated_at: item.updated_at,
+          status: item.status,
+          messageCount: item.messageCount,
+          lastMessagePreview: item.lastMessagePreview,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
         }
       })
       setSessions(merged)
@@ -118,27 +129,29 @@ export function ChatPage() {
   // ══════════════════════════════════════════════════════════════════════════
 
   useEffect(() => {
-    if (sessionDetail && activeId) {
-      const current = useChatStore.getState().sessions.find((s) => s.id === activeId)
+    if (serverMessages && activeId) {
+      const current = useChatStore.getState().messagesBySession[activeId]
       // Only overwrite if local messages are empty (don't clobber streaming data)
-      if (current && current.messages.length === 0 && sessionDetail.messages.length > 0) {
-        updateSessionMessages(activeId, sessionDetail.messages)
+      if (!current || current.length === 0) {
+        if (serverMessages.length > 0) {
+          updateSessionMessages(activeId, serverMessages)
+        }
       }
     }
-  }, [sessionDetail, activeId, updateSessionMessages])
+  }, [serverMessages, activeId, updateSessionMessages])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Surface session detail fetch error when local messages are empty
+  // Surface messages fetch error when local messages are empty
   // ══════════════════════════════════════════════════════════════════════════
 
   useEffect(() => {
-    if (sessionDetailError && activeId) {
-      const local = useChatStore.getState().sessions.find((s) => s.id === activeId)
-      if (!local || local.messages.length === 0) {
+    if (messagesError && activeId) {
+      const local = useChatStore.getState().messagesBySession[activeId]
+      if (!local || local.length === 0) {
         setError('加载会话消息失败，请检查网络连接')
       }
     }
-  }, [sessionDetailError, activeId, setError])
+  }, [messagesError, activeId, setError])
 
   // ══════════════════════════════════════════════════════════════════════════
   // Cleanup SSE on unmount
@@ -151,12 +164,16 @@ export function ChatPage() {
   }, [])
 
   // ══════════════════════════════════════════════════════════════════════════
-  // Derive sidebar items
+  // Derive sidebar items (merge sessions + messages for display)
   // ══════════════════════════════════════════════════════════════════════════
 
-  const sidebarItems: ConversationListItem[] = useMemo(
-    () => sessions.map(toSessionListItem),
-    [sessions],
+  const sidebarItems: QASessionListItem[] = useMemo(
+    () =>
+      sessions.map((s) => {
+        const msgs = messagesBySession[s.id] ?? []
+        return toSessionListItem(s, msgs)
+      }),
+    [sessions, messagesBySession],
   )
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -178,10 +195,10 @@ export function ChatPage() {
   // ══════════════════════════════════════════════════════════════════════════
 
   const handleDelete = useCallback(
-    async (id: string) => {
+    async (sessionId: string) => {
       try {
-        await deleteSessionMut.mutateAsync(id)
-        removeSession(id)
+        await deleteSessionMut.mutateAsync(sessionId)
+        removeSession(sessionId)
       } catch {
         setError('删除会话失败，请检查网络连接')
       }
@@ -198,7 +215,11 @@ export function ChatPage() {
       try {
         await renameSessionMut.mutateAsync({ sessionId, title: newTitle })
         const current = useChatStore.getState().sessions
-        setSessions(current.map((s) => (s.id === sessionId ? { ...s, title: newTitle } : s)))
+        setSessions(
+          current.map((s) =>
+            s.id === sessionId ? { ...s, title: newTitle } : s,
+          ),
+        )
       } catch {
         setError('重命名会话失败')
       }
@@ -236,31 +257,37 @@ export function ChatPage() {
       const uid: string = targetId
 
       // ② Push user message + empty assistant message into store
-      const userMsg: Message = {
+      const userMsg: QAMessage = {
         id: nextId(),
+        sessionId: uid,
         role: 'user',
         content: trimmed,
-        timestamp: new Date().toISOString(),
+        status: 'completed',
+        createdAt: new Date().toISOString(),
       }
-      const asstMsg: Message = {
+      const asstMsg: QAMessage = {
         id: nextId(),
+        sessionId: uid,
         role: 'assistant',
         content: '',
-        timestamp: new Date().toISOString(),
         status: 'streaming',
+        createdAt: new Date().toISOString(),
         thinking: [],
         citations: [],
       }
 
+      appendSessionMessages(uid, [userMsg, asstMsg])
+
+      // Update session metadata (title for first message)
       useChatStore.setState((state) => ({
         sessions: state.sessions.map((s) => {
           if (s.id !== uid) return s
-          const isFirst = s.messages.length === 0
+          const msgs = state.messagesBySession[uid] ?? []
+          const isFirst = msgs.length <= 2
           return {
             ...s,
             title: isFirst ? trimmed.slice(0, 30) + (trimmed.length > 30 ? '…' : '') : s.title,
-            messages: [...s.messages, userMsg, asstMsg],
-            updated_at: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
           }
         }),
       }))
@@ -269,30 +296,33 @@ export function ChatPage() {
 
       // Accumulators for SSE events
       let content = ''
-      const steps: ThinkingStep[] = []
-      const cites: Citation[] = []
+      const steps: QAThinkingStep[] = []
+      const cites: QACitation[] = []
 
       /**
        * Patch the last assistant message in the active session.
        * Uses Zustand setState with functional updater for latest state.
        */
       const patchAssistant = (patch: {
+        id?: string
         content?: string
-        thinking?: ThinkingStep[]
-        citations?: Citation[]
-        status?: Message['status']
+        thinking?: QAThinkingStep[]
+        citations?: QACitation[]
+        status?: QAMessage['status']
       }) => {
-        useChatStore.setState((state) => ({
-          sessions: state.sessions.map((s) => {
-            if (s.id !== uid) return s
-            const msgs = [...s.messages]
-            const lastIdx = msgs.length - 1
-            const last = msgs[lastIdx]
-            if (!last || last.role !== 'assistant') return s
-            msgs[lastIdx] = { ...last, ...patch }
-            return { ...s, messages: msgs }
-          }),
-        }))
+        useChatStore.setState((state) => {
+          const msgs = [...(state.messagesBySession[uid] ?? [])]
+          const lastIdx = msgs.length - 1
+          const last = msgs[lastIdx]
+          if (!last || last.role !== 'assistant') return state
+          msgs[lastIdx] = { ...last, ...patch }
+          return {
+            messagesBySession: {
+              ...state.messagesBySession,
+              [uid]: msgs,
+            },
+          }
+        })
       }
 
       // Seq verification helper
@@ -311,48 +341,104 @@ export function ChatPage() {
 
       // ③ Initiate SSE stream
       const { abort } = streamChat(
-        { conversation_id: uid, message: trimmed },
+        uid,
+        trimmed,
         {
-          onIntentStatus(data) {
+          onMessageCreated(data) {
             if (!verifySeq(data.seq)) return
-            const ex = steps.find((s) => s.type === 'intent')
-            if (data.status === 'started' && !ex) {
+            // Capture the real message id from the server
+            const serverMsgId = data.messageId as string | undefined
+            if (serverMsgId) {
+              patchAssistant({ id: serverMsgId })
+            }
+          },
+          onAgentIterationStarted(data) {
+            if (!verifySeq(data.seq)) return
+            const iterationNo = data.iterationNo as number | undefined
+            const label = iterationNo != null ? `Agent 迭代 ${iterationNo}` : 'Agent 分析中'
+            const ex = steps.find(
+              (s) => s.type === 'agent_iteration' && s.status === 'running',
+            )
+            if (!ex) {
               steps.push({
-                type: 'intent',
-                label: data.label,
+                type: 'agent_iteration',
+                label,
                 status: 'running',
               })
-            } else if (data.status === 'done' && ex) {
-              ex.status = 'done'
-              ex.label = data.label
             }
             patchAssistant({ thinking: [...steps] })
           },
-          onThinkingStep(data) {
+          onReasoningStep(data) {
             if (!verifySeq(data.seq)) return
-            const idx = steps.findIndex((s) => s.type === data.step.type)
+            const step = (data as Record<string, unknown>).step as QAThinkingStep | undefined
+            if (!step) return
+            const idx = steps.findIndex((s) => s.type === step.type)
             if (idx >= 0) {
-              steps[idx] = data.step
+              steps[idx] = step
             } else {
-              steps.push(data.step)
+              steps.push(step)
             }
             patchAssistant({ thinking: [...steps] })
           },
-          onToken(data) {
+          onToolStarted(data) {
+            if (!verifySeq(data.seq)) return
+            const toolName = (data.toolName as string) ?? '工具调用'
+            steps.push({
+              type: 'tool_call',
+              label: `调用: ${toolName}`,
+              status: 'running',
+            })
+            patchAssistant({ thinking: [...steps] })
+          },
+          onToolCompleted(data) {
+            if (!verifySeq(data.seq)) return
+            const toolName = (data.toolName as string) ?? '工具'
+            // Mark running tool_call step as done
+            const idx = steps.findIndex(
+              (s) => s.type === 'tool_call' && s.status === 'running',
+            )
+            if (idx >= 0) {
+              steps[idx] = {
+                ...steps[idx],
+                status: 'done',
+                label: `${toolName} 完成`,
+              }
+            }
+            patchAssistant({ thinking: [...steps] })
+          },
+          onToolFailed(data) {
+            if (!verifySeq(data.seq)) return
+            const toolName = (data.toolName as string) ?? '工具'
+            const idx = steps.findIndex(
+              (s) => s.type === 'tool_call' && s.status === 'running',
+            )
+            if (idx >= 0) {
+              steps[idx] = {
+                ...steps[idx],
+                status: 'failed',
+                label: `${toolName} 失败`,
+              }
+            }
+            patchAssistant({ thinking: [...steps] })
+          },
+          onAnswerDelta(data) {
             if (!verifySeq(data.seq)) return
             if (!firstToken) {
               firstToken = true
               patchAssistant({ status: 'streaming' })
             }
-            content += data.text
+            content += (data.content as string) ?? ''
             patchAssistant({ content })
           },
-          onCitation(data) {
+          onCitationDelta(data) {
             if (!verifySeq(data.seq)) return
-            cites.push(data.citation)
-            patchAssistant({ citations: [...cites] })
+            const citation = (data as Record<string, unknown>).citation as QACitation | undefined
+            if (citation) {
+              cites.push(citation)
+              patchAssistant({ citations: [...cites] })
+            }
           },
-          onDone() {
+          onAnswerCompleted() {
             setStreaming(false)
             abortRef.current = null
             patchAssistant({
@@ -395,6 +481,7 @@ export function ChatPage() {
     },
     [
       addSession,
+      appendSessionMessages,
       clearError,
       createSessionMut,
       setActiveId,
@@ -437,6 +524,7 @@ export function ChatPage() {
   // ══════════════════════════════════════════════════════════════════════════
 
   const activeSession = sessions.find((s) => s.id === activeId)
+  const activeMessages = activeId ? (messagesBySession[activeId] ?? []) : []
 
   // ══════════════════════════════════════════════════════════════════════════
   // Render
@@ -476,7 +564,7 @@ export function ChatPage() {
 
         {/* Messages area */}
         <ChatMessages
-          messages={activeSession?.messages ?? []}
+          messages={activeMessages}
           streaming={streaming}
           error={error}
           suggestedPrompts={SUGGESTED_PROMPTS}

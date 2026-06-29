@@ -106,7 +106,7 @@ function formToUpdateRequest(form: FormData) {
   if (form.apiKey) {
     params.apiKey = form.apiKey
   }
-  params.defaultParameters = { max_tokens: form.maxTokens }
+  params.defaultParameters = { maxTokens: form.maxTokens }
   return params
 }
 
@@ -197,7 +197,7 @@ export function ModelProfilesPage() {
       model: profile.model,
       apiKey: '',
       timeoutMs: profile.timeoutMs,
-      maxTokens: (profile.defaultParameters?.max_tokens as number) ?? 0,
+      maxTokens: (profile.defaultParameters?.maxTokens as number) ?? 0,
     })
     setEditOpen(true)
   }, [])

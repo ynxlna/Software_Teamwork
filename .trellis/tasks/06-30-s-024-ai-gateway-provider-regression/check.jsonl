@@ -1,0 +1,4 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Final AI Gateway go test/go build and diff whitespace verification."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Re-check provider error diagnostics and leakage behavior."}
+{"file":".trellis/spec/guides/commit-convention.md","reason":"Commit message format before committing task work."}
+{"file":".trellis/tasks/06-30-s-024-ai-gateway-provider-regression/research/provider-regression.md","reason":"Validate implementation and docs still match the researched gap."}

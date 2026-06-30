@@ -1,0 +1,7 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend service pre-development checklist and AI Gateway service-local quality gate."}
+{"file":".trellis/spec/backend/api-contracts.md","reason":"AI Gateway model invocation contract and error envelope constraints."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Provider failure normalization and no raw downstream error leakage."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Provider API key, prompt, embedding, and document text must not leak to logs or summaries."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required Go service-local test/build checks for AI Gateway changes."}
+{"file":".trellis/spec/guides/code-reuse-thinking-guide.md","reason":"Reuse existing provider smoke patterns instead of introducing duplicate helpers."}
+{"file":".trellis/tasks/06-30-s-024-ai-gateway-provider-regression/research/provider-regression.md","reason":"Local research summary for issue #287 implementation scope."}

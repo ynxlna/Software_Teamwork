@@ -43,6 +43,11 @@ func (r *Registry) Handler() http.Handler {
 	return promhttp.HandlerFor(r.reg, promhttp.HandlerOpts{})
 }
 
+// Gatherer exposes the underlying prometheus.Gatherer for diagnostics and tests.
+func (r *Registry) Gatherer() prometheus.Gatherer {
+	return r.reg
+}
+
 // ObserveHTTP records one HTTP request.
 // Labels must be low-cardinality: method is the HTTP verb, path is the matched
 // route pattern (never a raw URL containing user-supplied IDs), status is the

@@ -693,6 +693,82 @@ func (r *MemoryRepository) GetDocument(ctx context.Context, id string, scope ser
 	return cloneDocument(r.hydrateDocumentLocked(doc)), nil
 }
 
+func (r *MemoryRepository) UpdateDocument(ctx context.Context, input service.UpdateDocumentRecord, scope service.AccessScope) (service.KnowledgeDocument, error) {
+	if err := ctx.Err(); err != nil {
+		return service.KnowledgeDocument{}, err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	doc, exists := r.documents[input.ID]
+	if !exists || doc.DeletedAt != nil {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	kb, exists := r.knowledgeBases[doc.KnowledgeBaseID]
+	if !exists || kb.DeletedAt != nil {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	if !canRead(doc.CreatedBy, scope) && !canRead(kb.CreatedBy, scope) {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	doc.Tags = append([]string(nil), input.Tags...)
+	doc.UpdatedAt = input.UpdatedAt
+	r.documents[doc.ID] = doc
+	return cloneDocument(r.hydrateDocumentLocked(doc)), nil
+}
+
+func (r *MemoryRepository) SoftDeleteDocument(ctx context.Context, input service.DeleteDocumentRecord, scope service.AccessScope) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	doc, exists := r.documents[input.DocumentID]
+	if !exists || doc.DeletedAt != nil {
+		return service.ErrNotFound
+	}
+	kb, exists := r.knowledgeBases[doc.KnowledgeBaseID]
+	if !exists || kb.DeletedAt != nil {
+		return service.ErrNotFound
+	}
+	if !canRead(doc.CreatedBy, scope) && !canRead(kb.CreatedBy, scope) {
+		return service.ErrNotFound
+	}
+	if _, exists := r.jobs[input.JobID]; exists {
+		return service.ErrConflict
+	}
+	deleted := input.DeletedAt.UTC()
+	doc.DeletedAt = &deleted
+	doc.UpdatedAt = deleted
+	doc.CurrentJobID = cloneStringPtr(&input.JobID)
+	r.documents[doc.ID] = doc
+
+	documentID := doc.ID
+	stage := input.JobStage
+	message := input.JobMessage
+	job := service.ProcessingJob{
+		ID:              input.JobID,
+		KnowledgeBaseID: doc.KnowledgeBaseID,
+		DocumentID:      &documentID,
+		JobType:         input.JobType,
+		Status:          input.JobStatus,
+		CurrentStage:    &stage,
+		ProgressPercent: 0,
+		Message:         &message,
+		Attempts:        0,
+		MaxAttempts:     input.MaxAttempts,
+		CreatedAt:       input.CreatedAt,
+		UpdatedAt:       input.UpdatedAt,
+	}
+	r.jobs[job.ID] = job
+	return nil
+}
+
+func (r *MemoryRepository) ListDocumentChunks(ctx context.Context, documentID string, scope service.AccessScope, page service.PageInput) (service.DocumentChunkList, error) {
+	return r.ListChunks(ctx, documentID, scope, page)
+}
+
 func (r *MemoryRepository) FindChunksByIDs(ctx context.Context, ids []string) ([]service.DocumentChunk, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -745,6 +821,16 @@ func (r *MemoryRepository) ReplaceDocumentChunks(ctx context.Context, documentID
 		r.documents[documentID] = doc
 	}
 	return nil
+}
+
+func (r *MemoryRepository) SeedDocumentChunk(chunk service.DocumentChunk) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.chunks[chunk.ID] = cloneChunk(chunk)
+	if doc, exists := r.documents[chunk.DocumentID]; exists {
+		doc.ChunkCount = r.documentChunkCountLocked(doc.ID)
+		r.documents[doc.ID] = doc
+	}
 }
 
 func (r *MemoryRepository) hydrateKnowledgeBaseLocked(kb service.KnowledgeBase) service.KnowledgeBase {
@@ -853,12 +939,20 @@ func cloneJob(job service.ProcessingJob) service.ProcessingJob {
 	return job
 }
 
+func cloneChunks(items []service.DocumentChunk) []service.DocumentChunk {
+	out := make([]service.DocumentChunk, len(items))
+	for i, item := range items {
+		out[i] = cloneChunk(item)
+	}
+	return out
+}
+
 func cloneChunk(chunk service.DocumentChunk) service.DocumentChunk {
 	chunk.SectionPath = cloneStringPtr(chunk.SectionPath)
-	chunk.TokenCount = cloneInt32Ptr(chunk.TokenCount)
 	chunk.ChunkType = cloneStringPtr(chunk.ChunkType)
 	chunk.QdrantPointID = cloneStringPtr(chunk.QdrantPointID)
 	chunk.EmbeddingProvider = cloneStringPtr(chunk.EmbeddingProvider)
+	chunk.TokenCount = cloneInt32Ptr(chunk.TokenCount)
 	chunk.EmbeddingModel = cloneStringPtr(chunk.EmbeddingModel)
 	chunk.EmbeddingDimension = cloneInt32Ptr(chunk.EmbeddingDimension)
 	if chunk.Metadata == nil {

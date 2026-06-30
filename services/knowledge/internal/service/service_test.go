@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -503,10 +504,111 @@ func TestUploadDocumentMarksFailureWhenQueueHandoffFails(t *testing.T) {
 	}
 }
 
+func TestDocumentLifecycleUpdateDeleteChunksAndContent(t *testing.T) {
+	now := time.Date(2026, 6, 30, 9, 0, 0, 0, time.UTC)
+	repo := repository.NewMemoryRepository()
+	fileRef := "file_1"
+	repo.SeedKnowledgeBase(service.KnowledgeBase{
+		ID:                "kb_1",
+		Name:              "规程库",
+		Description:       "",
+		DocType:           "GENERAL",
+		ChunkStrategy:     json.RawMessage(`{}`),
+		RetrievalStrategy: json.RawMessage(`{}`),
+		CreatedBy:         "usr_1",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	repo.SeedDocument(service.KnowledgeDocument{
+		ID:              "doc_1",
+		KnowledgeBaseID: "kb_1",
+		FileRef:         &fileRef,
+		Name:            "规程.pdf",
+		Status:          service.DocumentStatusUploaded,
+		Tags:            []string{"旧标签"},
+		CreatedBy:       "usr_1",
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	})
+	tokenCount := int32(12)
+	repo.SeedDocumentChunk(service.DocumentChunk{
+		ID:              "chunk_1",
+		KnowledgeBaseID: "kb_1",
+		DocumentID:      "doc_1",
+		ChunkIndex:      0,
+		Content:         "第一段",
+		TokenCount:      &tokenCount,
+		Metadata:        map[string]any{"source": "parser"},
+		CreatedAt:       now,
+	})
+	files := &uploadFileClient{
+		contentFn: func(ctx context.Context, reqCtx service.RequestContext, fileID string) (service.FileContent, error) {
+			if fileID != "file_1" || reqCtx.RequestID != "req_content" {
+				t.Fatalf("content call fileID=%q reqCtx=%+v", fileID, reqCtx)
+			}
+			return service.FileContent{
+				Content:     io.NopCloser(strings.NewReader("pdf-bytes")),
+				ContentType: "application/pdf",
+				SizeBytes:   9,
+			}, nil
+		},
+	}
+	svc := service.NewWithDependencies(repo, files, nil, func() time.Time {
+		return now.Add(time.Hour)
+	}, func(prefix string) string {
+		return prefix + "_cleanup"
+	}, service.WithProcessingPipeline(files, nil, nil))
+
+	updatedTags := []string{"锅炉", "锅炉", " 规程 "}
+	updated, err := svc.UpdateDocument(context.Background(), writeContext("usr_1"), service.UpdateDocumentInput{
+		ID:   "doc_1",
+		Tags: &updatedTags,
+	})
+	if err != nil {
+		t.Fatalf("UpdateDocument() error = %v", err)
+	}
+	if len(updated.Tags) != 2 || updated.Tags[0] != "锅炉" || updated.Tags[1] != "规程" {
+		t.Fatalf("updated tags = %+v", updated.Tags)
+	}
+
+	chunks, err := svc.ListDocumentChunks(context.Background(), readContext("usr_1"), service.ListDocumentChunksInput{DocumentID: "doc_1"})
+	if err != nil {
+		t.Fatalf("ListDocumentChunks() error = %v", err)
+	}
+	if chunks.Page.Total != 1 || len(chunks.Items) != 1 || chunks.Items[0].Content != "第一段" {
+		t.Fatalf("chunks = %+v", chunks)
+	}
+
+	content, err := svc.GetDocumentContent(context.Background(), service.RequestContext{
+		RequestID: "req_content",
+		UserID:    "usr_1",
+	}, "doc_1")
+	if err != nil {
+		t.Fatalf("GetDocumentContent() error = %v", err)
+	}
+	body, err := io.ReadAll(content.Body)
+	if err != nil {
+		t.Fatalf("read content: %v", err)
+	}
+	_ = content.Body.Close()
+	if string(body) != "pdf-bytes" || content.ContentType != "application/pdf" {
+		t.Fatalf("content = %q type=%q", string(body), content.ContentType)
+	}
+
+	if err := svc.DeleteDocument(context.Background(), writeContext("usr_1"), "doc_1"); err != nil {
+		t.Fatalf("DeleteDocument() error = %v", err)
+	}
+	_, err = svc.GetDocument(context.Background(), readContext("usr_1"), "doc_1")
+	if !hasCode(err, service.CodeNotFound) {
+		t.Fatalf("GetDocument() after delete error = %v", err)
+	}
+}
+
 type uploadFileClient struct {
-	createFn func(context.Context, service.RequestContext, service.UploadedFile) (service.FileObject, error)
-	deleteFn func(context.Context, service.RequestContext, string) error
-	deleted  []string
+	createFn  func(context.Context, service.RequestContext, service.UploadedFile) (service.FileObject, error)
+	deleteFn  func(context.Context, service.RequestContext, string) error
+	contentFn func(context.Context, service.RequestContext, string) (service.FileContent, error)
+	deleted   []string
 }
 
 func (f *uploadFileClient) CreateFile(ctx context.Context, reqCtx service.RequestContext, file service.UploadedFile) (service.FileObject, error) {
@@ -522,6 +624,25 @@ func (f *uploadFileClient) DeleteFile(ctx context.Context, reqCtx service.Reques
 		return f.deleteFn(ctx, reqCtx, fileID)
 	}
 	return nil
+}
+
+func (f *uploadFileClient) GetFileContent(ctx context.Context, reqCtx service.RequestContext, fileID string) (service.FileContent, error) {
+	if f.contentFn != nil {
+		return f.contentFn(ctx, reqCtx, fileID)
+	}
+	return service.FileContent{}, service.NotFoundError("file content not found")
+}
+
+func (f *uploadFileClient) ReadSource(ctx context.Context, reqCtx service.RequestContext, fileID string) (service.SourceDocument, error) {
+	content, err := f.GetFileContent(ctx, reqCtx, fileID)
+	if err != nil {
+		return service.SourceDocument{}, err
+	}
+	return service.SourceDocument{
+		Body:        content.Content,
+		ContentType: content.ContentType,
+		SizeBytes:   content.SizeBytes,
+	}, nil
 }
 
 type uploadQueue struct {

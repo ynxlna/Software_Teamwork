@@ -159,24 +159,61 @@ func (c *Client) ReadSource(ctx context.Context, reqCtx service.RequestContext, 
 	if fileID == "" {
 		return service.SourceDocument{}, service.NewError(service.CodeDependency, "file source is not configured", nil)
 	}
+	content, err := c.readContent(ctx, reqCtx, fileID, false)
+	if err != nil {
+		return service.SourceDocument{}, err
+	}
+	return service.SourceDocument{
+		Body:        content.Content,
+		ContentType: content.ContentType,
+		SizeBytes:   content.SizeBytes,
+	}, nil
+}
+
+func (c *Client) GetFileContent(ctx context.Context, reqCtx service.RequestContext, fileID string) (service.FileContent, error) {
+	fileID = strings.TrimSpace(fileID)
+	if fileID == "" {
+		return service.FileContent{}, service.NewError(service.CodeNotFound, "file content not found", nil)
+	}
+	return c.readContent(ctx, reqCtx, fileID, true)
+}
+
+func (c *Client) readContent(ctx context.Context, reqCtx service.RequestContext, fileID string, exposeResourceErrors bool) (service.FileContent, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/internal/v1/files/"+url.PathEscape(fileID)+"/content", nil)
 	if err != nil {
-		return service.SourceDocument{}, service.NewError(service.CodeDependency, "file service request failed", err)
+		return service.FileContent{}, service.NewError(service.CodeDependency, "file service request failed", err)
 	}
 	c.setContextHeaders(req, reqCtx)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return service.SourceDocument{}, service.NewError(service.CodeDependency, "file service unavailable", err)
+		return service.FileContent{}, service.NewError(service.CodeDependency, "file service unavailable", err)
 	}
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		defer resp.Body.Close()
 		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
-		return service.SourceDocument{}, service.NewError(service.CodeDependency, "file service content read failed", nil)
+		if !exposeResourceErrors {
+			return service.FileContent{}, service.NewError(service.CodeDependency, "file service content read failed", nil)
+		}
+		switch resp.StatusCode {
+		case http.StatusNotFound:
+			return service.FileContent{}, service.NewError(service.CodeNotFound, "file content not found", nil)
+		case http.StatusUnauthorized:
+			return service.FileContent{}, service.NewError(service.CodeUnauthorized, "file service rejected knowledge request", nil)
+		case http.StatusForbidden:
+			return service.FileContent{}, service.NewError(service.CodeForbidden, "file service rejected knowledge request", nil)
+		default:
+			return service.FileContent{}, service.NewError(service.CodeDependency, "file service failed", nil)
+		}
 	}
-	return service.SourceDocument{
-		Body:        resp.Body,
-		ContentType: strings.TrimSpace(resp.Header.Get("Content-Type")),
+
+	contentType := strings.TrimSpace(resp.Header.Get("Content-Type"))
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+	return service.FileContent{
+		Content:     resp.Body,
+		ContentType: contentType,
 		SizeBytes:   resp.ContentLength,
 	}, nil
 }

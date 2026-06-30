@@ -467,6 +467,71 @@ func (s *Service) GetDocument(ctx context.Context, reqCtx RequestContext, id str
 	return doc, nil
 }
 
+func (s *Service) UpdateDocument(ctx context.Context, reqCtx RequestContext, input UpdateDocumentInput) (KnowledgeDocument, error) {
+	scope, err := mutationScope(reqCtx)
+	if err != nil {
+		return KnowledgeDocument{}, err
+	}
+	id := strings.TrimSpace(input.ID)
+	if id == "" {
+		return KnowledgeDocument{}, ValidationError("request validation failed", map[string]string{"documentId": "is required"})
+	}
+	fields := map[string]string{}
+	var tags []string
+	if input.Tags == nil {
+		fields["body"] = "must include at least one supported field"
+	} else {
+		var tagFields map[string]string
+		tags, tagFields = normalizeTags(*input.Tags)
+		for key, value := range tagFields {
+			fields[key] = value
+		}
+	}
+	if len(fields) > 0 {
+		return KnowledgeDocument{}, ValidationError("request validation failed", fields)
+	}
+	doc, err := s.repo.UpdateDocument(ctx, UpdateDocumentRecord{
+		ID:        id,
+		Tags:      tags,
+		UpdatedAt: s.now(),
+	}, scope)
+	if err != nil {
+		return KnowledgeDocument{}, repositoryError(err)
+	}
+	return doc, nil
+}
+
+func (s *Service) DeleteDocument(ctx context.Context, reqCtx RequestContext, id string) error {
+	scope, err := mutationScope(reqCtx)
+	if err != nil {
+		return err
+	}
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return ValidationError("request validation failed", map[string]string{"documentId": "is required"})
+	}
+	now := s.now()
+	if err := s.repo.SoftDeleteDocument(ctx, DeleteDocumentRecord{
+		DocumentID:  id,
+		JobID:       s.newID("job"),
+		JobType:     JobTypeDeleteCleanup,
+		JobStatus:   JobStatusQueued,
+		JobStage:    "delete_cleanup",
+		JobMessage:  "document marked deleted; cleanup is pending",
+		MaxAttempts: DefaultIngestionMaxAttempts,
+		DeletedAt:   now,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}, scope); err != nil {
+		return repositoryError(err)
+	}
+	return nil
+}
+
+func (s *Service) ListDocumentChunks(ctx context.Context, reqCtx RequestContext, input ListDocumentChunksInput) (DocumentChunkList, error) {
+	return s.ListChunks(ctx, reqCtx, ListChunksInput(input))
+}
+
 func (s *Service) GetDocumentContent(ctx context.Context, reqCtx RequestContext, id string) (SourceDocument, error) {
 	scope, err := readScope(reqCtx)
 	if err != nil {

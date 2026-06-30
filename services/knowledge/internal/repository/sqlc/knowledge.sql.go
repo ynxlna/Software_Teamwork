@@ -11,6 +11,30 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countDocumentChunks = `-- name: CountDocumentChunks :one
+SELECT COUNT(*)::bigint
+FROM document_chunks dc
+JOIN knowledge_documents d ON d.id = dc.document_id
+JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+WHERE dc.document_id = $1
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND ($2::boolean OR d.created_by = $3 OR kb.created_by = $3)
+`
+
+type CountDocumentChunksParams struct {
+	DocumentID string `json:"document_id"`
+	CanReadAll bool   `json:"can_read_all"`
+	UserID     string `json:"user_id"`
+}
+
+func (q *Queries) CountDocumentChunks(ctx context.Context, arg CountDocumentChunksParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countDocumentChunks, arg.DocumentID, arg.CanReadAll, arg.UserID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const countDocumentsByKnowledgeBase = `-- name: CountDocumentsByKnowledgeBase :one
 SELECT COUNT(*)::bigint
 FROM knowledge_documents d
@@ -396,6 +420,29 @@ func (q *Queries) CreateProcessingJob(ctx context.Context, arg CreateProcessingJ
 	return i, err
 }
 
+const getDeletedDocumentKnowledgeBaseID = `-- name: GetDeletedDocumentKnowledgeBaseID :one
+SELECT d.knowledge_base_id
+FROM knowledge_documents d
+JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+WHERE d.id = $1
+  AND d.deleted_at IS NOT NULL
+  AND kb.deleted_at IS NULL
+  AND ($2::boolean OR d.created_by = $3 OR kb.created_by = $3)
+`
+
+type GetDeletedDocumentKnowledgeBaseIDParams struct {
+	ID         string `json:"id"`
+	CanReadAll bool   `json:"can_read_all"`
+	UserID     string `json:"user_id"`
+}
+
+func (q *Queries) GetDeletedDocumentKnowledgeBaseID(ctx context.Context, arg GetDeletedDocumentKnowledgeBaseIDParams) (string, error) {
+	row := q.db.QueryRow(ctx, getDeletedDocumentKnowledgeBaseID, arg.ID, arg.CanReadAll, arg.UserID)
+	var knowledge_base_id string
+	err := row.Scan(&knowledge_base_id)
+	return knowledge_base_id, err
+}
+
 const getDocument = `-- name: GetDocument :one
 SELECT
   d.id,
@@ -551,6 +598,96 @@ func (q *Queries) GetKnowledgeBase(ctx context.Context, arg GetKnowledgeBasePara
 		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const listDocumentChunks = `-- name: ListDocumentChunks :many
+SELECT
+  dc.id,
+  dc.knowledge_base_id,
+  dc.document_id,
+  dc.chunk_index,
+  dc.section_path,
+  dc.content,
+  dc.token_count,
+  dc.chunk_type,
+  dc.qdrant_point_id,
+  dc.embedding_provider,
+  dc.embedding_dimension,
+  dc.metadata,
+  dc.created_at
+FROM document_chunks dc
+JOIN knowledge_documents d ON d.id = dc.document_id
+JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+WHERE dc.document_id = $1
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND ($2::boolean OR d.created_by = $3 OR kb.created_by = $3)
+ORDER BY dc.chunk_index ASC, dc.id ASC
+LIMIT $5 OFFSET $4
+`
+
+type ListDocumentChunksParams struct {
+	DocumentID  string `json:"document_id"`
+	CanReadAll  bool   `json:"can_read_all"`
+	UserID      string `json:"user_id"`
+	OffsetCount int32  `json:"offset_count"`
+	LimitCount  int32  `json:"limit_count"`
+}
+
+type ListDocumentChunksRow struct {
+	ID                 string             `json:"id"`
+	KnowledgeBaseID    string             `json:"knowledge_base_id"`
+	DocumentID         string             `json:"document_id"`
+	ChunkIndex         int32              `json:"chunk_index"`
+	SectionPath        pgtype.Text        `json:"section_path"`
+	Content            string             `json:"content"`
+	TokenCount         pgtype.Int4        `json:"token_count"`
+	ChunkType          pgtype.Text        `json:"chunk_type"`
+	QdrantPointID      pgtype.Text        `json:"qdrant_point_id"`
+	EmbeddingProvider  pgtype.Text        `json:"embedding_provider"`
+	EmbeddingDimension pgtype.Int4        `json:"embedding_dimension"`
+	Metadata           []byte             `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) ListDocumentChunks(ctx context.Context, arg ListDocumentChunksParams) ([]ListDocumentChunksRow, error) {
+	rows, err := q.db.Query(ctx, listDocumentChunks,
+		arg.DocumentID,
+		arg.CanReadAll,
+		arg.UserID,
+		arg.OffsetCount,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDocumentChunksRow
+	for rows.Next() {
+		var i ListDocumentChunksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.KnowledgeBaseID,
+			&i.DocumentID,
+			&i.ChunkIndex,
+			&i.SectionPath,
+			&i.Content,
+			&i.TokenCount,
+			&i.ChunkType,
+			&i.QdrantPointID,
+			&i.EmbeddingProvider,
+			&i.EmbeddingDimension,
+			&i.Metadata,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDocumentsByKnowledgeBase = `-- name: ListDocumentsByKnowledgeBase :many
@@ -756,6 +893,42 @@ func (q *Queries) ListKnowledgeBases(ctx context.Context, arg ListKnowledgeBases
 	return items, nil
 }
 
+const markDocumentDeleted = `-- name: MarkDocumentDeleted :execrows
+UPDATE knowledge_documents d
+SET
+  deleted_at = $1,
+  updated_at = $1,
+  current_job_id = $2
+FROM knowledge_bases kb
+WHERE d.id = $3
+  AND kb.id = d.knowledge_base_id
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND ($4::boolean OR d.created_by = $5 OR kb.created_by = $5)
+`
+
+type MarkDocumentDeletedParams struct {
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+	CleanupJobID pgtype.Text        `json:"cleanup_job_id"`
+	ID           string             `json:"id"`
+	CanReadAll   bool               `json:"can_read_all"`
+	UserID       string             `json:"user_id"`
+}
+
+func (q *Queries) MarkDocumentDeleted(ctx context.Context, arg MarkDocumentDeletedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, markDocumentDeleted,
+		arg.DeletedAt,
+		arg.CleanupJobID,
+		arg.ID,
+		arg.CanReadAll,
+		arg.UserID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const markDocumentFailed = `-- name: MarkDocumentFailed :execrows
 UPDATE knowledge_documents
 SET
@@ -856,6 +1029,41 @@ func (q *Queries) MarkProcessingJobFailed(ctx context.Context, arg MarkProcessin
 		arg.ErrorMessage,
 		arg.FinishedAt,
 		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateDocumentTags = `-- name: UpdateDocumentTags :execrows
+UPDATE knowledge_documents d
+SET
+  tags = $1,
+  updated_at = $2
+FROM knowledge_bases kb
+WHERE d.id = $3
+  AND kb.id = d.knowledge_base_id
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND ($4::boolean OR d.created_by = $5 OR kb.created_by = $5)
+`
+
+type UpdateDocumentTagsParams struct {
+	Tags       []byte             `json:"tags"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	ID         string             `json:"id"`
+	CanReadAll bool               `json:"can_read_all"`
+	UserID     string             `json:"user_id"`
+}
+
+func (q *Queries) UpdateDocumentTags(ctx context.Context, arg UpdateDocumentTagsParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateDocumentTags,
+		arg.Tags,
+		arg.UpdatedAt,
+		arg.ID,
+		arg.CanReadAll,
+		arg.UserID,
 	)
 	if err != nil {
 		return 0, err

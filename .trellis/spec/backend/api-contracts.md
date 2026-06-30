@@ -749,6 +749,156 @@ ai-gateway verifies request model matches profile.model before decrypting creden
 ai-gateway forwards model=profile.model to the provider
 ```
 
+## Scenario: Knowledge Document Lifecycle APIs
+
+### 1. Scope / Trigger
+
+- Trigger: implementing or changing Knowledge-owned document detail update,
+  deletion, original content reads, or chunk listing.
+- Applies to `services/knowledge/internal/http`,
+  `services/knowledge/internal/service`, `services/knowledge/internal/repository`,
+  `services/knowledge/internal/platform/fileclient`,
+  `services/gateway/internal/http/routes.go`, and the matching Gateway OpenAPI
+  document routes.
+
+### 2. Signatures
+
+Gateway public routes:
+
+```text
+PATCH  /api/v1/documents/{documentId}
+DELETE /api/v1/documents/{documentId}
+GET    /api/v1/documents/{documentId}/chunks?page=&pageSize=
+GET    /api/v1/documents/{documentId}/content
+```
+
+Knowledge internal routes:
+
+```text
+PATCH  /internal/v1/documents/{documentId}
+DELETE /internal/v1/documents/{documentId}
+GET    /internal/v1/documents/{documentId}/chunks?page=&pageSize=
+GET    /internal/v1/documents/{documentId}/content
+```
+
+File Service content read:
+
+```text
+GET /internal/v1/files/{fileId}/content
+```
+
+Database state involved:
+
+- `knowledge_documents.file_ref` remains internal and stores the File Service ID.
+- `knowledge_documents.deleted_at` hides soft-deleted documents.
+- `knowledge_documents.current_job_id` may point at a durable cleanup marker.
+- `processing_jobs.job_type = 'delete_cleanup'` records retryable deletion
+  cleanup work.
+- `document_chunks` is listed by `document_id`, ordered by `chunk_index` then
+  `id`.
+
+### 3. Contracts
+
+- Knowledge is the owner service for document lifecycle business state. Gateway
+  only authenticates, injects trusted context headers, and proxies active routes.
+- JSON success responses use the standard `{ data, requestId }` or
+  `{ data, page, requestId }` envelope.
+- `GET /documents/{documentId}/content` successful responses stream the original
+  bytes without the JSON envelope. Error responses still use the standard error
+  envelope.
+- `PATCH /documents/{documentId}` first-slice support is tags only. Unknown
+  fields or a body without `tags` must fail validation. Tags use the same
+  trim/dedupe/max-count/max-length rules as document upload.
+- `DELETE /documents/{documentId}` soft-deletes the Knowledge document and writes
+  a durable `delete_cleanup` processing-job marker. It must not synchronously
+  delete File Service bytes, Qdrant points, or chunks until the cleanup worker
+  contract exists.
+- `GET /documents/{documentId}/chunks` must authorize the parent document. An
+  existing document with no chunks, including pending processing states, returns
+  an empty paginated list rather than `501` or a dependency error.
+- `GET /documents/{documentId}/content` must authorize through Knowledge first,
+  then call File Service using the internal `file_ref`. Public responses and
+  errors must not include `fileRef`, File Service IDs, buckets, object keys,
+  storage paths, internal URLs, or raw downstream error bodies.
+
+### 4. Validation & Error Matrix
+
+| Condition | Response/error |
+| --- | --- |
+| Missing trusted `X-User-Id` | `401 unauthorized` |
+| Missing `knowledge:write` or admin role for PATCH/DELETE | `403 forbidden` |
+| Missing or blank `documentId` | `400 validation_error` |
+| PATCH body omits supported fields or includes unknown fields | `400 validation_error` |
+| Invalid page/pageSize or tag constraints | `400 validation_error` |
+| Missing, deleted, or hidden document | `404 not_found` |
+| Existing pending/empty document chunks | `200` with `data: []` and `page.total: 0` |
+| File Service content is missing or fails | caller-owned sanitized error, usually `502 dependency_error` |
+| PostgreSQL or other infrastructure failure | `502 dependency_error` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: Gateway proxies `/api/v1/documents/doc_1/content` to Knowledge;
+  Knowledge authorizes `doc_1`, reads its internal `file_ref`, streams File
+  Service bytes, and never returns the file ID in JSON.
+- Base: deleting a document sets `deleted_at`, hides it from future reads, and
+  creates a queued `delete_cleanup` job even though physical vector/file cleanup
+  is deferred.
+- Bad: Gateway returns `501` for active document lifecycle routes, Knowledge
+  exposes `fileRef` or object-storage details, or deletion performs slow File
+  Service/Qdrant calls inside a PostgreSQL transaction.
+
+### 6. Tests Required
+
+- Knowledge handler tests for PATCH, DELETE, chunks, content streaming, standard
+  envelopes, missing user context, write permission, and no `fileRef` leakage.
+- Knowledge service tests for tag normalization/validation, soft delete hiding,
+  cleanup marker creation, content authorization before File Service reads, and
+  chunk empty-list behavior.
+- Repository tests for tag updates, soft-delete plus cleanup job transaction,
+  deleted-row filtering, chunk ordering, and parent authorization before empty
+  pages.
+- File client tests with fake HTTP servers for content path, context headers,
+  body streaming, and sanitized downstream errors.
+- Gateway tests asserting the route matrix no longer marks implemented document
+  lifecycle routes `NotImplemented` and binary content is proxied without a JSON
+  envelope.
+- Required checks from changed services: `go test ./...`, `go build ./cmd/server`,
+  and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+frontend -> gateway /api/v1/documents/doc_1/content
+gateway -> file /internal/v1/files/file_123/content
+response headers/body expose file_123 or object key on errors
+```
+
+#### Correct
+
+```text
+frontend -> gateway /api/v1/documents/doc_1/content
+gateway -> knowledge /internal/v1/documents/doc_1/content
+knowledge authorizes doc_1, reads internal file_ref, calls File Service
+success streams bytes; errors stay sanitized and document-owned
+```
+
+#### Wrong
+
+```text
+DELETE /documents/doc_1 -> delete file object and Qdrant points while holding
+the document transaction; if cleanup fails the document stays visible
+```
+
+#### Correct
+
+```text
+DELETE /documents/doc_1 -> transaction sets knowledge_documents.deleted_at and
+creates processing_jobs(job_type='delete_cleanup'); later worker handles
+retryable file/vector cleanup
+```
+
 ## Scenario: Missing Downstream API Contracts
 
 ### 1. Scope / Trigger

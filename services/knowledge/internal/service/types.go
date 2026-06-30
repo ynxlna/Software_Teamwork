@@ -100,6 +100,7 @@ const (
 	JobTypeIngest            = "ingest"
 	JobTypeDocumentIngestion = JobTypeIngest
 	LegacyJobTypeIngestion   = "document_ingestion"
+	JobTypeDeleteCleanup     = "delete_cleanup"
 
 	DefaultIngestionMaxAttempts int32 = 3
 
@@ -243,9 +244,16 @@ type FileObject struct {
 	CreatedAt      time.Time
 }
 
+type FileContent struct {
+	Content     io.ReadCloser
+	ContentType string
+	SizeBytes   int64
+}
+
 type FileClient interface {
 	CreateFile(ctx context.Context, reqCtx RequestContext, file UploadedFile) (FileObject, error)
 	DeleteFile(ctx context.Context, reqCtx RequestContext, fileID string) error
+	GetFileContent(ctx context.Context, reqCtx RequestContext, fileID string) (FileContent, error)
 }
 
 type SourceDocument struct {
@@ -364,15 +372,24 @@ type ListDocumentsInput struct {
 	Page            PageInput
 }
 
+type UpdateDocumentInput struct {
+	ID   string
+	Tags *[]string
+}
+
 type ListChunksInput struct {
 	DocumentID string
 	Page       PageInput
 }
 
+type ListDocumentChunksInput = ListChunksInput
+
 type ChunkList struct {
 	Items []DocumentChunk
 	Page  Page
 }
+
+type DocumentChunkList = ChunkList
 
 type Repository interface {
 	CreateKnowledgeBase(ctx context.Context, input CreateKnowledgeBaseRecord) (KnowledgeBase, error)
@@ -384,6 +401,9 @@ type Repository interface {
 	MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, expectedAttempts *int32, code string, message string, failedAt time.Time) error
 	ListDocumentsByKnowledgeBase(ctx context.Context, knowledgeBaseID string, status *DocumentStatus, scope AccessScope, page PageInput) (DocumentList, error)
 	GetDocument(ctx context.Context, id string, scope AccessScope) (KnowledgeDocument, error)
+	UpdateDocument(ctx context.Context, input UpdateDocumentRecord, scope AccessScope) (KnowledgeDocument, error)
+	SoftDeleteDocument(ctx context.Context, input DeleteDocumentRecord, scope AccessScope) error
+	ListDocumentChunks(ctx context.Context, documentID string, scope AccessScope, page PageInput) (DocumentChunkList, error)
 	FindChunksByIDs(ctx context.Context, ids []string) ([]DocumentChunk, error)
 	ListParserConfigs(ctx context.Context, enabled *bool) ([]ParserConfig, error)
 	GetParserConfig(ctx context.Context, id string) (ParserConfig, error)
@@ -442,6 +462,25 @@ type CreateDocumentWithJobRecord struct {
 	ParserConfigSnapshot json.RawMessage
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
+}
+
+type UpdateDocumentRecord struct {
+	ID        string
+	Tags      []string
+	UpdatedAt time.Time
+}
+
+type DeleteDocumentRecord struct {
+	DocumentID  string
+	JobID       string
+	JobType     string
+	JobStatus   string
+	JobStage    string
+	JobMessage  string
+	MaxAttempts int32
+	DeletedAt   time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
 
 type DocumentStateUpdate struct {

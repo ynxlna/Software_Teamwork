@@ -64,6 +64,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /internal/v1/knowledge-bases/{knowledgeBaseId}/documents", s.handleListDocuments)
 	s.mux.HandleFunc("POST /internal/v1/knowledge-bases/{knowledgeBaseId}/documents", s.handleUploadDocument)
 	s.mux.HandleFunc("GET /internal/v1/documents/{documentId}", s.handleGetDocument)
+	s.mux.HandleFunc("PATCH /internal/v1/documents/{documentId}", s.handleUpdateDocument)
+	s.mux.HandleFunc("DELETE /internal/v1/documents/{documentId}", s.handleDeleteDocument)
 	s.mux.HandleFunc("GET /internal/v1/documents/{documentId}/chunks", s.handleListDocumentChunks)
 	s.mux.HandleFunc("GET /internal/v1/documents/{documentId}/content", s.handleGetDocumentContent)
 	s.mux.HandleFunc("POST /internal/v1/knowledge-queries", s.handleCreateKnowledgeQuery)
@@ -382,6 +384,38 @@ func (s *Server) handleGetDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, documentFromDomain(doc), requestIDFromContext(r.Context()))
+}
+
+func (s *Server) handleUpdateDocument(w http.ResponseWriter, r *http.Request) {
+	reqCtx, ok := s.gatewayContext(w, r)
+	if !ok {
+		return
+	}
+	var payload updateDocumentRequest
+	if !decodeJSONBody(w, r, &payload) {
+		return
+	}
+	doc, err := s.knowledge.UpdateDocument(r.Context(), reqCtx, service.UpdateDocumentInput{
+		ID:   r.PathValue("documentId"),
+		Tags: payload.Tags,
+	})
+	if err != nil {
+		writeAppError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, documentFromDomain(doc), requestIDFromContext(r.Context()))
+}
+
+func (s *Server) handleDeleteDocument(w http.ResponseWriter, r *http.Request) {
+	reqCtx, ok := s.gatewayContext(w, r)
+	if !ok {
+		return
+	}
+	if err := s.knowledge.DeleteDocument(r.Context(), reqCtx, r.PathValue("documentId")); err != nil {
+		writeAppError(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleListDocumentChunks(w http.ResponseWriter, r *http.Request) {

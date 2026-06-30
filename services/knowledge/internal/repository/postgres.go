@@ -398,13 +398,90 @@ func (r *PostgresRepository) GetDocument(ctx context.Context, id string, scope s
 	return documentFromGetRow(row), nil
 }
 
+func (r *PostgresRepository) UpdateDocument(ctx context.Context, input service.UpdateDocumentRecord, scope service.AccessScope) (service.KnowledgeDocument, error) {
+	tags, err := json.Marshal(input.Tags)
+	if err != nil {
+		return service.KnowledgeDocument{}, fmt.Errorf("marshal document tags: %w", err)
+	}
+	rowsAffected, err := r.queries.UpdateDocumentTags(ctx, sqlc.UpdateDocumentTagsParams{
+		ID:         input.ID,
+		Tags:       tags,
+		UpdatedAt:  pgTime(input.UpdatedAt),
+		CanReadAll: scope.CanReadAll,
+		UserID:     scope.UserID,
+	})
+	if err != nil {
+		return service.KnowledgeDocument{}, wrapPostgresError("update document tags", err)
+	}
+	if rowsAffected == 0 {
+		return service.KnowledgeDocument{}, service.ErrNotFound
+	}
+	return r.GetDocument(ctx, input.ID, scope)
+}
+
+func (r *PostgresRepository) SoftDeleteDocument(ctx context.Context, input service.DeleteDocumentRecord, scope service.AccessScope) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return wrapPostgresError("begin document delete transaction", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	qtx := r.queries.WithTx(tx)
+	rowsAffected, err := qtx.MarkDocumentDeleted(ctx, sqlc.MarkDocumentDeletedParams{
+		ID:           input.DocumentID,
+		DeletedAt:    pgTime(input.DeletedAt),
+		CleanupJobID: pgText(input.JobID),
+		CanReadAll:   scope.CanReadAll,
+		UserID:       scope.UserID,
+	})
+	if err != nil {
+		return wrapPostgresError("mark document deleted", err)
+	}
+	if rowsAffected == 0 {
+		return service.ErrNotFound
+	}
+	knowledgeBaseID, err := qtx.GetDeletedDocumentKnowledgeBaseID(ctx, sqlc.GetDeletedDocumentKnowledgeBaseIDParams{
+		ID:         input.DocumentID,
+		CanReadAll: scope.CanReadAll,
+		UserID:     scope.UserID,
+	})
+	if err != nil {
+		return wrapPostgresError("get deleted document knowledge base", err)
+	}
+	if _, err := qtx.CreateProcessingJob(ctx, sqlc.CreateProcessingJobParams{
+		ID:                   input.JobID,
+		KnowledgeBaseID:      knowledgeBaseID,
+		DocumentID:           input.DocumentID,
+		JobType:              input.JobType,
+		Status:               input.JobStatus,
+		CurrentStage:         input.JobStage,
+		Message:              input.JobMessage,
+		MaxAttempts:          input.MaxAttempts,
+		ParserConfigSnapshot: []byte(`{}`),
+		CreatedAt:            pgTime(input.CreatedAt),
+		UpdatedAt:            pgTime(input.UpdatedAt),
+	}); err != nil {
+		return wrapPostgresError("create document cleanup job", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return wrapPostgresError("commit document delete transaction", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) ListDocumentChunks(ctx context.Context, documentID string, scope service.AccessScope, page service.PageInput) (service.DocumentChunkList, error) {
+	return r.ListChunks(ctx, documentID, scope, page)
+}
+
 func (r *PostgresRepository) FindChunksByIDs(ctx context.Context, ids []string) ([]service.DocumentChunk, error) {
 	if len(ids) == 0 {
 		return []service.DocumentChunk{}, nil
 	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, knowledge_base_id, document_id, chunk_index, section_path, content,
-			COALESCE(token_count, 0), chunk_type, qdrant_point_id, embedding_provider,
+			token_count, chunk_type, qdrant_point_id, embedding_provider,
 			embedding_model, embedding_dimension, metadata, created_at
 		FROM document_chunks
 		WHERE id = ANY($1::text[])`, ids)
@@ -415,24 +492,9 @@ func (r *PostgresRepository) FindChunksByIDs(ctx context.Context, ids []string) 
 
 	items := []service.DocumentChunk{}
 	for rows.Next() {
-		var chunk service.DocumentChunk
-		var sectionPath, chunkType, pointID, embeddingProvider, embeddingModel pgtype.Text
-		var embeddingDimension pgtype.Int4
-		var metadata []byte
-		if err := rows.Scan(&chunk.ID, &chunk.KnowledgeBaseID, &chunk.DocumentID, &chunk.ChunkIndex, &sectionPath, &chunk.Content, &chunk.TokenCount, &chunkType, &pointID, &embeddingProvider, &embeddingModel, &embeddingDimension, &metadata, &chunk.CreatedAt); err != nil {
+		chunk, err := scanDocumentChunk(rows)
+		if err != nil {
 			return nil, wrapPostgresError("scan chunk", err)
-		}
-		chunk.SectionPath = textPtr(sectionPath)
-		chunk.ChunkType = textPtr(chunkType)
-		chunk.QdrantPointID = textPtr(pointID)
-		chunk.EmbeddingProvider = textPtr(embeddingProvider)
-		chunk.EmbeddingModel = textPtr(embeddingModel)
-		if embeddingDimension.Valid {
-			value := embeddingDimension.Int32
-			chunk.EmbeddingDimension = &value
-		}
-		if len(metadata) > 0 {
-			_ = json.Unmarshal(metadata, &chunk.Metadata)
 		}
 		items = append(items, chunk)
 	}
@@ -1161,6 +1223,10 @@ func pgTextPtr(value *string) pgtype.Text {
 		return pgtype.Text{}
 	}
 	return pgtype.Text{String: *value, Valid: true}
+}
+
+func pgText(value string) pgtype.Text {
+	return pgtype.Text{String: value, Valid: value != ""}
 }
 
 func pgInt4Ptr(value *int32) pgtype.Int4 {

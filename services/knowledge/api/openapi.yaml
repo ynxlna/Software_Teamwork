@@ -179,6 +179,38 @@ paths:
                 $ref: "#/components/schemas/DocumentResponse"
         "401": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+    patch:
+      tags: [knowledge]
+      summary: Update document metadata
+      operationId: internalUpdateDocument
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateDocumentRequest"
+      responses:
+        "200":
+          description: Updated document metadata.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentResponse"
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [knowledge]
+      summary: Soft-delete document
+      operationId: internalDeleteDocument
+      responses:
+        "204":
+          description: Document was soft-deleted and cleanup was queued.
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /internal/v1/documents/{documentId}/chunks:
     parameters:
       - $ref: "#/components/parameters/DocumentId"
@@ -307,6 +339,14 @@ components:
             - type: array
               items: { type: string }
             - type: string
+    UpdateDocumentRequest:
+      type: object
+      additionalProperties: false
+      required: [tags]
+      properties:
+        tags:
+          type: array
+          items: { type: string }
     KnowledgeBaseSummary:
       type: object
       required: [id, name, description, docType, chunkStrategy, retrievalStrategy, documentCount, chunkCount, createdAt, updatedAt]

@@ -720,7 +720,7 @@ func TestProxyStreamsSSEWithoutFixedTimeout(t *testing.T) {
 	}
 }
 
-func TestUnimplementedKnowledgeRouteReturnsNotImplemented(t *testing.T) {
+func TestDocumentPatchRouteProxiesToKnowledge(t *testing.T) {
 	hasher := testHasher(t)
 	store := newMemorySessionStore()
 	accessToken := "valid-token"
@@ -729,12 +729,28 @@ func TestUnimplementedKnowledgeRouteReturnsNotImplemented(t *testing.T) {
 		UserID:      "usr_1",
 		Username:    "alice",
 		Roles:       []string{},
-		Permissions: []string{"knowledge:read"},
+		Permissions: []string{"knowledge:write"},
 		TokenType:   "Bearer",
 		ExpiresAt:   time.Now().Add(time.Hour).UTC(),
 	})
+	var capturedMethod string
+	var capturedPath string
+	var capturedBody string
 	downstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		t.Fatal("unimplemented route should not call downstream")
+		capturedMethod = r.Method
+		capturedPath = r.URL.Path
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("read downstream body: %v", err)
+		}
+		capturedBody = string(body)
+		if r.Header.Get("X-User-Id") != "usr_1" ||
+			r.Header.Get("X-User-Permissions") != "knowledge:write" ||
+			r.Header.Get("X-Request-Id") != "req_patch" {
+			t.Fatalf("downstream headers = %#v", r.Header)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":{"id":"doc_1"},"requestId":"req_patch"}`))
 	}))
 	defer downstream.Close()
 
@@ -746,18 +762,22 @@ func TestUnimplementedKnowledgeRouteReturnsNotImplemented(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPatch, "/api/v1/documents/doc_1", strings.NewReader(`{"tags":["锅炉"]}`))
 	req.Header.Set("Authorization", "Bearer "+accessToken)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Request-Id", "req_not_implemented")
+	req.Header.Set("X-Request-Id", "req_patch")
 	res := httptest.NewRecorder()
 
 	server.ServeHTTP(res, req)
 
-	if res.Code != http.StatusNotImplemented {
+	if res.Code == http.StatusNotImplemented {
+		t.Fatalf("status = %d, route should proxy instead of returning 501", res.Code)
+	}
+	if res.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", res.Code, res.Body.String())
 	}
-	var body errorBody
-	decodeJSON(t, res.Body, &body)
-	if body.Error.Code != "not_implemented" || body.Error.RequestID != "req_not_implemented" {
-		t.Fatalf("error = %+v", body.Error)
+	if capturedMethod != http.MethodPatch || capturedPath != "/internal/v1/documents/doc_1" {
+		t.Fatalf("downstream method/path = %s %s", capturedMethod, capturedPath)
+	}
+	if !strings.Contains(capturedBody, `"tags"`) {
+		t.Fatalf("downstream body = %q", capturedBody)
 	}
 }
 

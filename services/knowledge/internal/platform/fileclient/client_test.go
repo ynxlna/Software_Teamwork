@@ -278,3 +278,81 @@ func TestDeleteFileTreatsMissingFileAsCleanedUp(t *testing.T) {
 		t.Fatalf("DeleteFile() error = %v", err)
 	}
 }
+
+func TestGetFileContentStreamsContentAndContextHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/internal/v1/files/file_001/content" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("X-Request-Id"); got != "req_content" {
+			t.Fatalf("X-Request-Id = %q", got)
+		}
+		if got := r.Header.Get("X-User-Id"); got != "usr_test" {
+			t.Fatalf("X-User-Id = %q", got)
+		}
+		if got := r.Header.Get("X-Caller-Service"); got != "knowledge" {
+			t.Fatalf("X-Caller-Service = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/pdf")
+		w.Header().Set("Content-Length", "9")
+		_, _ = w.Write([]byte("pdf-bytes"))
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, "svc-token", server.Client())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	content, err := client.GetFileContent(context.Background(), service.RequestContext{
+		RequestID: "req_content",
+		UserID:    "usr_test",
+	}, "file_001")
+	if err != nil {
+		t.Fatalf("GetFileContent() error = %v", err)
+	}
+	defer content.Content.Close()
+
+	body, err := io.ReadAll(content.Content)
+	if err != nil {
+		t.Fatalf("read content: %v", err)
+	}
+	if string(body) != "pdf-bytes" || content.ContentType != "application/pdf" || content.SizeBytes != 9 {
+		t.Fatalf("content body=%q type=%q size=%d", string(body), content.ContentType, content.SizeBytes)
+	}
+}
+
+func TestGetFileContentClassifiesDownstreamErrorsWithoutLeakingBody(t *testing.T) {
+	tests := []struct {
+		name     string
+		status   int
+		wantCode service.Code
+	}{
+		{name: "not found", status: http.StatusNotFound, wantCode: service.CodeNotFound},
+		{name: "dependency", status: http.StatusInternalServerError, wantCode: service.CodeDependency},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tt.status)
+				_, _ = w.Write([]byte(`{"error":{"message":"bucket hidden-bucket object obj-secret"}}`))
+			}))
+			defer server.Close()
+
+			client, err := New(server.URL, "", server.Client())
+			if err != nil {
+				t.Fatalf("New() error = %v", err)
+			}
+			_, err = client.GetFileContent(context.Background(), service.RequestContext{UserID: "usr_test"}, "file_001")
+			if err == nil {
+				t.Fatal("GetFileContent() error = nil")
+			}
+			appErr, ok := service.Classify(err)
+			if !ok || appErr.Code != tt.wantCode {
+				t.Fatalf("error = %#v, want code %q", err, tt.wantCode)
+			}
+			if strings.Contains(appErr.Message, "hidden-bucket") || strings.Contains(appErr.Message, "obj-secret") {
+				t.Fatalf("downstream body leaked into message: %q", appErr.Message)
+			}
+		})
+	}
+}

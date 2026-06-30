@@ -338,3 +338,72 @@ WHERE d.id = sqlc.arg(id)
   AND d.deleted_at IS NULL
   AND kb.deleted_at IS NULL
   AND (sqlc.arg(can_read_all)::boolean OR d.created_by = sqlc.arg(user_id) OR kb.created_by = sqlc.arg(user_id));
+
+-- name: UpdateDocumentTags :execrows
+UPDATE knowledge_documents d
+SET
+  tags = sqlc.arg(tags),
+  updated_at = sqlc.arg(updated_at)
+FROM knowledge_bases kb
+WHERE d.id = sqlc.arg(id)
+  AND kb.id = d.knowledge_base_id
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND (sqlc.arg(can_read_all)::boolean OR d.created_by = sqlc.arg(user_id) OR kb.created_by = sqlc.arg(user_id));
+
+-- name: MarkDocumentDeleted :execrows
+UPDATE knowledge_documents d
+SET
+  deleted_at = sqlc.arg(deleted_at),
+  updated_at = sqlc.arg(deleted_at),
+  current_job_id = sqlc.arg(cleanup_job_id)
+FROM knowledge_bases kb
+WHERE d.id = sqlc.arg(id)
+  AND kb.id = d.knowledge_base_id
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND (sqlc.arg(can_read_all)::boolean OR d.created_by = sqlc.arg(user_id) OR kb.created_by = sqlc.arg(user_id));
+
+-- name: GetDeletedDocumentKnowledgeBaseID :one
+SELECT d.knowledge_base_id
+FROM knowledge_documents d
+JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+WHERE d.id = sqlc.arg(id)
+  AND d.deleted_at IS NOT NULL
+  AND kb.deleted_at IS NULL
+  AND (sqlc.arg(can_read_all)::boolean OR d.created_by = sqlc.arg(user_id) OR kb.created_by = sqlc.arg(user_id));
+
+-- name: CountDocumentChunks :one
+SELECT COUNT(*)::bigint
+FROM document_chunks dc
+JOIN knowledge_documents d ON d.id = dc.document_id
+JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+WHERE dc.document_id = sqlc.arg(document_id)
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND (sqlc.arg(can_read_all)::boolean OR d.created_by = sqlc.arg(user_id) OR kb.created_by = sqlc.arg(user_id));
+
+-- name: ListDocumentChunks :many
+SELECT
+  dc.id,
+  dc.knowledge_base_id,
+  dc.document_id,
+  dc.chunk_index,
+  dc.section_path,
+  dc.content,
+  dc.token_count,
+  dc.chunk_type,
+  dc.qdrant_point_id,
+  dc.embedding_provider,
+  dc.embedding_dimension,
+  dc.metadata,
+  dc.created_at
+FROM document_chunks dc
+JOIN knowledge_documents d ON d.id = dc.document_id
+JOIN knowledge_bases kb ON kb.id = d.knowledge_base_id
+WHERE dc.document_id = sqlc.arg(document_id)
+  AND d.deleted_at IS NULL
+  AND kb.deleted_at IS NULL
+  AND (sqlc.arg(can_read_all)::boolean OR d.created_by = sqlc.arg(user_id) OR kb.created_by = sqlc.arg(user_id))
+ORDER BY dc.chunk_index ASC, dc.id ASC
+LIMIT sqlc.arg(limit_count) OFFSET sqlc.arg(offset_count);

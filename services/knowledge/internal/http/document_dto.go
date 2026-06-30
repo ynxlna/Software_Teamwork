@@ -6,6 +6,10 @@ import (
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/knowledge/internal/service"
 )
 
+type updateDocumentRequest struct {
+	Tags *[]string `json:"tags"`
+}
+
 type documentSummary struct {
 	ID              string                 `json:"id"`
 	KnowledgeBaseID string                 `json:"knowledgeBaseId"`

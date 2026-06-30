@@ -121,8 +121,10 @@ func (c *Client) CheckCitationSources(ctx context.Context, userID string, docume
 		switch {
 		case resp.StatusCode >= 200 && resp.StatusCode < 300:
 			availability[documentID] = true
-		case resp.StatusCode >= 400 && resp.StatusCode < 500:
+		case resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound:
 			availability[documentID] = false
+		case resp.StatusCode >= 400 && resp.StatusCode < 500:
+			return availability, fmt.Errorf("knowledge document visibility returned HTTP %d", resp.StatusCode)
 		default:
 			return availability, fmt.Errorf("knowledge document visibility returned HTTP %d", resp.StatusCode)
 		}

@@ -711,6 +711,7 @@ func TestAskPersistsCitationSnapshotsFromKnowledgeToolResults(t *testing.T) {
 		t.Fatal(err)
 	}
 	qa.now = func() time.Time { return now }
+	qa.SetCitationSourceChecker(&fakeCitationSourceChecker{availability: map[string]bool{"doc-1": true}})
 	result, err := qa.Ask(context.Background(), "user-id", "conversation-id", AskInput{Message: "find citation", Mode: "knowledge_qa"}, nil)
 	if err != nil {
 		t.Fatal(err)

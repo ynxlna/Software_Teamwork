@@ -382,3 +382,36 @@ Corrected the archived F-10 task commit reference after rebasing PR 266 onto lat
 ### Next Steps
 
 - None - task complete
+
+
+## Session 11: F-016 QA chat capability alignment
+
+**Date**: 2026-06-30
+**Task**: F-016 QA chat capability alignment
+**Branch**: `Frontend/feat/qa-capability-aligned-chat`
+
+### Summary
+
+Aligned QA chat SSE errors, tool summaries, citation snapshot messaging, and RAG degradation display with Gateway/backend readiness.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `879053b` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

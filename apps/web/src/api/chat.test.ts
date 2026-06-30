@@ -98,6 +98,47 @@ describe('chat stream API', () => {
     )
   })
 
+  it('uses SSE id as the cross-event stream seq before payload seq fields', async () => {
+    const onAnswerDelta = vi.fn()
+    const onAnswerCompleted = vi.fn()
+    const onError = vi.fn()
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        streamResponse(
+          [
+            'event: answer.delta',
+            'id: 5',
+            'data: {"content":"root","seq":99,"eventSeq":88}',
+            '',
+            'event: answer.completed',
+            'id: 6',
+            'data: {"responseRunId":"run-1"}',
+            '',
+            '',
+          ].join('\n'),
+        ),
+      )
+    vi.stubGlobal('fetch', fetchMock)
+
+    streamChat('session-1', 'question', {
+      onAnswerCompleted,
+      onAnswerDelta,
+      onError,
+    })
+
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1))
+    expect(onError).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(onAnswerCompleted).toHaveBeenCalledTimes(1))
+
+    expect(onAnswerDelta).toHaveBeenCalledWith(
+      expect.objectContaining({ content: 'root', eventSeq: 88, seq: 5 }),
+    )
+    expect(onAnswerCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({ responseRunId: 'run-1', seq: 6 }),
+    )
+  })
+
   it('uses the dispatched max stream seq for fatal stream errors', async () => {
     const onAnswerDelta = vi.fn()
     const onError = vi.fn()

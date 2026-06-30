@@ -95,19 +95,20 @@ describe('ChatPage stream sequencing', () => {
     await waitFor(() => expect(streamController).toBeDefined())
     await waitFor(() => expect(input).toBeDisabled())
 
-    const emit = async (event: string, data: Record<string, unknown>) => {
+    const emit = async (event: string, data: Record<string, unknown>, id?: number) => {
       await act(async () => {
+        const idLine = id === undefined ? '' : `id: ${id}\n`
         streamController?.enqueue(
-          encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`),
+          encoder.encode(`event: ${event}\n${idLine}data: ${JSON.stringify(data)}\n\n`),
         )
         await new Promise((resolve) => window.setTimeout(resolve, 0))
       })
     }
 
-    await emit('answer.delta', { content: 'first ', seq: 2 })
+    await emit('answer.delta', { content: 'first ' }, 2)
     await waitFor(() => expect(getLastAssistantMessage().content).toBe('first '))
 
-    await emit('answer.completed', { responseRunId: 'run-1', seq: 1 })
+    await emit('answer.completed', { responseRunId: 'run-1' }, 1)
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 0))
     })
@@ -119,10 +120,10 @@ describe('ChatPage stream sequencing', () => {
       status: 'streaming',
     })
 
-    await emit('answer.delta', { content: 'second', seq: 3 })
+    await emit('answer.delta', { content: 'second' }, 3)
     await waitFor(() => expect(getLastAssistantMessage().content).toBe('first second'))
 
-    await emit('answer.completed', { responseRunId: 'run-1', seq: 4 })
+    await emit('answer.completed', { responseRunId: 'run-1' }, 4)
     await waitFor(() => expect(useChatStore.getState().streaming).toBe(false))
 
     expect(input).not.toBeDisabled()

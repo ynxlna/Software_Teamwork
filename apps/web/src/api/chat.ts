@@ -80,16 +80,20 @@ function dispatch(event: QASseEventType, data: unknown, handlers: ChatStreamHand
 function parseSsePayload(
   data: string,
   fallbackSeq: number,
+  sseId?: string,
 ): Record<string, unknown> & {
   seq: number
 } {
   const raw = JSON.parse(data) as Record<string, unknown>
+  const idSeq = sseId === undefined || sseId === '' ? undefined : Number(sseId)
   const seq =
-    typeof raw.eventSeq === 'number'
-      ? raw.eventSeq
-      : typeof raw.seq === 'number'
-        ? raw.seq
-        : fallbackSeq
+    typeof idSeq === 'number' && Number.isFinite(idSeq)
+      ? idSeq
+      : typeof raw.eventSeq === 'number'
+        ? raw.eventSeq
+        : typeof raw.seq === 'number'
+          ? raw.seq
+          : fallbackSeq
 
   return { ...raw, seq }
 }
@@ -144,13 +148,13 @@ export function streamChat(
         status: error.status,
       })
     },
-    onEvent: ({ data, event }) => {
+    onEvent: ({ data, event, id }) => {
       if (event === 'heartbeat') return
       fallbackSeq += 1
 
       try {
         const qaEvent = event as QASseEventType
-        const payload = normalizeSsePayload(qaEvent, parseSsePayload(data, fallbackSeq))
+        const payload = normalizeSsePayload(qaEvent, parseSsePayload(data, fallbackSeq, id))
         recordDispatchedSeq(payload.seq)
         dispatch(qaEvent, payload, handlers)
       } catch {

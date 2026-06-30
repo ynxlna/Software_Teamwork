@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/gateway/internal/metrics"
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/gateway/internal/middleware"
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/gateway/internal/response"
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/gateway/internal/service"
@@ -31,6 +32,7 @@ type Config struct {
 	TokenHasher          service.TokenHasher
 	HTTPClient           *http.Client
 	ReadyCheck           func(context.Context) error
+	MetricsReg           *metrics.Registry
 }
 
 type Server struct {
@@ -78,6 +80,7 @@ func NewServer(cfg Config) *Server {
 		s.mux,
 		middleware.RequestID(),
 		middleware.Recover(cfg.Logger),
+		middleware.Metrics(cfg.MetricsReg, s.mux),
 		middleware.TimeoutWithSkip(cfg.RequestTimeout, skipsFixedRequestTimeout),
 		middleware.CORS(middleware.CORSConfig{
 			AllowedOrigins:   cfg.CORSAllowedOrigins,

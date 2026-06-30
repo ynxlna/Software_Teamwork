@@ -127,6 +127,12 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (s *Server) dispatch(w http.ResponseWriter, r *http.Request) {
 	requestID := middleware.RequestIDFromContext(r.Context())
 	ctx := service.WithRequestID(r.Context(), requestID)
+	if roles := strings.TrimSpace(r.Header.Get("X-User-Roles")); roles != "" {
+		ctx = service.WithUserRoles(ctx, roles)
+	}
+	if perms := strings.TrimSpace(r.Header.Get("X-User-Permissions")); perms != "" {
+		ctx = service.WithUserPermissions(ctx, perms)
+	}
 	r = r.WithContext(ctx)
 	if strings.HasPrefix(r.URL.Path, "/internal/v1/") && !secureTokenEqual(r.Header.Get("X-Service-Token"), s.serviceToken) {
 		writeError(w, r, service.NewError(service.CodeUnauthorized, "service authentication required", nil))

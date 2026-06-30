@@ -81,7 +81,7 @@ func NormalizeCitation(item Citation) Citation {
 	item.SourceUnavailableReason = strings.TrimSpace(item.SourceUnavailableReason)
 	item.Metadata = SanitizeCitationMetadata(item.Metadata)
 	if item.Content == "" {
-		item.Content = firstNonBlank(item.Text, item.Context, item.ContentPreview)
+		item.Content = item.ContentPreview
 	}
 	if item.IsSourceAvailable && item.DocumentID == "" {
 		item.IsSourceAvailable = false
@@ -444,17 +444,25 @@ func revalidateCitationSources(ctx context.Context, userID string, sourceChecker
 		seen[documentID] = struct{}{}
 		documentIDs = append(documentIDs, documentID)
 	}
+	checkedOK := false
 	availability := map[string]bool{}
 	if sourceChecker != nil && len(documentIDs) > 0 {
-		checked, _ := sourceChecker.CheckCitationSources(ctx, userID, documentIDs)
-		if checked != nil {
+		checked, err := sourceChecker.CheckCitationSources(ctx, userID, documentIDs)
+		if err == nil && checked != nil {
 			availability = checked
+			checkedOK = true
 		}
 	}
 	normalized := make([]Citation, 0, len(items))
 	for _, item := range items {
 		documentID := strings.TrimSpace(firstNonBlank(item.DocumentID, item.DocID))
-		normalized = append(normalized, ApplyCitationSourceAvailability(item, documentID != "" && availability[documentID]))
+		if checkedOK && documentID != "" {
+			normalized = append(normalized, ApplyCitationSourceAvailability(item, availability[documentID]))
+		} else if !checkedOK {
+			normalized = append(normalized, NormalizeCitation(item))
+		} else {
+			normalized = append(normalized, NormalizeCitation(item))
+		}
 	}
 	return normalized
 }

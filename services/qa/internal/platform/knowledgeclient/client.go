@@ -137,4 +137,10 @@ func (c *Client) setTrustedHeaders(ctx context.Context, req *http.Request, userI
 	if requestID := service.RequestIDFromContext(ctx); requestID != "" {
 		req.Header.Set("X-Request-Id", requestID)
 	}
+	if roles := service.UserRolesFromContext(ctx); roles != "" {
+		req.Header.Set("X-User-Roles", roles)
+	}
+	if permissions := service.UserPermissionsFromContext(ctx); permissions != "" {
+		req.Header.Set("X-User-Permissions", permissions)
+	}
 }

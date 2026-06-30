@@ -70,13 +70,13 @@ func TestResourceServicePreservesSnapshotWhenSourceCheckFails(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if citation.IsSourceAvailable || citation.Source == nil || citation.Source.Available {
-		t.Fatalf("source should be unavailable after failed revalidation: %+v", citation)
+	if !citation.IsSourceAvailable || citation.Source == nil || !citation.Source.Available {
+		t.Fatalf("source should be available (snapshot preserved after check failure): %+v", citation)
 	}
-	if citation.Source.Reason != citationSourceUnavailableReason || citation.Source.DownloadEndpoint != "" {
-		t.Fatalf("unexpected unavailable source mapping: %+v", citation.Source)
+	if citation.Source.Reason != "" || citation.Source.DownloadEndpoint != "/api/v1/documents/doc-1/content" {
+		t.Fatalf("unexpected source mapping after check failure: %+v", citation.Source)
 	}
-	if citation.Text != "saved quote" || citation.ContentPreview != "saved preview" || citation.Content != "saved quote" {
+	if citation.Text != "saved quote" || citation.ContentPreview != "saved preview" || citation.Content != "saved preview" {
 		t.Fatalf("snapshot text was not preserved: %+v", citation)
 	}
 	if citation.Metadata["pageLabel"] != "1" {

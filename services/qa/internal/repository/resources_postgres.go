@@ -81,7 +81,7 @@ WHERE table_schema = current_schema()
 }
 
 func (r *Postgres) ListMessageCitations(ctx context.Context, userID, messageID string) ([]service.Citation, error) {
-	rows, err := r.pool.Query(ctx, citationSelect+` WHERE ci.message_id::text=$1 AND c.external_user_id=$2 AND c.deleted_at IS NULL ORDER BY ci.citation_no`, messageID, userID)
+	rows, err := r.pool.Query(ctx, r.messageCitationSelect(ctx)+` WHERE ci.message_id::text=$1 AND c.external_user_id=$2 AND c.deleted_at IS NULL ORDER BY ci.citation_no`, messageID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list message citations: %w", err)
 	}
@@ -99,10 +99,10 @@ func (r *Postgres) ListMessageCitations(ctx context.Context, userID, messageID s
 	return items, nil
 }
 func (r *Postgres) GetCitation(ctx context.Context, userID, id string) (service.Citation, error) {
-	return scanCitation(r.pool.QueryRow(ctx, citationSelect+` WHERE ci.id::text=$1 AND c.external_user_id=$2 AND c.deleted_at IS NULL`, id, userID))
+	return scanCitation(r.pool.QueryRow(ctx, r.messageCitationSelect(ctx)+` WHERE ci.id::text=$1 AND c.external_user_id=$2 AND c.deleted_at IS NULL`, id, userID))
 }
 func (r *Postgres) LookupCitations(ctx context.Context, userID string, ids []string) ([]service.Citation, error) {
-	rows, err := r.pool.Query(ctx, citationSelect+` WHERE ci.id::text=ANY($1) AND c.external_user_id=$2 AND c.deleted_at IS NULL ORDER BY array_position($1::text[],ci.id::text)`, ids, userID)
+	rows, err := r.pool.Query(ctx, r.messageCitationSelect(ctx)+` WHERE ci.id::text=ANY($1) AND c.external_user_id=$2 AND c.deleted_at IS NULL ORDER BY array_position($1::text[],ci.id::text)`, ids, userID)
 	if err != nil {
 		return nil, fmt.Errorf("lookup citations: %w", err)
 	}
@@ -148,7 +148,7 @@ func scanCitation(row rowScanner) (service.Citation, error) {
 	if item.Metadata == nil {
 		item.Metadata = map[string]any{}
 	}
-	return service.ApplyCitationSourceAvailability(item, false), nil
+	return service.NormalizeCitation(item), nil
 }
 
 func (r *Postgres) ListToolCalls(ctx context.Context, userID, runID string) ([]service.AgentToolCall, error) {

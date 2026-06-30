@@ -26,12 +26,12 @@
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
 | 文档状态 | active | README、公开草案、数据模型、内部 OpenAPI 和实现说明存在。 |
-| 代码状态 | partial | Go service 已实现知识库 CRUD、文档列表/上传/详情、File Service handoff、PostgreSQL repository、asynq enqueue、parser-configs 运行时管理、ingestion worker、Parser Service client、Knowledge-owned chunker、embedding、chunk 持久化、vector index 写入、文档 chunks/content API 和 `knowledge-queries` 检索。 |
-| 契约对齐 | partial | Gateway OpenAPI 已声明 chunks、content、knowledge-queries、parser configs；这些 active routes 已由 Knowledge 和 Gateway proxy 落地。文档 PATCH/DELETE 仍为阶段性 `not_implemented`，真实跨依赖 smoke 仍待补齐。 |
+| 代码状态 | partial | Go service 已实现知识库 CRUD、文档列表/上传/详情、文档 tags 更新、软删除与 cleanup job 创建、File Service handoff、PostgreSQL repository、asynq enqueue、parser-configs 运行时管理、ingestion worker、Parser Service client、Knowledge-owned chunker、embedding、chunk 持久化、vector index 写入、文档 chunks/content API 和 `knowledge-queries` 检索。 |
+| 契约对齐 | partial | Gateway OpenAPI 已声明 document lifecycle、chunks、content、knowledge-queries、parser configs；这些 active routes 已由 Knowledge 和 Gateway proxy 落地。真实跨依赖 smoke 仍待补齐。 |
 | 数据持久化 | postgres / Redis queue / Qdrant | runtime 使用 PostgreSQL；Redis/asynq 负责任务投递；vector index 支持 Qdrant，未配置时使用 in-memory index。 |
-| 测试状态 | partial | 单元、handler、contract 和 platform tests 覆盖 CRUD、权限、上传补偿、queue handoff、worker 入库、File content 读取、Parser HTTP client、chunking、embedding、vector payload、parser-configs、chunks/content、`knowledge-queries`、错误 envelope 和 request id；缺真实依赖端到端联调。 |
+| 测试状态 | partial | 单元、handler、contract、repository integration 和 platform tests 覆盖 CRUD、权限、上传补偿、document lifecycle tags/soft delete/cleanup job、queue handoff、worker 入库、File content 读取、Parser HTTP client、chunking、embedding、vector payload、parser-configs、chunks/content、`knowledge-queries`、错误 envelope 和 request id；缺真实依赖端到端联调。 |
 | 依赖解耦 | documented | A-12 检索和 A-14 契约测试可依赖 `docs/api-contract.md` 2.6 与 `docs/data-models.md` 6.7 的 seeded chunk/vector fixture，不再要求 A-11 worker runtime 先完成。 |
-| 建议动作 | 联调 / 人工复审 | 继续补 document PATCH/DELETE、真实 File/Parser/Redis/Qdrant/AI Gateway 端到端 smoke，以及并发/外部副作用一致性加固；人工复审任务幂等、失败状态收敛和敏感数据不泄漏。 |
+| 建议动作 | 联调 / 人工复审 | 继续补真实 File/Parser/Redis/Qdrant/AI Gateway 端到端 smoke，以及并发/外部副作用一致性加固；人工复审任务幂等、失败状态收敛和敏感数据不泄漏。 |
 
 ## 3. 已实现
 
@@ -48,6 +48,7 @@
 | File content reader | `services/knowledge/internal/platform/fileclient/client.go` | `docs/services/file/README.md` | fileclient tests | 调用 `/internal/v1/files/{fileId}/content`，透传 request/user/service headers，失败脱敏为 dependency error。 |
 | 文档 chunks HTTP API | `services/knowledge/internal/http/server.go`、`internal/service/ingestion.go`、`internal/repository/postgres.go` | `docs/services/gateway/api/openapi.yaml`、`services/knowledge/api/openapi.yaml` | `TestDocumentChunksAndContentContract`、Gateway proxy tests | 支持 `GET /internal/v1/documents/{documentId}/chunks`，分页返回 Knowledge-owned chunk DTO，不暴露原始向量或 Qdrant payload。 |
 | 原始文档 content API | `services/knowledge/internal/http/server.go`、`internal/service/service.go`、`internal/platform/fileclient/client.go` | `docs/services/gateway/api/openapi.yaml`、`docs/architecture/service-boundaries.md` | `TestDocumentChunksAndContentContract`、Gateway binary proxy tests | 先校验 Knowledge 文档可见性，再通过 File Service 内部读取 raw bytes；响应为二进制流，不包 JSON envelope，不暴露 `file_ref`、object key 或内部 URL。 |
+| 文档 lifecycle API | `services/knowledge/internal/http/server.go`、`internal/service/service.go`、`internal/repository/postgres.go` | `docs/services/gateway/api/openapi.yaml`、`services/knowledge/api/openapi.yaml` | service/http tests、PostgreSQL repository lifecycle integration test、Gateway proxy tests | 支持 `PATCH /internal/v1/documents/{documentId}` 更新 tags，`DELETE /internal/v1/documents/{documentId}` 软删除并创建 `delete_cleanup` job；响应不暴露 `file_ref`、Qdrant point 或 embedding model。 |
 | Parser Service client / chunker | `services/knowledge/internal/platform/parser`、`internal/service/chunker.go` | `docs/services/knowledge/README.md`、`docs/services/parser/README.md` | parser/client、worker/service tests | Knowledge 以流式 base64 JSON 请求调用独立 Parser Service，消费 `content/title/backend/pages`，并在 Knowledge 内完成 chunking；当前切片仍以 `content` 为主，能映射到单页时会保存 `page_start/page_end/source_pages` 和 parser 质量字段。PaddleOCR runtime 不在 Knowledge Go 进程内。 |
 | embedding / vector index | `services/knowledge/internal/platform/embedding`、`internal/platform/vector` | `docs/architecture/service-boundaries.md` | platform/worker tests | local hashing 默认；可选 AI Gateway embedding；Qdrant HTTP adapter 或 in-memory index。 |
 | `knowledge-queries` 检索 | `services/knowledge/internal/service/retrieval.go`、`internal/http/server.go`、Gateway proxy route | `docs/services/knowledge/docs/api-contract.md`、`docs/services/gateway/api/openapi.yaml` | service retrieval tests、`TestKnowledgeQueryContractWithSeededRepositoryAndFakeVector`、`TestKnowledgeQueriesRouteProxiesToKnowledge` | 基于 embedder + vector index 搜索，回 PostgreSQL hydrate chunks/documents，过滤未 ready/不可见文档，支持 tags、metadata filter、可选 AI Gateway rerank 和 local no-op rerank fallback。 |
@@ -57,7 +58,7 @@
 
 | 缺口 | 文档来源 | 影响范围 | 建议任务 |
 | --- | --- | --- | --- |
-| document PATCH/DELETE 未实现 | `docs/services/gateway/api/openapi.yaml` | API / frontend | 待确认：实现标签更新、删除和 file/index cleanup。 |
+| delete cleanup worker 未闭环 | `docs/services/gateway/api/openapi.yaml` | API / storage / vector index | lifecycle DELETE 会软删除文档并创建 `delete_cleanup` job；后续仍需补真实 File/Qdrant 清理 worker。 |
 | 真实 Qdrant collection 管理 / smoke 未闭环 | `docs/services/knowledge/docs/api-contract.md`、`docs/architecture/technology-decisions.md` | retrieval / deployment | 当前 Qdrant adapter 已实现 search/upsert/delete，但本地默认 memory index；需要真实 collection 创建、上传入库、query smoke 记录。 |
 | 真实 AI Gateway embedding/rerank smoke 未闭环 | `docs/architecture/service-boundaries.md`、`docs/services/knowledge/docs/data-models.md` | retrieval / AI Gateway | embedding 与 rerank adapter 已实现，默认 local hashing/no-op fallback；需要带真实 provider credential 的跨服务 smoke。 |
 
@@ -65,10 +66,9 @@
 
 | 出入点 | 文档要求 | 当前实现 | 风险 | 建议处理 |
 | --- | --- | --- | --- | --- |
-| Gateway active Knowledge paths | Gateway OpenAPI 将 Knowledge operations 设为 active | chunks、content、knowledge-queries、parser-configs 已转为 Knowledge proxy；`PATCH/DELETE /documents` 仍标为 `NotImplemented` | 未落地的 PATCH/DELETE 前端生成 client 后调用会得到 501 | 对剩余 document lifecycle routes 补实现，或在契约/owner map 标注阶段性不可调用。 |
 | AI Gateway rerank smoke 状态 | AI Gateway 已实现 embeddings/rerankings endpoint，Knowledge 支持 embedding 与 rerank adapter | `knowledge-queries` 可选 rerank 已接入；本地未配置 `RERANK_MODEL` 时使用 no-op fallback | 容易把 no-op fallback 误读为真实 provider rerank 已验收 | 保留 fake/seeded 契约测试，同时补带真实 provider credential 的跨服务 smoke。 |
-| 公开 Knowledge 草案范围 | `docs/services/knowledge/api/public.openapi.yaml` 覆盖 deletion jobs、processing jobs、query tests、support materials、settings、statistics | runtime 只实现 KB CRUD 和文档 upload/list/detail | 公开草案可能被误读为已落地 | 保留为设计草案，在 implementation 中明确缺口。 |
-| File handoff 边界 | Knowledge 拥有文档资源，File 只保存基础 file object | 当前已按 `/internal/v1/files` 保存 raw file，并通过 content API 读取；delete cleanup 未闭环 | 删除文档时 file reference 可能残留 | 实现 document lifecycle cleanup。 |
+| 公开 Knowledge 草案范围 | `docs/services/knowledge/api/public.openapi.yaml` 覆盖 deletion jobs、processing jobs、query tests、support materials、settings、statistics | runtime 已实现 KB CRUD、文档 upload/list/detail/tags/soft delete、chunks/content 和 knowledge-queries；deletion job 查询、processing job 查询、query tests、support materials、settings、statistics 仍是草案/缺口 | 公开草案可能被误读为已落地 | 保留为设计草案，在 implementation 中明确缺口。 |
+| File handoff 边界 | Knowledge 拥有文档资源，File 只保存基础 file object | 当前已按 `/internal/v1/files` 保存 raw file，并通过 content API 读取；DELETE 已创建 cleanup job，但实际 File/Qdrant 清理 worker 未闭环 | 删除文档后底层 file/vector 清理仍可能滞后 | 实现 delete cleanup worker 幂等消费。 |
 
 ## 6. MVP / mock / memory backend / 占位
 
@@ -79,7 +79,7 @@
 | fake parser client | A-11 worker、A-12/A-14 契约测试的 parsed content 输入 | 真实 Parser service smoke 稳定后仍可保留为快速契约测试 | Parser contract tests |
 | seeded chunk/vector fixture | A-12 retrieval 和 A-14 contract tests | 真实 worker + Qdrant + AI Gateway smoke 稳定后仍可保留为快速契约测试 | A-12/A-14 并行开发 |
 | fake vector / fake AI adapter | 检索过滤、rerank trace、错误 envelope 和 request id 测试 | 真实依赖集成测试补齐；不替代端到端 smoke | Retrieval contract tests |
-| gateway `NotImplemented` document lifecycle routes | 暂时占住 document PATCH/DELETE active contract | 对应服务实现或契约阶段状态经管理组确认 | Knowledge document lifecycle follow-up |
+| delete cleanup job | DELETE 文档后记录待清理副作用 | File/Qdrant 清理 worker 幂等完成并有真实依赖 smoke | Knowledge document cleanup follow-up |
 
 ## 7. 运行与配置
 
@@ -102,14 +102,14 @@
 | Repository 集成测试 | `KNOWLEDGE_TEST_DATABASE_URL=... go test ./internal/repository -count=1` | CI 覆盖 repository lifecycle；无 env 时本地跳过 | 只覆盖 PostgreSQL repository，不覆盖 File/Redis/Qdrant。 |
 | Parser 服务测试 | `cd services/parser && uv run ruff check . && uv run pytest && uv run python -m compileall src tests` | not run（A-014 未改 parser） | 使用 fake OCR backend，不下载 PaddleOCR 模型。 |
 | 端到端上传联调 | PostgreSQL + File + Redis end-to-end upload | missing | 需要真实依赖联调；A-14 契约测试已用 seeded/fake 依赖覆盖 active operations。 |
-| 契约测试 | gateway route matrix + Knowledge handler tests | pass（2026-06-30） | chunks、content、knowledge-queries、parser-configs 等 active path 已补 contract/request-id/error envelope 覆盖；document PATCH/DELETE 仍为 `not_implemented`。 |
+| 契约测试 | gateway route matrix + Knowledge handler tests | pass（2026-06-30） | document lifecycle、chunks、content、knowledge-queries、parser-configs 等 active path 已补 contract/request-id/error envelope 覆盖。 |
 | 手工 smoke | 启动 PostgreSQL、File、Redis 后上传文档 | not run | 需要可复现脚本或 Compose。 |
 
 ## 9. 建议任务
 
 | 任务 | 类型 | 优先级 | 依据 | 说明 |
 | --- | --- | --- | --- | --- |
-| 实现 Knowledge 文档 PATCH/DELETE lifecycle | 新任务 | P0 | Gateway active contract | 解除 `PATCH/DELETE /api/v1/documents/{documentId}` 相关 501，并协调 tags、soft delete、file/index cleanup。 |
+| 实现 delete cleanup worker | 新任务 | P0 | 文档删除副作用一致性 | 消费 `delete_cleanup` job，幂等清理 File Service 原始文件和 Qdrant/vector index，并记录失败状态。 |
 | 补真实 File/Parser/Qdrant/AI Gateway 端到端 smoke | 新任务 | P0 | 当前 worker 与 contract 主要由 fake/memory 依赖覆盖 | 覆盖上传、入队、worker 消费、Parser Service parse、document ready、chunks 可查、content 可读、Qdrant points 存在和 `knowledge-queries` 可命中。 |
 
 ## 10. 最近检查记录
@@ -117,6 +117,7 @@
 | 日期 | 检查人/工具 | 代码基准 | 结论 |
 | --- | --- | --- | --- |
 | 2026-06-30 | Codex | A-014 working tree | 补齐 chunks/content internal route、Gateway proxy、seeded/fake-backed `knowledge-queries` contract、错误 envelope 和 request id 测试；document PATCH/DELETE 与真实 Qdrant/AI Gateway smoke 仍待后续任务。 |
+| 2026-06-30 | Codex | PR #273 | 文档 PATCH/DELETE lifecycle 已落地：tags 更新、软删除、cleanup job 创建、Gateway proxy 和 PostgreSQL repository lifecycle 集成测试；真实 File/Qdrant cleanup worker 和跨依赖 smoke 仍待后续任务。 |
 | 2026-06-30 | Codex | working tree | 补充 A-11/A-12/A-14 解耦契约：A-12/A-14 可用 seeded chunks、fake vector/AI adapter 做契约和 handler 测试；完整 ingestion runtime 仍由 A-11 交付。 |
 | 2026-06-30 | Codex | A-13 PR #249 | parser-configs 运行时管理已落地并合入：Knowledge 内部 API、Gateway proxy、默认 builtin seed、上传 snapshot、conflict 映射和前端管理入口均已覆盖。 |
 | 2026-06-30 | Codex | PR #226 docs extraction | 从 PR #226 单独抽出 Parser Runtime 文档和 OpenAPI 契约；当前分支只记录契约，未引入 Knowledge worker 实现代码。 |

@@ -113,6 +113,139 @@ func TestPostgresRepositoryDocumentUploadLifecycle(t *testing.T) {
 	}
 }
 
+func TestPostgresRepositoryDocumentLifecycleUpdateAndDelete(t *testing.T) {
+	repo, pool, cleanup := newPostgresRepositoryForTest(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	now := time.Date(2026, 6, 30, 9, 0, 0, 0, time.UTC)
+	ownerScope := service.AccessScope{UserID: "usr_owner", CanWrite: true}
+	otherScope := service.AccessScope{UserID: "usr_other", CanWrite: true}
+
+	kb, err := repo.CreateKnowledgeBase(ctx, service.CreateKnowledgeBaseRecord{
+		ID:                "kb_lifecycle",
+		Name:              "生命周期库",
+		Description:       "",
+		DocType:           "GENERAL",
+		ChunkStrategy:     json.RawMessage(`{"type":"fixed"}`),
+		RetrievalStrategy: json.RawMessage(`{"mode":"vector"}`),
+		CreatedBy:         "usr_owner",
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	})
+	if err != nil {
+		t.Fatalf("CreateKnowledgeBase() error = %v", err)
+	}
+
+	doc, _, err := repo.CreateDocumentWithJob(ctx, service.CreateDocumentWithJobRecord{
+		DocumentID:      "doc_lifecycle",
+		KnowledgeBaseID: kb.ID,
+		FileRef:         "file_lifecycle",
+		Name:            "生命周期.pdf",
+		ContentType:     "application/pdf",
+		SizeBytes:       32,
+		Status:          service.DocumentStatusReady,
+		Tags:            []string{"old"},
+		CurrentJobID:    "job_ingest_lifecycle",
+		CreatedBy:       "usr_owner",
+		JobID:           "job_ingest_lifecycle",
+		JobType:         service.JobTypeDocumentIngestion,
+		JobStatus:       service.JobStatusSucceeded,
+		JobStage:        "ready",
+		JobMessage:      "document ready",
+		MaxAttempts:     3,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}, ownerScope)
+	if err != nil {
+		t.Fatalf("CreateDocumentWithJob() error = %v", err)
+	}
+
+	if _, err := repo.UpdateDocument(ctx, service.UpdateDocumentRecord{
+		ID:        doc.ID,
+		Tags:      []string{"new", "reviewed"},
+		UpdatedAt: now.Add(time.Minute),
+	}, otherScope); err == nil {
+		t.Fatal("UpdateDocument() by unrelated user succeeded, want not found")
+	}
+
+	updated, err := repo.UpdateDocument(ctx, service.UpdateDocumentRecord{
+		ID:        doc.ID,
+		Tags:      []string{"new", "reviewed"},
+		UpdatedAt: now.Add(2 * time.Minute),
+	}, ownerScope)
+	if err != nil {
+		t.Fatalf("UpdateDocument() error = %v", err)
+	}
+	if got, want := strings.Join(updated.Tags, ","), "new,reviewed"; got != want {
+		t.Fatalf("updated tags = %q, want %q", got, want)
+	}
+
+	deleteAt := now.Add(3 * time.Minute)
+	if err := repo.SoftDeleteDocument(ctx, service.DeleteDocumentRecord{
+		DocumentID:  doc.ID,
+		JobID:       "job_delete_cleanup_lifecycle",
+		JobType:     service.JobTypeDeleteCleanup,
+		JobStatus:   service.JobStatusQueued,
+		JobStage:    "delete_cleanup",
+		JobMessage:  "document queued for delete cleanup",
+		MaxAttempts: 1,
+		DeletedAt:   deleteAt,
+		CreatedAt:   deleteAt,
+		UpdatedAt:   deleteAt,
+	}, otherScope); err == nil {
+		t.Fatal("SoftDeleteDocument() by unrelated user succeeded, want not found")
+	}
+
+	if err := repo.SoftDeleteDocument(ctx, service.DeleteDocumentRecord{
+		DocumentID:  doc.ID,
+		JobID:       "job_delete_cleanup_lifecycle",
+		JobType:     service.JobTypeDeleteCleanup,
+		JobStatus:   service.JobStatusQueued,
+		JobStage:    "delete_cleanup",
+		JobMessage:  "document queued for delete cleanup",
+		MaxAttempts: 1,
+		DeletedAt:   deleteAt,
+		CreatedAt:   deleteAt,
+		UpdatedAt:   deleteAt,
+	}, ownerScope); err != nil {
+		t.Fatalf("SoftDeleteDocument() error = %v", err)
+	}
+
+	if _, err := repo.GetDocument(ctx, doc.ID, ownerScope); err == nil {
+		t.Fatal("GetDocument() after delete succeeded, want not found")
+	}
+
+	list, err := repo.ListDocumentsByKnowledgeBase(ctx, kb.ID, nil, ownerScope, service.PageInput{Page: 1, PageSize: 20})
+	if err != nil {
+		t.Fatalf("ListDocumentsByKnowledgeBase() after delete error = %v", err)
+	}
+	if list.Page.Total != 0 || len(list.Items) != 0 {
+		t.Fatalf("deleted document still visible in list: %+v", list)
+	}
+
+	var jobType, jobStatus, jobStage, jobMessage string
+	var maxAttempts int32
+	var deletedAt time.Time
+	if err := pool.QueryRow(ctx, `
+		SELECT j.job_type, j.status, COALESCE(j.current_stage, ''), COALESCE(j.message, ''), j.max_attempts, d.deleted_at
+		FROM processing_jobs j
+		JOIN knowledge_documents d ON d.id = j.document_id
+		WHERE j.id = $1
+	`, "job_delete_cleanup_lifecycle").Scan(&jobType, &jobStatus, &jobStage, &jobMessage, &maxAttempts, &deletedAt); err != nil {
+		t.Fatalf("query delete cleanup job: %v", err)
+	}
+	if jobType != service.JobTypeDeleteCleanup ||
+		jobStatus != service.JobStatusQueued ||
+		jobStage != "delete_cleanup" ||
+		jobMessage != "document queued for delete cleanup" ||
+		maxAttempts != 1 ||
+		!deletedAt.Equal(deleteAt) {
+		t.Fatalf("cleanup job = type:%q status:%q stage:%q message:%q maxAttempts:%d deletedAt:%s",
+			jobType, jobStatus, jobStage, jobMessage, maxAttempts, deletedAt)
+	}
+}
+
 func newPostgresRepositoryForTest(t *testing.T) (*repository.PostgresRepository, *pgxpool.Pool, func()) {
 	t.Helper()
 

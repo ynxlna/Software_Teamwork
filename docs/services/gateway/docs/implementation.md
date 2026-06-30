@@ -27,10 +27,10 @@
 | --- | --- | --- |
 | 文档状态 | active | README、OpenAPI、active owner map 和数据模型文档存在。 |
 | 代码状态 | partial | Go gateway、auth public routes、Redis session cache、proxy route matrix、中间件和错误归一化已实现。 |
-| 契约对齐 | guarded / partial | route matrix 覆盖 97 个 active operations，并校验 method/path/owner/operationId 与 OpenAPI 一致；admin parser-configs 已转为 Knowledge proxy，剩余若干 Knowledge document/retrieval routes 仍被标为 `NotImplemented`。 |
+| 契约对齐 | guarded / partial | route matrix 覆盖 97 个 active operations，并校验 method/path/owner/operationId 与 OpenAPI 一致；admin parser-configs、Knowledge document lifecycle、chunks、content 和 knowledge-queries 已转为 owner proxy；当前 Gateway route matrix 不再为 Knowledge active routes 返回阶段性 501。 |
 | 数据持久化 | redis / none | Gateway 不持久化业务数据库；使用 Redis 保存 session cache。 |
 | 测试状态 | partial | 单元测试覆盖 route matrix、auth proxy、headers、binary/SSE proxy、中间件；缺真实 Redis/downstream 集成测试。 |
-| 建议动作 | 补实现 / 回写文档 | 处理 active 但 501 的 routes，并补端到端联调验证。 |
+| 建议动作 | 联调 / 复核 | 补真实 Redis、auth 和 owner services 端到端联调验证。 |
 
 ## 3. 已实现
 
@@ -46,12 +46,13 @@
 | CORS / body limit / timeout / recover / request id | `services/gateway/internal/middleware/` | 前后端集成契约 | middleware/server tests | 覆盖基础 edge policy。 |
 | 服务边界导入守卫 | `services/gateway/internal/http/routes_internal_test.go` | 服务边界 / 技术基线 | `TestGatewayDoesNotImportBusinessInfrastructureClients` | 防止 Gateway 生产代码引入 SQL、MinIO、Qdrant 或 provider SDK。 |
 | Admin parser config proxy | `services/gateway/internal/http/routes.go`、`parser_config_test.go` | Gateway OpenAPI admin runtime config | `cd services/gateway && go test ./...` | 转发 `/api/v1/admin/parser-configs` 到 Knowledge `/internal/v1/parser-configs`，支持管理员权限、request id、validation/conflict/error 归一化。 |
+| Knowledge document lifecycle proxy | `services/gateway/internal/http/routes.go`、`gateway_auth_proxy_test.go` | Gateway OpenAPI document paths | `TestKnowledgeDocumentLifecycleRoutesProxyToKnowledge` | 转发 `PATCH/DELETE /api/v1/documents/{documentId}` 到 Knowledge，保留认证上下文和 request id。 |
+| Knowledge chunks/content/query proxy | `services/gateway/internal/http/routes.go`、`gateway_auth_proxy_test.go` | Gateway OpenAPI Knowledge active paths | `TestKnowledgeDocumentChunkAndContentRoutesProxyToKnowledge`、`TestKnowledgeQueriesRouteProxiesToKnowledge` | chunks/query 返回 JSON envelope，content 保持二进制透明代理。 |
 
 ## 4. 未实现
 
 | 缺口 | 文档来源 | 影响范围 | 建议任务 |
 | --- | --- | --- | --- |
-| 多个 active Knowledge document/retrieval routes 返回 501 | Gateway OpenAPI active paths | API / frontend / knowledge | 待确认：补下游实现或调整 active 状态。 |
 | 管理概览/跨服务指标聚合契约缺失 | `x-missing-contracts`、owner map | API / frontend | 待确认：先定契约再实现。 |
 | 真实依赖 ready/smoke 未验证 | README / deploy expectation | deploy / integration | 待确认：补 Redis + auth + owner services smoke。 |
 
@@ -59,7 +60,6 @@
 
 | 出入点 | 文档要求 | 当前实现 | 风险 | 建议处理 |
 | --- | --- | --- | --- | --- |
-| Active OpenAPI vs 501 | OpenAPI 和 owner map 将 97 operations 列为 active；active 表示 public method/path/schema 已进入协作契约，不等同于所有 owner service 已完成端到端实现 | `routes.go` 中 5 个 Knowledge document/retrieval operations 标为 `NotImplemented`；admin parser-configs 已取消 501 并代理到 Knowledge | 前端可生成类型和 client 方法，但剩余 501 路径不能写入 smoke-ready 或已闭环能力 | 对应 owner service 补实现；在能力矩阵、runbook 和 PR 验证中继续标明阶段性 501。 |
 | readyz 依赖 | Gateway README 要求统一入口可用 | `gatewayReadyCheck` 要求 Redis、auth、knowledge、qa、document、ai-gateway base URL 全配置 | 本地只启动 gateway 时 `/readyz` 易失败 | README/implementation 保留该行为，补本地 smoke 配置。 |
 | 下游错误归一化 | 前后端契约要求统一 error envelope | proxy 会丢弃非公开错误细节并归一化 | 有利于安全，但可能隐藏调试信息 | 在日志/trace 中补 request id 和 dependency 信息。 |
 | Gateway 不写业务逻辑 | 服务边界要求 Gateway 不访问 SQL/MinIO/Qdrant/LLM | 当前代码符合 | 无 | 持续通过 review/测试防回归。 |
@@ -68,7 +68,6 @@
 
 | 项目 | 当前用途 | 退出条件 | 关联任务 |
 | --- | --- | --- | --- |
-| `NotImplemented` route flag | 为已进入 OpenAPI 但下游未完成的 paths 返回稳定 501 | 下游实现完成或 OpenAPI 降级 | 仅剩 document PATCH/DELETE、chunks、content、knowledge-queries 等 Knowledge routes |
 | test memory session store | Gateway auth/proxy 单元测试 | 保留测试用 | 无 |
 
 ## 7. 运行与配置
@@ -94,7 +93,6 @@
 
 | 任务 | 类型 | 优先级 | 依据 | 说明 |
 | --- | --- | --- | --- | --- |
-| 清零 Gateway active 501 routes | 修改既有任务 | P0 | Active contract 可调用性 | 按 owner service 实现或回写契约状态。 |
 | 增加 Gateway integration smoke | 新任务 | P1 | readyz 和 proxy 依赖真实服务 | 覆盖 Redis/auth/owner base URL。 |
 | 扩展 OpenAPI schema-level route test | 后续增强 | P2 | 当前已校验 method/path/owner/operationId | 可继续补充参数、响应 content type 和 security 字段漂移检查。 |
 
@@ -105,3 +103,4 @@
 | 2026-06-29 | Codex goal | `eddf917` + working tree | Gateway 架构边界清晰，route matrix 覆盖 97 active operations；主要风险是 active contract 中仍有多条 501 占位。 |
 | 2026-06-30 | Codex | `8f294ec` + 本分支改动 | route matrix 已显式覆盖 gateway/auth 直接路由和 owner proxy routes，并与 OpenAPI 的 method/path/owner/operationId 对齐；501 占位和 Gateway 不直连业务基础设施均有回归测试。 |
 | 2026-06-30 | Codex | A-13 PR #249 | admin parser-configs 已完成 Gateway proxy 和权限/error 测试，不再属于 501 占位范围。 |
+| 2026-06-30 | Codex | PR #273 | Knowledge document lifecycle、chunks、content 和 knowledge-queries 已完成 Gateway proxy，不再属于 501 占位范围；真实 Redis/downstream smoke 仍待补齐。 |

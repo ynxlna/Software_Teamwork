@@ -1,5 +1,5 @@
 import { Ban, Download, FileText, Loader2, PencilLine, Play, RefreshCw, Save } from 'lucide-react'
-import { type FormEvent, useEffect, useState } from 'react'
+import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
 import { ProgressSummary } from '@/components/common'
 import { Button } from '@/components/ui/button'
@@ -205,6 +205,11 @@ export function ReportGeneratePage() {
   const activeSection = sections.find((item) => item.id === activeSectionId) ?? sections[0]
   const effectiveJob = jobQuery.data ?? lastJob
   const selectedTemplate = templates.find((template) => template.id === form.templateId)
+
+  const usingFallback = useMemo(
+    () => typeQuery.isError || templateQuery.isError || materialQuery.isError || !typeQuery.data?.length,
+    [typeQuery.isError, templateQuery.isError, materialQuery.isError, typeQuery.data],
+  )
 
   useEffect(() => {
     const firstTemplate = templates[0]
@@ -473,6 +478,11 @@ export function ReportGeneratePage() {
           </div>
         </div>
 
+        {usingFallback && (
+          <div className="mt-4 rounded-lg border border-amber-500/40 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            报告配置接口暂未联通，当前展示本地示例数据。报告类型、模板和材料以服务端实际配置为准。
+          </div>
+        )}
         {(notice || formError) && (
           <div
             className={cn(

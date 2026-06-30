@@ -12,12 +12,12 @@ import (
 )
 
 type fakeReportFileRepository struct {
-	reports            map[string]Report
-	sections           []ReportSection
-	files              map[string]ReportFile
-	jobs               map[string]ReportJob
-	attempts           map[string]ReportJobAttempt
-	taskIDErr          error
+	reports   map[string]Report
+	sections  []ReportSection
+	files     map[string]ReportFile
+	jobs      map[string]ReportJob
+	attempts  map[string]ReportJobAttempt
+	taskIDErr error
 	// simulateDeleteOnSucceededUpdate, if true, makes UpdateReportFile return a
 	// conflict error when the status is succeeded, simulating a race where the
 	// report is deleted after DOCX generation but before the final write-back.
@@ -141,6 +141,14 @@ func (f *fakeReportFileRepository) UpdateReportFile(_ context.Context, value Rep
 		return ReportFile{}, NewError(CodeConflict, "report has been deleted", nil)
 	}
 	f.files[value.ID] = value
+	if value.Status == ReportFileStatusSucceeded {
+		report := f.reports[value.ReportID]
+		report.Status = ReportStatusExported
+		report.LatestReportFileID = value.ID
+		now := time.Now().UTC()
+		report.ExportedAt = &now
+		f.reports[value.ReportID] = report
+	}
 	return value, nil
 }
 
@@ -156,15 +164,30 @@ func (f *fakeReportFileQueue) EnqueueReportJob(context.Context, JobType, string,
 type fakeReportFileContentClient struct {
 	content FileContent
 	created UploadedFile
+	err     error
 }
 
 func (f *fakeReportFileContentClient) CreateFile(_ context.Context, _ RequestContext, file UploadedFile) (FileObject, error) {
+	if f.err != nil {
+		return FileObject{}, f.err
+	}
 	f.created = file
 	return FileObject{ID: "file-internal-1", Filename: file.Filename, ContentType: file.ContentType, SizeBytes: file.SizeBytes}, nil
 }
 
 func (f *fakeReportFileContentClient) ReadFileContent(context.Context, RequestContext, string) (FileContent, error) {
 	return f.content, nil
+}
+
+type fakeReportFileGenerator struct {
+	err error
+}
+
+func (f fakeReportFileGenerator) GenerateDOCX(context.Context, Report, []ReportSection) ([]byte, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return []byte("docx"), nil
 }
 
 func TestCreateReportFileCreatesPendingJobAndSafeMetadata(t *testing.T) {
@@ -268,6 +291,40 @@ func TestExecuteReportFileCreationUsesSavedSectionsAndStoresFileRef(t *testing.T
 	}
 	if !docxContains(t, data, "final edited content") {
 		t.Fatal("generated DOCX did not include saved section content")
+	}
+}
+
+func TestExecuteReportFileCreationFailureDoesNotUpdateReportExportMetadata(t *testing.T) {
+	exportedAt := time.Date(2026, 6, 29, 8, 0, 0, 0, time.UTC)
+	repo := newFakeReportFileRepository()
+	repo.reports["report-1"] = Report{
+		ID:                 "report-1",
+		Name:               "Stable report",
+		CreatorID:          "user-1",
+		Status:             ReportStatusGenerated,
+		LatestReportFileID: "previous-file",
+		ExportedAt:         &exportedAt,
+	}
+	repo.sections = []ReportSection{{Title: "Section", Content: "saved content"}}
+	repo.files["rf-1"] = ReportFile{
+		ID: "rf-1", ReportID: "report-1", JobID: "job-1",
+		Filename: "Stable report.docx", Format: ReportFileFormatDOCX, Status: ReportFileStatusPending,
+	}
+	svc := NewReportFileService(repo, &fakeReportFileContentClient{}, nil, fakeReportFileGenerator{err: errors.New("docx generator unavailable")})
+
+	err := svc.ExecuteReportFileCreation(context.Background(), ReportFileExecutionPayload{JobID: "job-1", UserID: "user-1"})
+	if err == nil {
+		t.Fatal("expected generator error, got nil")
+	}
+	report := repo.reports["report-1"]
+	if report.Status != ReportStatusGenerated ||
+		report.LatestReportFileID != "previous-file" ||
+		report.ExportedAt == nil ||
+		!report.ExportedAt.Equal(exportedAt) {
+		t.Fatalf("report export metadata changed after failed file job: %+v", report)
+	}
+	if got := repo.files["rf-1"].Status; got != ReportFileStatusFailed {
+		t.Fatalf("report file status = %q, want %q", got, ReportFileStatusFailed)
 	}
 }
 

@@ -156,7 +156,7 @@ func (w *Worker) recordJobStatusOperation(ctx context.Context, payload ReportJob
 	if !ok {
 		return
 	}
-	_, _ = recorder.CreateOperationLog(ctx, service.OperationLog{
+	service.RecordOperationLog(ctx, recorder, service.OperationLog{
 		OperatorID:      payload.UserID,
 		OperatorName:    payload.UserID,
 		OperationType:   operationType,

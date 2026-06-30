@@ -350,6 +350,11 @@ func recordOperationLog(ctx context.Context, recorder OperationLogRecorder, log 
 	_, _ = recorder.CreateOperationLog(ctx, log)
 }
 
+// RecordOperationLog writes an operation log through the shared sanitizer.
+func RecordOperationLog(ctx context.Context, recorder OperationLogRecorder, log OperationLog) {
+	recordOperationLog(ctx, recorder, log)
+}
+
 func recordOperationIfSupported(ctx context.Context, candidate any, log OperationLog) {
 	recorder, ok := candidate.(OperationLogRecorder)
 	if !ok {

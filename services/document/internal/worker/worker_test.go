@@ -45,6 +45,38 @@ func TestWorkerRecordsOperationLogsForJobStatusTransitions(t *testing.T) {
 	}
 }
 
+func TestWorkerSanitizesOperationLogSummaries(t *testing.T) {
+	payload := ReportJobPayload{
+		RequestID: "req-worker",
+		JobType:   "content_generation prompt=secret https://minio.local/bucket/object",
+		JobID:     "job-1",
+		AttemptID: "attempt-1",
+		UserID:    "user-1",
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	manager := &fakeWorkerJobManager{}
+	worker := &Worker{
+		logger:  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		jobsMgr: manager,
+	}
+
+	if err := worker.handleReportJob(context.Background(), asynq.NewTask(TaskContentGeneration, raw)); err != nil {
+		t.Fatalf("handleReportJob() error = %v", err)
+	}
+
+	if len(manager.logs) != 2 {
+		t.Fatalf("operation log count = %d, want 2", len(manager.logs))
+	}
+	for _, log := range manager.logs {
+		if got := log.ParameterSummary["jobType"]; got != "[redacted]" {
+			t.Fatalf("operation log jobType summary was not sanitized: %+v", log.ParameterSummary)
+		}
+	}
+}
+
 func TestWorkerExecutesReportFileCreationJob(t *testing.T) {
 	mgr := &fakeWorkerJobManager{}
 	executor := &fakeReportFileExecutor{}

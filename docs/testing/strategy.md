@@ -16,7 +16,7 @@
 - OpenAPI 是协作源；改 Gateway active API 时必须跑契约校验和前端类型同步检查。
 - 数据库 migration 必须能从空库 apply。
 - env-gated integration tests 默认可能跳过；如果本次改动触碰 repository、SQL 或 migration，应尽量提供本地数据库执行记录。
-- 当前没有完整 E2E smoke；不要用单服务测试替代跨服务验收。
+- 当前没有完整跨服务 E2E smoke；不要用单服务测试或前端 mock E2E 替代跨服务验收。
 - Parser 当前只有内部契约和目录 scaffold；Python packaging、PaddleOCR runtime、Parser CI 和 Parser HTTP tests 未落地前，不能把 Parser 写成 required check。
 - open PR、未合入 issue 和草案不能写成当前 `develop` 已实现；测试记录也不能把未稳定依赖的检查写成 required。
 
@@ -28,7 +28,7 @@
 | `go-migrations.yml` | `services/{ai-gateway,auth,document,file,knowledge,qa}` | 校验 migration 文件名并用 `goose@v3.27.1` 对 PostgreSQL 16 apply；Gateway 和 Parser 当前没有 SQL migration。 |
 | `frontend.yml` | `apps/web/**`、根前端依赖文件和 workflow | 执行 `bun install --frozen-lockfile`、`bun run --cwd apps/web check`、`build`、`test:unit`、安装 Chromium 后执行 `test:e2e`。 |
 | `gateway-contract.yml` | Gateway OpenAPI active API | 执行 verifier unit tests 和 `python3 scripts/verify_gateway_active_api.py`。 |
-| `check-api-types.yml` | 前端 Gateway 类型漂移 | 执行 `bun run api:generate` 并要求 generated diff 干净。 |
+| `check-api-types.yml` | 前端 Gateway 类型漂移 | 在 `apps/web` 执行 `bun run api:generate`，本地等价命令为 `bun run --cwd apps/web api:generate`，并要求 generated diff 干净。 |
 | `commitlint.yml` / `pr-guard.yml` | 协作规则 | 检查提交格式、PR body、issue 关联和 base 更新要求。 |
 
 当前可作为 required checks 的优先候选是 Go service tests、goose migration apply、Frontend check/build/unit/E2E、Gateway contract/API drift 和 API type drift。Parser Python/runtime CI、后端路径过滤矩阵和跨服务 E2E smoke 仍未落地；在 CI 提供稳定依赖前只能作为 PR 前建议或缺口登记。

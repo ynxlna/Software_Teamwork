@@ -2,21 +2,21 @@
 
 日期：2026-06-29
 
-本文记录当前仓库可以怎样在本地启动、验证和排查服务。它不是生产部署说明，也不把未落地的根级 Compose 当成既有能力。
+本文记录当前仓库可以怎样在本地启动、验证和排查服务。它不是生产部署说明；根级 `deploy/docker-compose.yml` 只作为本地/演示联调基线，不等同于已经具备完整一键 E2E smoke。
 
 ## 当前结论
 
 | 范围 | 当前状态 | 说明 |
 | --- | --- | --- |
-| 根级一键联调 Compose | 缺失 | 仓库还没有 `deploy/docker-compose.yml` 或根级全服务 Compose。对应任务仍是 #122、#125、#150。 |
+| 根级本地/演示 Compose | partial | `deploy/docker-compose.yml` 已提供共享 PostgreSQL、Redis、Qdrant、MinIO、服务 migration 和服务串联基线；仍缺统一跨服务 smoke、seed data 和一键验收脚本。 |
 | QA 服务 Compose | partial | `services/qa/docker-compose.yml` 会启动 QA PostgreSQL、Auth PostgreSQL、Redis、Auth、QA 和 Gateway；不包含 Knowledge、Document、File、AI Gateway。 |
 | Document 服务 Compose | partial | `services/document/docker-compose.yml` 会启动 Document PostgreSQL、Redis、migration 和 Document；不包含 File、AI Gateway。 |
 | AI Gateway 本地运行 | host-run | 需要手动准备 PostgreSQL、migration、service token hash、credential encryption key 和 provider profile。当前无服务级 Compose。 |
-| File / Knowledge 独立运行 | host-run | 需要手动准备各自依赖；MinIO、Qdrant adapter 尚未落地。 |
+| File / Knowledge 独立运行 | host-run | 需要手动准备各自依赖；File MinIO adapter 已落地但缺真实对象存储 smoke，Knowledge Qdrant adapter 尚未落地。 |
 | Parser Runtime | contract-only | 当前只有内部 OpenAPI、README 和目录 scaffold；Python packaging、PaddleOCR runtime、Docker image 和 HTTP smoke 尚未落地。 |
 | 前端联调入口 | host-run | 前端只调用 public Gateway `/api/v1/**`；不要直连内部服务。 |
 
-因此当前本地联调应按“服务级 smoke + 手动拼接关键链路”的方式执行。除非 #122/#125 合并，不要在 PR 或文档中声称已有完整一键本地 E2E 环境。
+因此当前本地联调应按“根级依赖基线 + 服务级 smoke + 手动拼接关键链路”的方式执行。除非 #125 等跨服务 smoke 任务落地，不要在 PR 或文档中声称已有完整一键本地 E2E 验收环境。
 
 ## 前置依赖
 
@@ -118,10 +118,10 @@ go run ./cmd/server
 
 | 缺口 | 影响 | 跟踪 |
 | --- | --- | --- |
-| 根级全服务 Compose 缺失 | 不能一键启动 Auth/Gateway/File/Knowledge/QA/Document/AI Gateway。 | #122、#150 |
+| 根级跨服务 smoke 缺失 | 即使使用 `deploy/docker-compose.yml` 启动本地/演示基线，也不能自动证明 Auth/Gateway/File/Knowledge/QA/Document/AI Gateway 链路可用。 | #125 |
 | 跨服务契约测试和 E2E smoke 缺失 | 不能自动证明前端 -> Gateway -> 多服务链路可用。 | #125 |
 | Parser runtime 和 smoke 缺失 | 只能检查 `services/parser/api/openapi.yaml` 与文档一致性，不能验证真实 PaddleOCR 解析或 Knowledge -> Parser 调用链路。 | 待拆分 |
-| Qdrant adapter 和 MinIO adapter 未落地 | Knowledge 检索闭环和 File 对象存储闭环仍是局部实现。 | #152、#154 |
+| Qdrant adapter 未落地，MinIO 跨服务 smoke 缺失 | Knowledge 检索闭环仍缺 Qdrant adapter；File 已有 MinIO adapter，但真实对象存储和跨服务内容读取 smoke 仍缺。 | #152、#154 |
 | Document 真实 AI 生成和富 DOCX 工具链未落地 | 报告 job 状态机和基础 DOCX 导出可用；真实大纲/正文生成、Pandoc/LibreOffice 富 DOCX 转换和跨服务内容读取 smoke 仍需补齐。 | #160、#223 |
 | Document 跨服务 smoke 仍缺失 | settings/statistics/logs 已在服务端落地，但管理端、Gateway、File Service、Document worker 串联 smoke 仍未一键化。 | #159、#221 |
 | QA Agent Run MVP 和权限一致性仍在推进 | QA 会话/消息基础可用，完整 Agent 编排和 403 一致性仍需收口。 | #157、#217 |

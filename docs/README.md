@@ -55,7 +55,7 @@
 
 | 文档 | 内容 |
 | --- | --- |
-| [本地联调运行手册](runbooks/local-integration.md) | 当前服务级 Compose、host-run 依赖、冒烟顺序、已知缺口和 PR 前联调判断。 |
+| [本地联调运行手册](runbooks/local-integration.md) | 根级本地/演示 Compose、服务级 Compose、host-run 依赖、冒烟顺序、已知缺口和 PR 前联调判断。 |
 | [测试策略](testing/strategy.md) | Go、migration、Gateway contract、前端、env-gated integration tests 和跨服务 smoke 的当前测试策略。 |
 
 ## 协作与维护

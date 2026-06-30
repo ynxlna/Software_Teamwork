@@ -62,11 +62,14 @@ check 名称补入 `contexts`。
 [.github/workflows/task-issue-sync.yml](../../.github/workflows/task-issue-sync.yml)
 会在任务 issue 创建、编辑或重新打开时自动执行：
 
-- 识别标题形如 `S-001 ...` 或 `A-001 ...` 且正文写明
+- 识别标题形如 `A-001 ...`、`B-001 ...`、`C-001 ...`、`F-001 ...` 或 `S-001 ...`，且正文写明
   `GitHub Project：Software Teamwork` 的任务 issue。
 - 根据 issue 标题前缀强制同步 `Group`，并根据任务正文的 `优先级`、
   `批次`、`模块`、`Risk`、`依赖任务` 同步 GitHub Project 字段。
-- 根据主责小组和模块自动补 label；仓库不存在的 label 会跳过并在日志中提示。
+- 根据主责小组和模块自动补可用 label；当前 `L1nggTeam`、`JerryTeam`、`PrimeTeam`
+  会作为小组 label，`Frontend` 和 `Special` 只同步为 Project `Group`，通常通过
+  `frontend`、`ci`、`deployment`、`service:<name>` 等模块 label 标记。仓库不存在的
+  label 会跳过并在日志中提示。
 - 同步成功后把正文中的 `Project sync` 改为 `synced`；同步失败则改为
   `blocked`。
 

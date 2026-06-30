@@ -10,7 +10,7 @@
 
 ```txt
 upstream = https://github.com/Sakayori-Iroha-168/Software_Teamwork
-origin   = https://github.com/L-1ngg/Software_Teamwork
+origin   = https://github.com/YOUR_NAME/Software_Teamwork
 ```
 
 `upstream` 是团队主仓库，`origin` 是个人 fork 仓库。
@@ -31,19 +31,19 @@ origin/*          个人 fork 分支
 
 ```bash
 git fetch upstream --prune
-git switch -c L1nggTeam/feat/<short-name> upstream/develop
+git switch -c <team>/feat/<short-name> upstream/develop
 ```
 
 个人开发分支推送到自己的 fork：
 
 ```bash
-git push -u origin L1nggTeam/feat/<short-name>
+git push -u origin <team>/feat/<short-name>
 ```
 
 PR 方向按 `CONTRIBUTING.md` 固定为：
 
 ```txt
-from: L-1ngg/Software_Teamwork:L1nggTeam/feat/<short-name>
+from: YOUR_NAME/Software_Teamwork:<team>/feat/<short-name>
 to:   Sakayori-Iroha-168/Software_Teamwork:develop
 ```
 
@@ -145,7 +145,7 @@ eslint-config-prettier
 前端 API 类型统一从 gateway OpenAPI 生成：
 
 ```bash
-bunx openapi-typescript docs/services/gateway/api/openapi.yaml -o apps/web/src/api/generated/gateway.ts
+bun run --cwd apps/web api:generate
 ```
 
 规则：

@@ -59,7 +59,7 @@
 
 | 出入点 | 文档要求 | 当前实现 | 风险 | 建议处理 |
 | --- | --- | --- | --- | --- |
-| Active OpenAPI vs 501 | OpenAPI 和 owner map 将 97 operations 列为 active | `routes.go` 中 5 个 Knowledge document/retrieval operations 标为 `NotImplemented`；admin parser-configs 已取消 501 并代理到 Knowledge | 前端可生成方法但调用剩余未落地路径会得到 501 | 对应 owner service 补实现，或在契约/owner map 标注阶段性不可调用。 |
+| Active OpenAPI vs 501 | OpenAPI 和 owner map 将 97 operations 列为 active；active 表示 public method/path/schema 已进入协作契约，不等同于所有 owner service 已完成端到端实现 | `routes.go` 中 5 个 Knowledge document/retrieval operations 标为 `NotImplemented`；admin parser-configs 已取消 501 并代理到 Knowledge | 前端可生成类型和 client 方法，但剩余 501 路径不能写入 smoke-ready 或已闭环能力 | 对应 owner service 补实现；在能力矩阵、runbook 和 PR 验证中继续标明阶段性 501。 |
 | readyz 依赖 | Gateway README 要求统一入口可用 | `gatewayReadyCheck` 要求 Redis、auth、knowledge、qa、document、ai-gateway base URL 全配置 | 本地只启动 gateway 时 `/readyz` 易失败 | README/implementation 保留该行为，补本地 smoke 配置。 |
 | 下游错误归一化 | 前后端契约要求统一 error envelope | proxy 会丢弃非公开错误细节并归一化 | 有利于安全，但可能隐藏调试信息 | 在日志/trace 中补 request id 和 dependency 信息。 |
 | Gateway 不写业务逻辑 | 服务边界要求 Gateway 不访问 SQL/MinIO/Qdrant/LLM | 当前代码符合 | 无 | 持续通过 review/测试防回归。 |

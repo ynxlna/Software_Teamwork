@@ -9,6 +9,11 @@ This document is the human-readable audit list for gateway active API paths. The
 - `/healthz` and `/readyz` are operational routes owned by `gateway`; they intentionally do not use bearer auth.
 - No stable active path uses action-style segments such as `/login`, `/logout`, `/search`, `/generate`, `/export`, `/retry`, or `/revoke`.
 - Frontend clients should generate callable methods only from active OpenAPI `paths`, not from `x-missing-contracts`.
+- Active means the public method/path/schema is part of the collaboration contract.
+  A small number of owner-service operations may still return the stable
+  `not_implemented` error while implementation catches up; check
+  `docs/services/gateway/docs/implementation.md` before treating an active path
+  as end-to-end smoke-ready.
 
 ## Owner Summary
 

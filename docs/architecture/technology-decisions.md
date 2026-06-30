@@ -103,7 +103,7 @@
 | API 版本前缀 | `/api/v1` / `/internal/v1` | `v1` | 已固定 | 公开入口以 gateway OpenAPI 为准；内部服务使用服务级契约。 |
 | 后端测试 | Go `testing` + `httptest` | Go `1.25` 标准库 | 已固定 | 默认不引入 BDD 测试框架。 |
 | CI | GitHub Actions | `actions/github-script@v7`；runner `ubuntu-latest` | 部分已固定 | 已有协作类 workflow、Go service build/test workflow 和 goose migration apply workflow；前端 workflow 尚待落地。 |
-| 观测 | `slog` + Prometheus metrics；关键链路 OpenTelemetry tracing | `github.com/prometheus/client_golang@v1.23.2`；`go.opentelemetry.io/otel@v1.44.0`；`go.opentelemetry.io/otel/sdk@v1.44.0`；`go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0`；`go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 已固定 | 第一阶段先保证结构化日志和低基数字段指标；tracing 默认按下方采样/导出策略启用。 |
+| 观测 | `slog` + Prometheus metrics；关键链路 OpenTelemetry tracing | `github.com/prometheus/client_golang@v1.23.2`；`go.opentelemetry.io/otel@v1.44.0`；`go.opentelemetry.io/otel/sdk@v1.44.0`；`go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0`；`go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 已选型，待固定 | 第一阶段先保证结构化日志和低基数字段指标；首次落地 metrics/tracing 时必须写入对应服务 `go.mod` 并同步本文状态。 |
 | DOCX 生成 | Document worker 当前使用内置 Go `SimpleDOCXGenerator`；Pandoc/LibreOffice 作为后续富 DOCX 工具链 | 内置 Go 生成器：标准库；Pandoc 候选基线 `3.10`；LibreOffice 待 worker image 落地固定 tag + digest | 部分已固定 | 当前不依赖外部 CLI；引入 Pandoc/LibreOffice 前必须固定 worker 镜像或 CLI 版本和摘要。 |
 | MCP 集成 | 官方 MCP Go SDK；暂不拆独立 sidecar | `github.com/modelcontextprotocol/go-sdk@v1.1.0` | 已固定 | QA 负责工具白名单、权限、参数校验、超时和脱敏记录；SDK 升级或 sidecar 化另开兼容性任务。 |
 | 本地部署 | Docker Compose | Compose 文件格式无 top-level version | 已选型 | QA 和 Document 已有服务本地 Compose；根 `deploy/docker-compose.yml` 尚未落地。 |
@@ -161,11 +161,11 @@
 | Qdrant | 待固定 | 尚无 Compose/runtime adapter | Knowledge 需要时补版本和运行配置。 |
 | MinIO server | 待固定 | 尚无 Compose/部署版本锁定 | File MinIO adapter 已落地；补本地或部署依赖时固定版本。 |
 | MinIO client (`mc`) | 待固定 | 尚无 Compose/部署版本锁定 | 本地 bucket 初始化方案待补。 |
-| Prometheus Go client | `github.com/prometheus/client_golang@v1.23.2` | 技术选型基线 | 新增 Go 服务暴露 Prometheus metrics 时默认沿用该版本，指标 label 不得包含用户输入、prompt、token、object key 或 API key 指纹。 |
-| OpenTelemetry Go API | `go.opentelemetry.io/otel@v1.44.0` | 技术选型基线 | OpenTelemetry API/root module；新增 tracing 不应只引入该 module。 |
-| OpenTelemetry Go SDK | `go.opentelemetry.io/otel/sdk@v1.44.0` | 技术选型基线 | 关键链路 tracing 使用 parent-based ratio sampler；dev/local 可配置为 100%，生产默认 1%。 |
-| OpenTelemetry OTLP HTTP trace exporter | `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0` | 技术选型基线 | 配置 exporter endpoint 时用于导出 traces；未配置 endpoint 时不导出 trace，避免无意外联。 |
-| OpenTelemetry Prometheus exporter | `go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 技术选型基线 | 用于 OTel metrics 与 Prometheus scrape 兼容；若服务只使用 Prometheus client，可暂不引入。 |
+| Prometheus Go client | `github.com/prometheus/client_golang@v1.23.2` | 目标技术基线，尚未写入 `go.mod` | 新增 Go 服务暴露 Prometheus metrics 时默认沿用该版本，指标 label 不得包含用户输入、prompt、token、object key 或 API key 指纹。 |
+| OpenTelemetry Go API | `go.opentelemetry.io/otel@v1.44.0` | 目标技术基线，尚未写入 `go.mod` | OpenTelemetry API/root module；新增 tracing 不应只引入该 module。 |
+| OpenTelemetry Go SDK | `go.opentelemetry.io/otel/sdk@v1.44.0` | 目标技术基线，尚未写入 `go.mod` | 关键链路 tracing 使用 parent-based ratio sampler；dev/local 可配置为 100%，生产默认 1%。 |
+| OpenTelemetry OTLP HTTP trace exporter | `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0` | 目标技术基线，尚未写入 `go.mod` | 配置 exporter endpoint 时用于导出 traces；未配置 endpoint 时不导出 trace，避免无意外联。 |
+| OpenTelemetry Prometheus exporter | `go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 目标技术基线，尚未写入 `go.mod` | 用于 OTel metrics 与 Prometheus scrape 兼容；若服务只使用 Prometheus client，可暂不引入。 |
 | MCP Go SDK | `github.com/modelcontextprotocol/go-sdk@v1.1.0` | `services/qa/go.mod` | QA 当前直接作为 MCP Host/Client；暂不切换到独立 MCP sidecar。 |
 | Document 内置 DOCX 生成器 | Go 标准库 `archive/zip` + XML | `services/document/internal/service/docx_generator.go` | 当前只覆盖基础 DOCX 包装和文本/表格扁平化导出，不等同于 Pandoc/LibreOffice 富文档转换。 |
 | Pandoc CLI | `3.10` 候选基线 | Pandoc 官方 release | 后续引入 rich DOCX worker 时再写入 Dockerfile/Compose/部署镜像，并固定下载包 checksum 或镜像 digest。 |

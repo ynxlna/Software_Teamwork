@@ -211,3 +211,75 @@ Resolved the latest Codex PR Review finding by exposing the top report navigatio
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Review PR 226 A11 worker fixes
+
+**Date**: 2026-06-30
+**Task**: Review PR 226 A11 worker fixes
+**Branch**: `review/pr-226`
+
+### Summary
+
+Reviewed PR #226 for issue #83, fixed stale-running recovery and attempt fencing for Knowledge ingestion jobs, pushed fixes to the existing contributor PR branch, and verified Knowledge service tests/build plus repository diff checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6662048` | (see git log) |
+| `d52828d` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
+
+
+## Session 7: Finish issue 116 shared UI states
+
+**Date**: 2026-06-30
+**Task**: Finish issue 116 shared UI states
+**Branch**: `Frontend/refactor/shared-ui-states`
+
+### Summary
+
+Implemented and verified shared frontend state UI for issue #116.
+
+### Main Changes
+
+﻿- Added shared common UI state primitives for `StateBlock`, `InlineNotice`, `ConfirmDialog`, `ProgressSummary`, and `TableSkeleton`.
+- Reused the shared state components across knowledge documents/search, QA chat/sidebar, and report generate/records surfaces for loading, empty, error, progress, warning, and destructive confirmation states.
+- Captured the frontend shared-state component convention in `.trellis/spec/frontend/component-guidelines.md`.
+- Verified against latest `upstream/develop`; `git rev-list --left-right --count upstream/develop...HEAD` was clean before committing.
+- Validation passed: `bun run --cwd apps/web check`, `bun run --cwd apps/web build`, and `git diff --check`.
+
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `9131aed` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

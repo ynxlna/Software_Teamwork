@@ -483,7 +483,7 @@ func cleanList(values []string) []string {
 
 func mapFileError(err error) error {
 	var appErr *AppError
-	if errors.As(err, &appErr) && appErr.Code == CodeValidation {
+	if errors.As(err, &appErr) && (appErr.Code == CodeValidation || appErr.Code == CodeNotFound) {
 		return err
 	}
 	return dependencyError("file service failed", err)

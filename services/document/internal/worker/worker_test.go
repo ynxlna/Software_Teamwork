@@ -45,6 +45,37 @@ func TestWorkerRecordsOperationLogsForJobStatusTransitions(t *testing.T) {
 	}
 }
 
+func TestWorkerExecutesReportFileCreationJob(t *testing.T) {
+	mgr := &fakeWorkerJobManager{}
+	executor := &fakeReportFileExecutor{}
+	w := &Worker{
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		jobsMgr:            mgr,
+		reportFileExecutor: executor,
+	}
+	payload := ReportJobPayload{
+		RequestID: "req-1",
+		JobType:   string(service.JobTypeReportFileCreation),
+		JobID:     "job-1",
+		AttemptID: "attempt-1",
+		UserID:    "user-1",
+	}
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+
+	if err := w.handleReportJob(context.Background(), asynq.NewTask(TaskReportFileCreation, body)); err != nil {
+		t.Fatalf("handleReportJob() error = %v", err)
+	}
+	if executor.payload.JobID != "job-1" || executor.payload.UserID != "user-1" {
+		t.Fatalf("executor payload = %+v", executor.payload)
+	}
+	if !mgr.jobRunning || !mgr.attemptRunning || !mgr.jobSucceeded || !mgr.attemptSucceeded {
+		t.Fatalf("expected running and succeeded state transitions, got %+v", mgr)
+	}
+}
+
 func TestWorkerRecordsFailedOperationLogWhenJobUpdateFails(t *testing.T) {
 	payload := ReportJobPayload{
 		RequestID: "req-worker-failed",
@@ -75,12 +106,54 @@ func TestWorkerRecordsFailedOperationLogWhenJobUpdateFails(t *testing.T) {
 	}
 }
 
+func TestWorkerRecordsFailedOperationLogWhenReportFileExecutionFails(t *testing.T) {
+	payload := ReportJobPayload{
+		RequestID: "req-file-failed",
+		JobType:   string(service.JobTypeReportFileCreation),
+		JobID:     "job-1",
+		AttemptID: "attempt-1",
+		UserID:    "user-1",
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	manager := &fakeWorkerJobManager{}
+	executor := &fakeReportFileExecutor{err: errors.New("file service unavailable")}
+	worker := &Worker{
+		logger:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		jobsMgr:            manager,
+		reportFileExecutor: executor,
+	}
+
+	if err := worker.handleReportJob(context.Background(), asynq.NewTask(TaskReportFileCreation, raw)); err == nil {
+		t.Fatal("handleReportJob() error = nil, want execution error")
+	}
+
+	if len(manager.logs) != 2 {
+		t.Fatalf("operation log count = %d, want running and failed", len(manager.logs))
+	}
+	if !manager.jobFailed || !manager.attemptFailed {
+		t.Fatalf("expected failed state transitions, got %+v", manager)
+	}
+	if got := manager.logs[1]; got.OperationType != service.OperationReportJobFailed || got.OperationResult != service.OperationResultFailed || got.TargetID != "job-1" {
+		t.Fatalf("failed operation log = %+v", got)
+	}
+}
+
 type fakeWorkerJobManager struct {
-	logs         []service.OperationLog
-	succeededErr error
+	jobRunning       bool
+	jobSucceeded     bool
+	jobFailed        bool
+	attemptRunning   bool
+	attemptSucceeded bool
+	attemptFailed    bool
+	logs             []service.OperationLog
+	succeededErr     error
 }
 
 func (f *fakeWorkerJobManager) SetJobRunning(context.Context, string) error {
+	f.jobRunning = true
 	return nil
 }
 
@@ -88,26 +161,41 @@ func (f *fakeWorkerJobManager) SetJobSucceeded(context.Context, string) error {
 	if f.succeededErr != nil {
 		return f.succeededErr
 	}
+	f.jobSucceeded = true
 	return nil
 }
 
 func (f *fakeWorkerJobManager) SetJobFailed(context.Context, string, string, string) error {
+	f.jobFailed = true
 	return nil
 }
 
 func (f *fakeWorkerJobManager) SetAttemptRunning(context.Context, string) error {
+	f.attemptRunning = true
 	return nil
 }
 
 func (f *fakeWorkerJobManager) SetAttemptSucceeded(context.Context, string) error {
+	f.attemptSucceeded = true
 	return nil
 }
 
 func (f *fakeWorkerJobManager) SetAttemptFailed(context.Context, string, string, string) error {
+	f.attemptFailed = true
 	return nil
 }
 
 func (f *fakeWorkerJobManager) CreateOperationLog(_ context.Context, log service.OperationLog) (service.OperationLog, error) {
 	f.logs = append(f.logs, log)
 	return log, nil
+}
+
+type fakeReportFileExecutor struct {
+	payload service.ReportFileExecutionPayload
+	err     error
+}
+
+func (f *fakeReportFileExecutor) ExecuteReportFileCreation(_ context.Context, payload service.ReportFileExecutionPayload) error {
+	f.payload = payload
+	return f.err
 }

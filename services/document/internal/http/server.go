@@ -50,6 +50,13 @@ type AdminSvc interface {
 	ListOperationLogs(context.Context, service.RequestContext, service.OperationLogListFilter) (service.OperationLogListResult, error)
 }
 
+type ReportFileSvc interface {
+	ListReportFiles(ctx context.Context, rctx service.RequestContext, filter service.ReportFileListFilter) (service.ReportFileListResult, error)
+	CreateReportFile(ctx context.Context, rctx service.RequestContext, input service.CreateReportFileInput) (service.ReportFile, error)
+	GetReportFile(ctx context.Context, rctx service.RequestContext, id string) (service.ReportFile, error)
+	ReadReportFileContent(ctx context.Context, rctx service.RequestContext, id string) (service.FileContent, error)
+}
+
 const defaultMaxUploadBytes = int64(32 << 20)
 
 type Config struct {
@@ -59,6 +66,7 @@ type Config struct {
 	ReportService   ReportService
 	JobSvc          JobSvc
 	AdminService    AdminSvc
+	ReportFileSvc   ReportFileSvc
 	MaxUploadBytes  int64
 }
 
@@ -69,6 +77,7 @@ type Server struct {
 	reportService  ReportService
 	jobSvc         JobSvc
 	adminService   AdminSvc
+	reportFileSvc  ReportFileSvc
 	maxUploadBytes int64
 	mux            *http.ServeMux
 }
@@ -87,6 +96,7 @@ func NewServer(cfg Config) *Server {
 		reportService:  cfg.ReportService,
 		jobSvc:         cfg.JobSvc,
 		adminService:   cfg.AdminService,
+		reportFileSvc:  cfg.ReportFileSvc,
 		maxUploadBytes: cfg.MaxUploadBytes,
 		mux:            http.NewServeMux(),
 	}
@@ -117,11 +127,10 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /report-jobs/{jobId}/attempts", s.handleListAttempts)
 	s.mux.HandleFunc("POST /report-jobs/{jobId}/attempts", s.handleRetryJob)
 	s.mux.HandleFunc("GET /reports/{reportId}/events", s.handleListEvents)
-	// Remaining report-generation resources stay scaffolded until their tasks land.
-	s.mux.HandleFunc("GET /report-files", s.handleNotImplemented)
-	s.mux.HandleFunc("POST /report-files", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-files/{reportFileId}", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-files/{reportFileId}/content", s.handleNotImplemented)
+	s.mux.HandleFunc("GET /report-files", s.handleListReportFiles)
+	s.mux.HandleFunc("POST /report-files", s.handleCreateReportFile)
+	s.mux.HandleFunc("GET /report-files/{reportFileId}", s.handleGetReportFile)
+	s.mux.HandleFunc("GET /report-files/{reportFileId}/content", s.handleGetReportFileContent)
 	s.mux.HandleFunc("GET /report-statistics/overview", s.handleGetReportStatisticsOverview)
 	s.mux.HandleFunc("GET /report-statistics/daily", s.handleListReportDailyStatistics)
 	s.mux.HandleFunc("GET /report-operation-logs", s.handleListReportOperationLogs)

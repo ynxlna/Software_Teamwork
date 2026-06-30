@@ -115,6 +115,13 @@ type FileObject struct {
 	CreatedAt      time.Time
 }
 
+type FileContent struct {
+	Filename    string
+	ContentType string
+	SizeBytes   int64
+	Content     io.ReadCloser
+}
+
 type ReportTemplate struct {
 	ID           string
 	TemplateName string
@@ -247,6 +254,49 @@ type ReportJob struct {
 	StartedAt    *time.Time
 	FinishedAt   *time.Time
 	CreatedAt    time.Time
+}
+
+type ReportFileStatus string
+
+const (
+	ReportFileStatusPending   ReportFileStatus = "pending"
+	ReportFileStatusRunning   ReportFileStatus = "running"
+	ReportFileStatusSucceeded ReportFileStatus = "succeeded"
+	ReportFileStatusFailed    ReportFileStatus = "failed"
+)
+
+const ReportFileFormatDOCX = "docx"
+
+type ReportFile struct {
+	ID        string
+	ReportID  string
+	JobID     string
+	Filename  string
+	Format    string
+	FileRef   string
+	FileSize  int64
+	Status    ReportFileStatus
+	CreatedBy string
+	CreatedAt time.Time
+}
+
+type ReportFileListFilter struct {
+	Page      int
+	PageSize  int
+	ReportID  string
+	CreatorID string
+}
+
+type ReportFileListResult struct {
+	Items []ReportFile
+	Page  PageMeta
+}
+
+type CreateReportFileInput struct {
+	ReportID     string
+	Format       string
+	TemplateID   string
+	StyleOptions json.RawMessage
 }
 
 type ReportJobAttempt struct {

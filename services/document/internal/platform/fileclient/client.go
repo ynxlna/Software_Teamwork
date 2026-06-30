@@ -128,6 +128,37 @@ func (c *Client) DeleteFile(ctx context.Context, reqCtx service.RequestContext, 
 	return nil
 }
 
+func (c *Client) ReadFileContent(ctx context.Context, reqCtx service.RequestContext, fileID string) (service.FileContent, error) {
+	if strings.TrimSpace(fileID) == "" {
+		return service.FileContent{}, service.NewError(service.CodeNotFound, "file not found", nil)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/internal/v1/files/"+url.PathEscape(fileID)+"/content", nil)
+	if err != nil {
+		return service.FileContent{}, service.NewError(service.CodeDependency, "file service request failed", err)
+	}
+	setContextHeaders(req, reqCtx)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return service.FileContent{}, service.NewError(service.CodeDependency, "file service unavailable", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		defer resp.Body.Close()
+		_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
+		if resp.StatusCode == http.StatusNotFound {
+			return service.FileContent{}, service.NewError(service.CodeNotFound, "file content not found", nil)
+		}
+		return service.FileContent{}, service.NewError(service.CodeDependency, "file service failed", nil)
+	}
+
+	filename := filenameFromContentDisposition(resp.Header.Get("Content-Disposition"))
+	return service.FileContent{
+		Filename:    filename,
+		ContentType: resp.Header.Get("Content-Type"),
+		SizeBytes:   resp.ContentLength,
+		Content:     resp.Body,
+	}, nil
+}
+
 func writeMultipartFile(writer *multipart.Writer, file service.UploadedFile) error {
 	if strings.TrimSpace(file.ChecksumSHA256) != "" {
 		if err := writer.WriteField("checksumSha256", strings.TrimSpace(file.ChecksumSHA256)); err != nil {
@@ -150,6 +181,17 @@ func writeMultipartFile(writer *multipart.Writer, file service.UploadedFile) err
 	}
 	_, err = io.Copy(part, file.Content)
 	return err
+}
+
+func filenameFromContentDisposition(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return ""
+	}
+	_, params, err := mime.ParseMediaType(value)
+	if err != nil {
+		return ""
+	}
+	return params["filename"]
 }
 
 func setContextHeaders(req *http.Request, reqCtx service.RequestContext) {

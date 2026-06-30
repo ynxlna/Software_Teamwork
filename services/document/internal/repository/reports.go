@@ -8,8 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/repository/sqlc"
 	"github.com/Sakayori-Iroha-168/Software_Teamwork/services/document/internal/service"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // --- Reports ---
@@ -646,7 +648,261 @@ func (r *PostgresRepository) ListReportSectionVersions(ctx context.Context, sect
 	return versions, nil
 }
 
+// --- Report files ---
+
+func (r *PostgresRepository) CreateReportFile(ctx context.Context, value service.ReportFile) (service.ReportFile, error) {
+	reportID, err := parseUUID(value.ReportID)
+	if err != nil {
+		return service.ReportFile{}, service.NewError(service.CodeValidation, "invalid report id", err)
+	}
+	jobID, err := parseOptionalUUIDField(value.JobID, "jobId")
+	if err != nil {
+		return service.ReportFile{}, err
+	}
+	if value.CreatedAt.IsZero() {
+		value.CreatedAt = time.Now().UTC()
+	}
+	row := r.db.QueryRow(ctx, `
+		INSERT INTO report_files (
+			id, report_id, job_id, filename, file_type, file_ref,
+			file_size, file_status, created_by, created_at
+		)
+		VALUES (
+			$1, $2, NULLIF($3, '')::uuid, $4, $5, NULLIF($6, ''),
+			$7, $8, NULLIF($9, ''), $10
+		)
+		RETURNING
+			id::text, report_id::text, COALESCE(job_id::text, ''), filename,
+			file_type, COALESCE(file_ref, ''), file_size, file_status,
+			COALESCE(created_by, ''), created_at`,
+		value.ID,
+		reportID,
+		jobID,
+		value.Filename,
+		value.Format,
+		value.FileRef,
+		value.FileSize,
+		string(value.Status),
+		value.CreatedBy,
+		value.CreatedAt,
+	)
+	created, err := scanReportFile(row)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return service.ReportFile{}, service.NewError(service.CodeConflict, "report file already exists", err)
+		}
+		return service.ReportFile{}, fmt.Errorf("insert report file: %w", err)
+	}
+	return created, nil
+}
+
+func (r *PostgresRepository) ListReportFiles(ctx context.Context, filter service.ReportFileListFilter) ([]service.ReportFile, int, error) {
+	conditions := []string{"r.deleted_at IS NULL"}
+	args := []any{}
+	argN := func(value any) string {
+		args = append(args, value)
+		return fmt.Sprintf("$%d", len(args))
+	}
+
+	if strings.TrimSpace(filter.ReportID) != "" {
+		reportID, err := parseUUID(strings.TrimSpace(filter.ReportID))
+		if err != nil {
+			return nil, 0, service.NewError(service.CodeValidation, "invalid report id", err)
+		}
+		conditions = append(conditions, "f.report_id = "+argN(reportID))
+	}
+	if strings.TrimSpace(filter.CreatorID) != "" {
+		conditions = append(conditions, "r.creator_id = "+argN(strings.TrimSpace(filter.CreatorID)))
+	}
+	where := strings.Join(conditions, " AND ")
+
+	var total int
+	if err := r.db.QueryRow(ctx, `
+		SELECT count(*)
+		FROM report_files f
+		JOIN reports r ON r.id = f.report_id
+		WHERE `+where, args...).Scan(&total); err != nil {
+		return nil, 0, fmt.Errorf("count report files: %w", err)
+	}
+
+	pageSize := filter.PageSize
+	if pageSize <= 0 {
+		pageSize = 20
+	}
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	limitArg := argN(pageSize)
+	offsetArg := argN((page - 1) * pageSize)
+	rows, err := r.db.Query(ctx, fmt.Sprintf(`
+		SELECT
+			f.id::text, f.report_id::text, COALESCE(f.job_id::text, ''),
+			f.filename, f.file_type, COALESCE(f.file_ref, ''), f.file_size,
+			f.file_status, COALESCE(f.created_by, ''), f.created_at
+		FROM report_files f
+		JOIN reports r ON r.id = f.report_id
+		WHERE %s
+		ORDER BY f.created_at DESC, f.id DESC
+		LIMIT %s OFFSET %s`, where, limitArg, offsetArg), args...)
+	if err != nil {
+		return nil, 0, fmt.Errorf("list report files: %w", err)
+	}
+	defer rows.Close()
+
+	files := make([]service.ReportFile, 0)
+	for rows.Next() {
+		file, err := scanReportFile(rows)
+		if err != nil {
+			return nil, 0, fmt.Errorf("scan report file: %w", err)
+		}
+		files = append(files, file)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, 0, fmt.Errorf("iterate report files: %w", err)
+	}
+	return files, total, nil
+}
+
+func (r *PostgresRepository) GetReportFileByID(ctx context.Context, id string) (service.ReportFile, error) {
+	reportFileID, err := parseUUID(id)
+	if err != nil {
+		return service.ReportFile{}, service.NewError(service.CodeValidation, "invalid report file id", err)
+	}
+	row := r.db.QueryRow(ctx, `
+		SELECT
+			id::text, report_id::text, COALESCE(job_id::text, ''), filename,
+			file_type, COALESCE(file_ref, ''), file_size, file_status,
+			COALESCE(created_by, ''), created_at
+		FROM report_files
+		WHERE id = $1`, reportFileID)
+	reportFile, err := scanReportFile(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return service.ReportFile{}, service.NewError(service.CodeNotFound, "report file not found", err)
+		}
+		return service.ReportFile{}, fmt.Errorf("get report file: %w", err)
+	}
+	return reportFile, nil
+}
+
+func (r *PostgresRepository) GetReportFileByJobID(ctx context.Context, jobID string) (service.ReportFile, error) {
+	id, err := parseUUID(jobID)
+	if err != nil {
+		return service.ReportFile{}, service.NewError(service.CodeValidation, "invalid job id", err)
+	}
+	row := r.db.QueryRow(ctx, `
+		SELECT
+			id::text, report_id::text, COALESCE(job_id::text, ''), filename,
+			file_type, COALESCE(file_ref, ''), file_size, file_status,
+			COALESCE(created_by, ''), created_at
+		FROM report_files
+		WHERE job_id = $1
+		ORDER BY created_at DESC
+		LIMIT 1`, id)
+	reportFile, err := scanReportFile(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return service.ReportFile{}, service.NewError(service.CodeNotFound, "report file not found", err)
+		}
+		return service.ReportFile{}, fmt.Errorf("get report file by job: %w", err)
+	}
+	return reportFile, nil
+}
+
+func (r *PostgresRepository) UpdateReportFile(ctx context.Context, value service.ReportFile) (service.ReportFile, error) {
+	reportFileID, err := parseUUID(value.ID)
+	if err != nil {
+		return service.ReportFile{}, service.NewError(service.CodeValidation, "invalid report file id", err)
+	}
+	jobID, err := parseOptionalUUIDField(value.JobID, "jobId")
+	if err != nil {
+		return service.ReportFile{}, err
+	}
+	if value.Status == service.ReportFileStatusSucceeded {
+		tx, err := r.pool.Begin(ctx)
+		if err != nil {
+			return service.ReportFile{}, fmt.Errorf("begin report file update transaction: %w", err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+
+		updated, err := updateReportFileRow(ctx, tx, reportFileID, jobID, value)
+		if err != nil {
+			return service.ReportFile{}, err
+		}
+		exportedAt := time.Now().UTC()
+		if _, err := tx.Exec(ctx, `
+			UPDATE reports
+			SET
+				latest_report_file_id = $1,
+				status = 'exported',
+				exported_at = $2,
+				updated_at = $2
+			WHERE id = $3`, reportFileID, exportedAt, updated.ReportID); err != nil {
+			return service.ReportFile{}, fmt.Errorf("update report export metadata: %w", err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			return service.ReportFile{}, fmt.Errorf("commit report file update transaction: %w", err)
+		}
+		return updated, nil
+	}
+	return updateReportFileRow(ctx, r.db, reportFileID, jobID, value)
+}
+
+func updateReportFileRow(ctx context.Context, db sqlc.DBTX, reportFileID pgtype.UUID, jobID string, value service.ReportFile) (service.ReportFile, error) {
+	row := db.QueryRow(ctx, `
+		UPDATE report_files SET
+			job_id = NULLIF($2, '')::uuid,
+			filename = $3,
+			file_type = $4,
+			file_ref = NULLIF($5, ''),
+			file_size = $6,
+			file_status = $7
+		WHERE id = $1
+		RETURNING
+			id::text, report_id::text, COALESCE(job_id::text, ''), filename,
+			file_type, COALESCE(file_ref, ''), file_size, file_status,
+			COALESCE(created_by, ''), created_at`,
+		reportFileID,
+		jobID,
+		value.Filename,
+		value.Format,
+		value.FileRef,
+		value.FileSize,
+		string(value.Status),
+	)
+	updated, err := scanReportFile(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return service.ReportFile{}, service.NewError(service.CodeNotFound, "report file not found", err)
+		}
+		return service.ReportFile{}, fmt.Errorf("update report file: %w", err)
+	}
+	return updated, nil
+}
+
 // --- scanning helpers ---
+
+func scanReportFile(row scanner) (service.ReportFile, error) {
+	var value service.ReportFile
+	var status string
+	if err := row.Scan(
+		&value.ID,
+		&value.ReportID,
+		&value.JobID,
+		&value.Filename,
+		&value.Format,
+		&value.FileRef,
+		&value.FileSize,
+		&status,
+		&value.CreatedBy,
+		&value.CreatedAt,
+	); err != nil {
+		return service.ReportFile{}, err
+	}
+	value.Status = service.ReportFileStatus(status)
+	return value, nil
+}
 
 func scanReportOutline(row scanner) (service.ReportOutline, error) {
 	var value service.ReportOutline

@@ -150,3 +150,56 @@ func TestDeleteFileTreatsMissingFileAsCleanedUp(t *testing.T) {
 		t.Fatalf("DeleteFile() error = %v", err)
 	}
 }
+
+func TestReadFileContentStreamsBodyAndHeaders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/internal/v1/files/file_001/content" {
+			t.Fatalf("request = %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("X-Request-Id"); got != "req_file" {
+			t.Fatalf("X-Request-Id = %q", got)
+		}
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+		w.Header().Set("Content-Disposition", `attachment; filename="report.docx"`)
+		_, _ = w.Write([]byte("docx-bytes"))
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, server.Client())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	content, err := client.ReadFileContent(context.Background(), service.RequestContext{RequestID: "req_file"}, "file_001")
+	if err != nil {
+		t.Fatalf("ReadFileContent() error = %v", err)
+	}
+	defer content.Content.Close()
+	body, err := io.ReadAll(content.Content)
+	if err != nil {
+		t.Fatalf("read content: %v", err)
+	}
+	if string(body) != "docx-bytes" || content.Filename != "report.docx" {
+		t.Fatalf("unexpected content: filename=%q body=%q", content.Filename, string(body))
+	}
+}
+
+func TestReadFileContentMapsMissingFileToNotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":{"message":"hidden"}}`))
+	}))
+	defer server.Close()
+
+	client, err := New(server.URL, server.Client())
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	_, err = client.ReadFileContent(context.Background(), service.RequestContext{}, "file_001")
+	appErr, ok := service.Classify(err)
+	if !ok || appErr.Code != service.CodeNotFound {
+		t.Fatalf("error = %#v, want not_found", err)
+	}
+	if strings.Contains(appErr.Message, "hidden") {
+		t.Fatalf("downstream body leaked into message: %q", appErr.Message)
+	}
+}

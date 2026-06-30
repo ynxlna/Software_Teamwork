@@ -65,7 +65,7 @@ docker compose up --build
 curl -fsS http://localhost:8085/readyz
 ```
 
-注意：模板、材料和报告文件 bytes 需要 File Service；真实大纲/正文生成需要 AI Gateway；DOCX 创建还需要 Pandoc/LibreOffice 工具链。当前 Compose 只给这些下游设置 URL，不启动下游服务。Document worker 目前只完成 job/attempt 状态流转，不执行真实 AI 或 DOCX 生成。
+注意：模板、材料和报告文件 bytes 需要 File Service；真实大纲/正文生成需要 AI Gateway。当前基础 DOCX 导出使用 Document 内置 `SimpleDOCXGenerator`，不需要 Pandoc/LibreOffice；Pandoc/LibreOffice 仅是后续富 DOCX worker 工具链。当前 Compose 只给 File/AI Gateway 下游设置 URL，不启动这些下游服务，所以 Document-only 环境不能完整读取生成文件内容。Document worker 会执行 `report_file_creation` 的基础 DOCX 导出；其他大纲/正文生成类 job 仍只完成 job/attempt 状态流转。
 
 ### AI Gateway host-run
 
@@ -108,7 +108,7 @@ go run ./cmd/server
 | 场景 | 检查 | 当前预期 |
 | --- | --- | --- |
 | Auth/Gateway/QA 局部环境 | `GET /readyz` | 三个服务 ready；真实 AI 调用可能因未启动 AI Gateway 失败。 |
-| Document 局部环境 | 创建 report job 后查询 job/attempt/events | 任务会入队并由 worker 推进为 succeeded；不会生成真实内容或 DOCX。 |
+| Document 局部环境 | 创建 report job 后查询 job/attempt/events | 非文件生成类任务会入队并由 worker 推进为 succeeded；不会生成真实 AI 大纲/正文。若额外提供 File Service，`report_file_creation` 可生成基础 DOCX 并通过 content endpoint 读取成功文件。 |
 | AI Gateway profile | 创建 chat/embedding/rerank profile，调用对应内部 endpoint | fake provider 和兼容 provider 应返回 OpenAI-style body；真实 provider 需手工验证。 |
 | Gateway contract | `python3 scripts/verify_gateway_active_api.py` | active path、owner、security 和 owner map 不漂移。 |
 | 前端 Gateway 类型 | `bun run --cwd apps/web api:generate` 后检查 diff | 生成类型应与 Gateway OpenAPI 保持同步。 |
@@ -120,8 +120,8 @@ go run ./cmd/server
 | 根级全服务 Compose 缺失 | 不能一键启动 Auth/Gateway/File/Knowledge/QA/Document/AI Gateway。 | #122、#150 |
 | 跨服务契约测试和 E2E smoke 缺失 | 不能自动证明前端 -> Gateway -> 多服务链路可用。 | #125 |
 | Qdrant adapter 和 MinIO adapter 未落地 | Knowledge 检索闭环和 File 对象存储闭环仍是局部实现。 | #152、#154 |
-| Document 真实 AI/Pandoc/DOCX 生成未落地 | 报告 job 状态机可用，但真实内容和文件导出不可用。 | #160、#223 |
-| Document settings/statistics/logs 仍待合入 | 管理端报告配置和统计闭环未完成。 | #159、#221 |
+| Document 真实 AI 生成和富 DOCX 工具链未落地 | 报告 job 状态机和基础 DOCX 导出可用；真实大纲/正文生成、Pandoc/LibreOffice 富 DOCX 转换和跨服务内容读取 smoke 仍需补齐。 | #160、#223 |
+| Document 跨服务 smoke 仍缺失 | settings/statistics/logs 已在服务端落地，但管理端、Gateway、File Service、Document worker 串联 smoke 仍未一键化。 | #159、#221 |
 | QA Agent Run MVP 和权限一致性仍在推进 | QA 会话/消息基础可用，完整 Agent 编排和 403 一致性仍需收口。 | #157、#217 |
 | 前端测试基线未落地 | 前端当前以 typecheck/lint/format/build 为主，缺 Vitest/RTL/Playwright。 | #117、#163 |
 

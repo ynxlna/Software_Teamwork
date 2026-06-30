@@ -41,7 +41,7 @@
 | `services/knowledge` | 已落地 Go knowledge 服务、PostgreSQL repository、知识库 CRUD、文档上传 handoff 和 asynq 入队；入库 worker、Qdrant、embedding、retrieval 尚未落地。 | `services/knowledge/go.mod`、`services/knowledge/migrations/`、`docs/services/knowledge/docs/implementation.md` |
 | `services/parser` | 已新增 parser runtime 契约和目录 scaffold，目标运行时为 Python + PaddleOCR；尚未添加 Python/PaddleOCR 依赖、Docker image 或部署 wiring。 | `services/parser/README.md`、`docs/services/parser/README.md`、`docs/services/parser/api/public.openapi.yaml`、`docs/services/parser/api/internal.openapi.yaml` |
 | `services/qa` | 已落地 Go QA 服务、PostgreSQL repository、会话/消息/SSE、配置、引用、工具/MCP/model client 基础；默认走 AI Gateway chat，真实 Knowledge retrieval 和跨服务 smoke 仍待补齐。 | `services/qa/go.mod`、`services/qa/migrations/`、`docs/services/qa/docs/implementation.md` |
-| `services/document` | 已落地 Go document 服务、PostgreSQL repository、模板/材料/报告/大纲/章节 API、report jobs/attempts/events 和 asynq worker 状态机；report files、statistics、settings 和真实 AI/Pandoc/DOCX 生成仍未落地。 | `services/document/go.mod`、`services/document/migrations/`、`docs/services/document/docs/implementation.md` |
+| `services/document` | 已落地 Go document 服务、PostgreSQL repository、模板/材料/报告/大纲/章节 API、report jobs/attempts/events、report files、statistics、settings 和 asynq worker 状态机；真实 AI 生成和 Pandoc/LibreOffice 富 DOCX 工具链仍未落地。 | `services/document/go.mod`、`services/document/migrations/`、`docs/services/document/docs/implementation.md` |
 | `services/ai-gateway` | 已落地 Go AI Gateway、PostgreSQL repository、model profile CRUD、credential encryption、service-token auth、OpenAI-compatible chat completions、embeddings、rerankings、provider invocation 记录和 usage aggregate；真实 provider/跨服务 smoke 仍待补齐。 | `services/ai-gateway/go.mod`、`services/ai-gateway/migrations/`、`docs/services/ai-gateway/docs/implementation.md` |
 | CI | 已有 PR guard、commitlint、auto-label、Go service build/test workflow 和 goose migration apply workflow；前端流水线尚未落地。 | `.github/workflows/*.yml` |
 
@@ -103,9 +103,9 @@
 | API 版本前缀 | `/api/v1` / `/internal/v1` | `v1` | 已固定 | 公开入口以 gateway OpenAPI 为准；内部服务使用服务级契约。 |
 | 后端测试 | Go `testing` + `httptest` | Go `1.25` 标准库 | 已固定 | 默认不引入 BDD 测试框架。 |
 | CI | GitHub Actions | `actions/github-script@v7`；runner `ubuntu-latest` | 部分已固定 | 已有协作类 workflow、Go service build/test workflow 和 goose migration apply workflow；前端 workflow 尚待落地。 |
-| 观测 | `slog` + Prometheus metrics；关键链路 OpenTelemetry tracing | Prometheus/OTel 依赖待固定 | 已选型，待固定 | 第一阶段先保证结构化日志和指标。 |
-| DOCX 生成 | Document worker 调用 Pandoc/LibreOffice 类工具链 | 待固定 | 已选型，待固定 | 落地时必须固定工具链镜像或 CLI 版本。 |
-| MCP 集成 | 成熟 SDK 或独立 MCP sidecar | 待固定 | 已选型，待固定 | QA 负责工具白名单、权限、参数校验和脱敏记录。 |
+| 观测 | `slog` + Prometheus metrics；关键链路 OpenTelemetry tracing | `github.com/prometheus/client_golang@v1.23.2`；`go.opentelemetry.io/otel@v1.44.0`；`go.opentelemetry.io/otel/sdk@v1.44.0`；`go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0`；`go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 已选型，待固定 | 第一阶段先保证结构化日志和低基数字段指标；首次落地 metrics/tracing 时必须写入对应服务 `go.mod` 并同步本文状态。 |
+| DOCX 生成 | Document worker 当前使用内置 Go `SimpleDOCXGenerator`；Pandoc/LibreOffice 作为后续富 DOCX 工具链 | 内置 Go 生成器：标准库；Pandoc 候选基线 `3.10`；LibreOffice 待 worker image 落地固定 tag + digest | 部分已固定 | 当前不依赖外部 CLI；引入 Pandoc/LibreOffice 前必须固定 worker 镜像或 CLI 版本和摘要。 |
+| MCP 集成 | 官方 MCP Go SDK；暂不拆独立 sidecar | `github.com/modelcontextprotocol/go-sdk@v1.1.0` | 已固定 | QA 负责工具白名单、权限、参数校验、超时和脱敏记录；SDK 升级或 sidecar 化另开兼容性任务。 |
 | 本地部署 | Docker Compose | Compose 文件格式无 top-level version | 已选型 | QA 和 Document 已有服务本地 Compose；根 `deploy/docker-compose.yml` 尚未落地。 |
 
 ## 前端版本明细
@@ -160,6 +160,15 @@
 | Qdrant | 待固定 | 尚无 Compose/runtime adapter | Knowledge 需要时补版本和运行配置。 |
 | MinIO server | 待固定 | 尚无 Compose/部署版本锁定 | File MinIO adapter 已落地；补本地或部署依赖时固定版本。 |
 | MinIO client (`mc`) | 待固定 | 尚无 Compose/部署版本锁定 | 本地 bucket 初始化方案待补。 |
+| Prometheus Go client | `github.com/prometheus/client_golang@v1.23.2` | 目标技术基线，尚未写入 `go.mod` | 新增 Go 服务暴露 Prometheus metrics 时默认沿用该版本，指标 label 不得包含用户输入、prompt、token、object key 或 API key 指纹。 |
+| OpenTelemetry Go API | `go.opentelemetry.io/otel@v1.44.0` | 目标技术基线，尚未写入 `go.mod` | OpenTelemetry API/root module；新增 tracing 不应只引入该 module。 |
+| OpenTelemetry Go SDK | `go.opentelemetry.io/otel/sdk@v1.44.0` | 目标技术基线，尚未写入 `go.mod` | 关键链路 tracing 使用 parent-based ratio sampler；dev/local 可配置为 100%，生产默认 1%。 |
+| OpenTelemetry OTLP HTTP trace exporter | `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0` | 目标技术基线，尚未写入 `go.mod` | 配置 exporter endpoint 时用于导出 traces；未配置 endpoint 时不导出 trace，避免无意外联。 |
+| OpenTelemetry Prometheus exporter | `go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 目标技术基线，尚未写入 `go.mod` | 用于 OTel metrics 与 Prometheus scrape 兼容；若服务只使用 Prometheus client，可暂不引入。 |
+| MCP Go SDK | `github.com/modelcontextprotocol/go-sdk@v1.1.0` | `services/qa/go.mod` | QA 当前直接作为 MCP Host/Client；暂不切换到独立 MCP sidecar。 |
+| Document 内置 DOCX 生成器 | Go 标准库 `archive/zip` + XML | `services/document/internal/service/docx_generator.go` | 当前只覆盖基础 DOCX 包装和文本/表格扁平化导出，不等同于 Pandoc/LibreOffice 富文档转换。 |
+| Pandoc CLI | `3.10` 候选基线 | Pandoc 官方 release | 后续引入 rich DOCX worker 时再写入 Dockerfile/Compose/部署镜像，并固定下载包 checksum 或镜像 digest。 |
+| LibreOffice headless | 待固定 | 尚无 worker image/runtime adapter | 仅作为后续 rich DOCX 兼容转换候选；落地时必须固定镜像 tag + digest，不能依赖运行环境自带 `soffice`。 |
 | QA service image | 本地构建 | `services/qa/docker-compose.yml` | QA 本地 Compose 串联 auth/gateway/QA 数据库。 |
 | Document service image | 本地构建 | `services/document/docker-compose.yml` | Document 本地 Compose 串联 PostgreSQL、migration 和服务。 |
 
@@ -202,7 +211,7 @@ public/internal 命名落位。
 | 队列 | Redis Streams 手写 | `asynq` | PostgreSQL queue | `asynq` | `asynq v0.26.0` 已固定 |
 | 前端 API client | 手写 fetch 类型 | `openapi-typescript` + wrapper | Orval | `openapi-typescript` + wrapper | `openapi-typescript@7.13.0` 已固定；wrapper 已有 |
 | 认证 token | Opaque token | JWT access + refresh | HttpOnly cookie session | Opaque Bearer token | 协议契约 |
-| DOCX 生成 | Go DOCX 库 | Pandoc/LibreOffice | 独立模板服务 | Document worker + Pandoc/LibreOffice 类工具链 | 待固定 |
+| DOCX 生成 | Go DOCX 库 | Pandoc/LibreOffice | 独立模板服务 | 当前阶段：Document worker + 内置 Go `SimpleDOCXGenerator`；富文档阶段：Document worker + Pandoc/LibreOffice worker image | 内置生成器已固定为标准库实现；Pandoc 候选 `3.10`，LibreOffice 镜像待落地固定 |
 
 ## 后端落地约定
 
@@ -257,8 +266,9 @@ services/<service>/
 - 后端服务默认初始化 `slog.NewJSONHandler(os.Stdout, ...)`。
 - 日志字段至少包含 `service`、`request_id`、`operation`、`status`；有用户上下文时可包含 `user_id`。
 - 不记录密码、token、API key、数据库连接串、MinIO secret、prompt 全文、文档全文、object key 或 provider 原始响应体。
-- 指标第一阶段采用 Prometheus 风格 endpoint；指标 label 不得包含用户输入正文、prompt、token、object key 或 API key 指纹。
-- Prometheus client 和 OpenTelemetry SDK 版本尚未固定；接入时必须补充版本和采样、导出策略。
+- 指标第一阶段采用 Prometheus 风格 endpoint；Go 服务新增指标默认使用 `github.com/prometheus/client_golang@v1.23.2`，指标 label 不得包含用户输入正文、prompt、token、object key 或 API key 指纹。
+- 关键链路 tracing 默认使用 `go.opentelemetry.io/otel@v1.44.0`、`go.opentelemetry.io/otel/sdk@v1.44.0` 和 `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0`。采样策略为 parent-based ratio sampler：dev/local 可配置为 100%，生产默认 1%；未配置 exporter endpoint 时不导出 trace，避免无意外联。
+- 如需将 OTel metrics 暴露给 Prometheus scrape，使用 `go.opentelemetry.io/otel/exporters/prometheus@v0.66.0`；只需要普通业务指标的服务可先使用 Prometheus client。
 
 ### Qdrant、MinIO 和对象边界
 
@@ -303,4 +313,4 @@ services/<service>/
 - 前端接入 `openapi-typescript`，生成 gateway 类型，并固定生成器版本。
 - 前端测试接入 Vitest、React Testing Library 和 Playwright，并固定版本。
 - 本地 Compose 和生产部署补齐 Qdrant、MinIO、MinIO mc 等依赖时，必须使用固定镜像 tag，不能以 `latest` 作为生产基线。
-- 为 Prometheus metrics、OpenTelemetry tracing、DOCX 工具链和 MCP SDK/sidecar 固定版本。
+- 为 Document 富 DOCX worker 固定 Pandoc/LibreOffice 运行镜像或 CLI 包版本、checksum 和部署策略；若后续需要 MCP sidecar 或 SDK 升级，单独开兼容性任务。

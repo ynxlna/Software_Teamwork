@@ -5,10 +5,11 @@ report jobs, job attempts, events, generated file metadata, statistics, and
 operation logs.
 
 The current implementation provides the service/data baseline, implemented
-report type/template/material/report/outline/section APIs, and the report
-job/attempt/event state machine, report settings, report statistics, and
-operation logs. It does not implement real AI generation, DOCX export
-execution, MCP tools, report file content, or AI Gateway generation calls yet.
+report type/template/material/report/outline/section APIs, the report
+job/attempt/event state machine, report file creation, report settings, report
+statistics, and operation logs. DOCX export currently uses the in-process Go
+`SimpleDOCXGenerator`; real AI generation, MCP tools, Pandoc/LibreOffice rich
+DOCX conversion, and AI Gateway generation calls are not implemented yet.
 
 ## Local Configuration
 
@@ -30,8 +31,8 @@ Optional variables:
 | `DOCUMENT_HTTP_ADDR` | `:8085` | HTTP listen address. |
 | `DOCUMENT_AI_GATEWAY_SERVICE_TOKEN` | empty | Service token sent to AI Gateway profile validation APIs. Falls back to `INTERNAL_SERVICE_TOKEN` when empty. |
 | `INTERNAL_SERVICE_TOKEN` | empty | Shared internal service token fallback for local/dev deployments. |
-| `DOCUMENT_PANDOC_PATH` | `pandoc` | DOCX toolchain command path reserved for worker usage. |
-| `DOCUMENT_LIBREOFFICE_PATH` | `soffice` | LibreOffice command path reserved for worker usage. |
+| `DOCUMENT_PANDOC_PATH` | `pandoc` | Reserved path for a future Pandoc-backed rich DOCX worker. The current Dockerfile does not install this CLI. |
+| `DOCUMENT_LIBREOFFICE_PATH` | `soffice` | Reserved path for a future LibreOffice-backed conversion worker. The current Dockerfile does not install this CLI. |
 | `DOCUMENT_SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout. |
 
 ## Run
@@ -73,10 +74,10 @@ The service-local operational contract is documented in [`api/openapi.yaml`](api
 
 Gateway exposes these document-owned report routes under `/api/v1`. The service
 local paths below omit that prefix. Implemented routes call the document service
-layer. Job routes persist state and drive the worker state machine, but the
-worker currently does not execute real AI or DOCX generation. Report file
-routes are still scaffolded and return the standard error envelope with
-`error.code=not_implemented` and HTTP `501` until that workflow lands.
+layer. Job routes persist state and drive the worker state machine; file export
+jobs currently produce basic DOCX packages through the in-process Go generator.
+The richer Pandoc/LibreOffice toolchain remains a future worker dependency and
+is not installed in the current service image.
 
 | Method | Local path | Operation ID | Status |
 | --- | --- | --- | --- |
@@ -114,10 +115,10 @@ routes are still scaffolded and return the standard error envelope with
 | `GET` | `/report-jobs/{jobId}/attempts` | `listReportJobAttempts` | Implemented |
 | `POST` | `/report-jobs/{jobId}/attempts` | `createReportJobAttempt` | Implemented; retry claim/enqueue |
 | `GET` | `/reports/{reportId}/events` | `listReportEvents` | Implemented |
-| `GET` | `/report-files` | `listReportFiles` | Scaffold |
-| `POST` | `/report-files` | `createReportFile` | Scaffold |
-| `GET` | `/report-files/{reportFileId}` | `getReportFile` | Scaffold |
-| `GET` | `/report-files/{reportFileId}/content` | `getReportFileContent` | Scaffold |
+| `GET` | `/report-files` | `listReportFiles` | Implemented |
+| `POST` | `/report-files` | `createReportFile` | Implemented; enqueues basic DOCX export |
+| `GET` | `/report-files/{reportFileId}` | `getReportFile` | Implemented |
+| `GET` | `/report-files/{reportFileId}/content` | `getReportFileContent` | Implemented; requires succeeded file content |
 | `GET` | `/report-statistics/overview` | `getReportStatisticsOverview` | Implemented |
 | `GET` | `/report-statistics/daily` | `listDailyReportStatistics` | Implemented |
 | `GET` | `/report-operation-logs` | `listReportOperationLogs` | Implemented |

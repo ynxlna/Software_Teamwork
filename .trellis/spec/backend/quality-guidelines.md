@@ -10,11 +10,20 @@ Every backend service must remain independently testable, buildable, and
 deployable. Quality checks run from each service directory because every service
 owns a separate `go.mod`.
 
-Minimum service-local checks:
+Minimum Go service-local checks:
 
 ```bash
 go test ./...
 go build ./cmd/server
+```
+
+`services/parser/` is a Python runtime boundary rather than a Go service. When
+changing Parser, run these checks from `services/parser`:
+
+```bash
+uv run ruff check .
+uv run pytest
+uv run python -m compileall src tests
 ```
 
 When lint tooling is introduced, CI should run the selected linter for each

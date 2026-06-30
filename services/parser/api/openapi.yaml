@@ -139,11 +139,12 @@ components:
               enum: [parser]
             status:
               type: string
-              enum: [ok, ready, degraded]
+              example: ready
             backend:
               type: string
-              nullable: true
-              description: Sanitized active parser backend identifier.
+              example: paddleocr
+            reason:
+              type: string
         requestId:
           type: string
     CreateParsedDocumentRequest:

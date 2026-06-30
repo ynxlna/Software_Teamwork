@@ -88,7 +88,8 @@
 | 环境变量 | `DATABASE_URL`、`FILE_SERVICE_BASE_URL`、`PARSER_SERVICE_BASE_URL`、`KNOWLEDGE_REDIS_ADDR`、`KNOWLEDGE_SERVICE_TOKEN` 必填；另有 embedding、AI Gateway、Qdrant、HTTP/version/env/max upload/shutdown 配置 | 仍需按部署环境补真实依赖连通性检查。 |
 | PostgreSQL / migration | `migrations/0001_create_knowledge_core_tables.sql`、`0002_create_parser_configs.sql`，runtime `pgx/v5` | goose apply CI 已覆盖 migration；repository lifecycle 由 `KNOWLEDGE_TEST_DATABASE_URL` 集成测试覆盖。 |
 | Redis / queue | 使用 `asynq` client 投递 ingestion，worker 在同进程消费 `knowledge:document:ingest` | 后续可按部署形态拆分独立 worker 进程。 |
-| Parser / object storage / vector store / AI provider | 通过 File Service 保存和读取 raw file；通过 Parser Service 解析 raw bytes；Qdrant adapter 与 AI Gateway embedding adapter 已接入 | 仍需真实 File/Parser/Qdrant/AI Gateway 端到端联调。 |
+| Object storage / vector store / AI provider | 通过 File Service 保存和读取 raw file；Qdrant adapter 与 AI Gateway embedding adapter 已接入 | 仍需真实 File/Qdrant/AI Gateway 端到端联调。 |
+| Parser runtime | Knowledge 通过 `PARSER_SERVICE_BASE_URL` 调 `services/parser` 的 `/internal/v1/parsed-documents`；Parser Service 以 Python/FastAPI/PaddleOCR 独立部署 | 仍需真实 PaddleOCR 模型 smoke 和部署环境资源配置。 |
 
 当 `EMBEDDING_PROVIDER=ai_gateway` 时，`EMBEDDING_MODEL` 必须匹配解析出的 AI Gateway embedding profile `model`。`AI_GATEWAY_EMBEDDING_PROFILE_ID` 可留空以使用 AI Gateway 默认启用的 embedding profile，但 provider 调用前仍会强制校验 model 匹配。
 
@@ -98,6 +99,7 @@
 | --- | --- | --- | --- |
 | 单元测试 | `cd services/knowledge && go test ./...` | pass（A-13 PR 验证） | 主要使用 memory/fake 依赖，并覆盖 parser-configs 管理、fallback、conflict 和上传 snapshot。 |
 | Repository 集成测试 | `KNOWLEDGE_TEST_DATABASE_URL=... go test ./internal/repository -count=1` | CI 覆盖 repository lifecycle；无 env 时本地跳过 | 只覆盖 PostgreSQL repository，不覆盖 File/Redis/Qdrant。 |
+| Parser 服务测试 | `cd services/parser && uv run ruff check . && uv run pytest && uv run python -m compileall src tests` | pass（本次执行） | 使用 fake OCR backend，不下载 PaddleOCR 模型。 |
 | 端到端上传联调 | PostgreSQL + File + Redis end-to-end upload | missing | 需要真实依赖联调。 |
 | 契约测试 | gateway route matrix + Knowledge handler tests | partial | content、knowledge-queries、parser-configs 等 active path 仍需继续补齐或回写阶段状态。 |
 | 手工 smoke | 启动 PostgreSQL、File、Redis 后上传文档 | not run | 需要可复现脚本或 Compose。 |

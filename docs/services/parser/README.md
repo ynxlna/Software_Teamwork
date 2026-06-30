@@ -36,10 +36,29 @@ Knowledge 调用 Parser 时必须传递 `X-Request-Id`、`X-Caller-Service: know
 
 ## 运行时方向
 
-Parser 目标实现是 Python/PaddleOCR。Go 服务只通过 HTTP 调用 Parser，不应在
-Knowledge 进程中引入 PaddleOCR、PaddlePaddle、OpenCV、CUDA 或模型加载依赖。
+Parser 是使用 `uv` 管理的 Python 服务。它用 FastAPI 提供内部 HTTP API，直接解析
+TXT/Markdown 和 Office OpenXML 格式，并把 PDF/image OCR 路径路由到 PaddleOCR。
+Go 服务只通过 HTTP 调用 Parser，不应在 Knowledge 进程中引入 PaddleOCR、
+PaddlePaddle、OpenCV、CUDA 或模型加载依赖。
 
 ## 当前状态
 
-Parser runtime 作为独立服务部署。实现代码和运行说明维护在
-[`services/parser/README.md`](../../../services/parser/README.md)。
+当前实现：
+
+- `services/parser/pyproject.toml` 和 `uv.lock` 固定 Python runtime、FastAPI、Uvicorn、测试工具和可选 PaddleOCR extra。
+- `services/parser/src/parser_service/http` 实现 `/healthz`、`/readyz` 和 `POST /internal/v1/parsed-documents`。
+- `services/parser/src/parser_service/service` 处理 base64 校验、文档大小限制、解析超时、并发限制和响应归一化。
+- `services/parser/src/parser_service/backends/document.py` 直接解析 TXT/Markdown、DOCX、PPTX、XLSX，并把 PDF/images 路由到 OCR backend。
+- `services/parser/src/parser_service/backends/paddleocr` lazy-load PaddleOCR，并归一化 PaddleOCR 2.x 和 3.x 常见结果形态。
+- `services/parser/Dockerfile` 构建带 PaddleOCR extra 的 runtime image。
+
+验证：
+
+```bash
+cd services/parser
+uv run ruff check .
+uv run pytest
+uv run python -m compileall src tests
+```
+
+测试套件使用 fake OCR backend，不下载 PaddleOCR 模型。

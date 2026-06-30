@@ -39,7 +39,7 @@
 | `services/auth` | 已落地 Go auth 服务、PostgreSQL repository、用户/会话内部 API、argon2id、token hash 和 migration。 | `services/auth/go.mod`、`services/auth/migrations/`、`docs/services/auth/docs/implementation.md` |
 | `services/file` | 已落地 Go file 服务、基础 `/internal/v1/files/**` API、memory/local/MinIO object store、file_objects migration、PostgreSQL metadata runtime 和 service-token 校验；`FILE_DATABASE_URL` 为空时仍保留 memory metadata 模式。 | `services/file/go.mod`、`services/file/migrations/`、`docs/services/file/docs/implementation.md` |
 | `services/knowledge` | 已落地 Go knowledge 服务、PostgreSQL repository、知识库 CRUD、文档上传 handoff、asynq 入队、入库 worker、Parser service client、Knowledge-owned chunker、embedding 和 Qdrant adapter；retrieval 尚未落地。 | `services/knowledge/go.mod`、`services/knowledge/migrations/`、`docs/services/knowledge/docs/implementation.md` |
-| `services/parser` | 已新增内部 Parser runtime scaffold，目标运行时为 Python + PaddleOCR，并预留 `/internal/v1/parsed-documents` 契约；尚未添加 Python/PaddleOCR 依赖、Docker image 或部署 wiring。 | `services/parser/README.md`、`services/parser/api/openapi.yaml`、`docs/services/parser/README.md`、`docs/services/parser/api/public.openapi.yaml`、`docs/services/parser/api/internal.openapi.yaml` |
+| `services/parser` | 已落地内部 Python Parser runtime，使用 FastAPI/Uvicorn、`uv` 锁定依赖、PaddleOCR optional extra 和 Dockerfile；支持 `/healthz`、`/readyz`、`POST /internal/v1/parsed-documents`，并提供 TXT/Markdown、Office OpenXML 和 PaddleOCR OCR 解析路径。 | `services/parser/pyproject.toml`、`services/parser/uv.lock`、`services/parser/Dockerfile`、`services/parser/api/openapi.yaml`、`docs/services/parser/README.md`、`docs/services/parser/api/public.openapi.yaml`、`docs/services/parser/api/internal.openapi.yaml` |
 | `services/qa` | 已落地 Go QA 服务、PostgreSQL repository、会话/消息/SSE、配置、引用、工具/MCP/model client 基础；默认走 AI Gateway chat，真实 Knowledge retrieval 和跨服务 smoke 仍待补齐。 | `services/qa/go.mod`、`services/qa/migrations/`、`docs/services/qa/docs/implementation.md` |
 | `services/document` | 已落地 Go document 服务、PostgreSQL repository、模板/材料/报告/大纲/章节 API、report jobs/attempts/events、report files、statistics、settings 和 asynq worker 状态机；真实 AI 生成和 Pandoc/LibreOffice 富 DOCX 工具链仍未落地。 | `services/document/go.mod`、`services/document/migrations/`、`docs/services/document/docs/implementation.md` |
 | `services/ai-gateway` | 已落地 Go AI Gateway、PostgreSQL repository、model profile CRUD、credential encryption、service-token auth、OpenAI-compatible chat completions、embeddings、rerankings、provider invocation 记录和 usage aggregate；真实 provider/跨服务 smoke 仍待补齐。 | `services/ai-gateway/go.mod`、`services/ai-gateway/migrations/`、`docs/services/ai-gateway/docs/implementation.md` |
@@ -80,6 +80,12 @@
 | 前端 SSE | `fetch` stream wrapper | Web 标准 | 标准库 / 协议 | QA 消息创建使用 POST + `text/event-stream`，支持 `AbortController`。 |
 | 前端测试 | Vitest + React Testing Library + Playwright | 待固定 | 已选型，待固定 | 当前未加入 `apps/web/package.json`。 |
 | 前端代码质量 | ESLint Flat Config + Prettier | ESLint `9.39.4`，Prettier `3.9.0` | 已固定 | 插件版本见前端明细。 |
+| Parser 运行时语言 | Python | `3.12` | 已固定 | `services/parser` 使用 Python 3.12、`uv`、FastAPI/Uvicorn 和 PaddleOCR；这是 PaddleOCR 运行时边界，不是 Go 服务。 |
+| Parser 包管理 | `uv` | `uv@0.11.6` | 已固定 | `services/parser/uv.lock` 为 Parser 服务锁文件；CI 和 Dockerfile 使用同一版本。 |
+| Parser HTTP 框架 | FastAPI + Uvicorn | `fastapi==0.138.2`、`uvicorn==0.49.0` | 已固定 | Parser 是内部服务，仅暴露 `/healthz`、`/readyz` 和 `/internal/v1/parsed-documents`。 |
+| Parser 校验 | Pydantic | `pydantic==2.13.4` | 已固定 | 用于 Parser HTTP request schema。 |
+| Parser OCR 后端 | PaddleOCR + PaddlePaddle | `paddleocr==3.7.0`、`paddlepaddle==3.3.1` | 已固定 | 本地开发中为 optional extra；runtime Dockerfile 默认安装 extra。 |
+| Parser 测试和 lint | pytest + Ruff | `pytest==9.0.2`、`ruff==0.14.9` | 已固定 | 测试使用 fake OCR backend，不下载模型。 |
 | 后端语言 | Go | `go 1.25` | 已固定 | 项目 Go 服务基线固定为 1.25；已落地服务 module 和 Dockerfile 应保持一致。 |
 | 后端 HTTP 路由 | Go `net/http` / `http.ServeMux` | Go `1.25` 标准库 | 已固定 | 不默认引入 `gin`/`chi`。 |
 | 后端日志 | Go `log/slog` | Go `1.25` 标准库 | 已固定 | 生产默认 JSON 结构化日志。 |
@@ -103,6 +109,7 @@
 | API 版本前缀 | `/api/v1` / `/internal/v1` | `v1` | 已固定 | 公开入口以 gateway OpenAPI 为准；内部服务使用服务级契约。 |
 | 后端测试 | Go `testing` + `httptest` | Go `1.25` 标准库 | 已固定 | 默认不引入 BDD 测试框架。 |
 | CI | GitHub Actions | `actions/github-script@v7`；runner `ubuntu-latest` | 部分已固定 | 已有协作类 workflow、Go service build/test workflow 和 goose migration apply workflow；前端 workflow 尚待落地。 |
+| Parser CI | GitHub Actions + uv | `uv@0.11.6`；runner `ubuntu-latest` | 已固定 | `.github/workflows/parser-service.yml` 运行 `uv sync --frozen --group dev`、Ruff、pytest 和 compileall。 |
 | 观测 | `slog` + Prometheus metrics；关键链路 OpenTelemetry tracing | `github.com/prometheus/client_golang@v1.23.2`；`go.opentelemetry.io/otel@v1.44.0`；`go.opentelemetry.io/otel/sdk@v1.44.0`；`go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp@v1.44.0`；`go.opentelemetry.io/otel/exporters/prometheus@v0.66.0` | 已选型，待固定 | 第一阶段先保证结构化日志和低基数字段指标；首次落地 metrics/tracing 时必须写入对应服务 `go.mod` 并同步本文状态。 |
 | DOCX 生成 | Document worker 当前使用内置 Go `SimpleDOCXGenerator`；Pandoc/LibreOffice 作为后续富 DOCX 工具链 | 内置 Go 生成器：标准库；Pandoc 候选基线 `3.10`；LibreOffice 待 worker image 落地固定 tag + digest | 部分已固定 | 当前不依赖外部 CLI；引入 Pandoc/LibreOffice 前必须固定 worker 镜像或 CLI 版本和摘要。 |
 | MCP 集成 | 官方 MCP Go SDK；暂不拆独立 sidecar | `github.com/modelcontextprotocol/go-sdk@v1.1.0` | 已固定 | QA 负责工具白名单、权限、参数校验、超时和脱敏记录；SDK 升级或 sidecar 化另开兼容性任务。 |
@@ -198,7 +205,7 @@ public/internal 命名落位。
 | 服务 | 偏离项 | 原因 |
 | --- | --- | --- |
 | `knowledge` | 无。 | Knowledge 现在与仓库 Go 1.25 baseline 一致；仍沿用标准库 `net/http` / `http.ServeMux` 路由形态。 |
-| `parser` | 非 Go runtime scaffold。 | Parser 的目标后端是 PaddleOCR，当前主流运行时应使用 Python/PaddleOCR；Go 只作为 Knowledge HTTP client，不承载 PaddleOCR 运行时。 |
+| `parser` | 非 Go runtime。 | Parser 的目标后端是 PaddleOCR，当前主流运行时使用 Python/PaddleOCR；Go 只作为 Knowledge HTTP client，不承载 PaddleOCR 运行时。 |
 
 ## 三选一决策记录
 

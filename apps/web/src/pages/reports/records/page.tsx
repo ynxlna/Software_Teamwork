@@ -2,15 +2,8 @@ import { Link } from '@tanstack/react-router'
 import { FilePlus2, Search, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 
+import { ConfirmDialog, InlineNotice, StateBlock, TableSkeleton } from '@/components/common'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import type { Report } from '@/features/reports'
 import { useDeleteReport, useReportsQuery } from '@/features/reports'
@@ -104,80 +97,80 @@ export function ReportRecordsPage() {
       </div>
 
       {reportsQuery.isError && (
-        <div className="mb-4 rounded-lg border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+        <InlineNotice className="mb-4" variant="warning">
           gateway 暂未联通，当前展示本地报告记录示例。
+        </InlineNotice>
+      )}
+
+      {reportsQuery.isLoading && !isFallback ? (
+        <TableSkeleton columns={6} showToolbar={false} />
+      ) : reports.length === 0 ? (
+        <StateBlock title="暂无报告记录" variant="empty" />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-border bg-card">
+          <table className="w-full min-w-[720px] border-collapse text-sm">
+            <thead className="bg-muted/60 text-left text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">报告名称</th>
+                <th className="px-4 py-3 font-medium">类型</th>
+                <th className="px-4 py-3 font-medium">年份</th>
+                <th className="px-4 py-3 font-medium">状态</th>
+                <th className="px-4 py-3 font-medium">更新时间</th>
+                <th className="w-16 px-4 py-3 font-medium">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map((report) => (
+                <tr
+                  key={report.id}
+                  className="border-t border-border transition-colors hover:bg-muted/30"
+                >
+                  <td className="max-w-72 truncate px-4 py-3 font-medium">{report.name}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.reportType}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{report.year ?? '-'}</td>
+                  <td className="px-4 py-3">
+                    <span className="rounded-full bg-muted px-2 py-1 text-xs">{report.status}</span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground">
+                    {formatDate(report.updatedAt ?? report.createdAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {canWriteReports && !isFallback && (
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        aria-label="删除报告"
+                        onClick={() => setDeleteTarget(report)}
+                      >
+                        <Trash2 className="size-3 text-destructive" />
+                      </Button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
-        <table className="w-full border-collapse text-sm">
-          <thead className="bg-muted/60 text-left text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 font-medium">报告名称</th>
-              <th className="px-4 py-3 font-medium">类型</th>
-              <th className="px-4 py-3 font-medium">年份</th>
-              <th className="px-4 py-3 font-medium">状态</th>
-              <th className="px-4 py-3 font-medium">更新时间</th>
-              <th className="w-16 px-4 py-3 font-medium">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reports.map((report) => (
-              <tr
-                key={report.id}
-                className="border-t border-border hover:bg-muted/30 transition-colors"
-              >
-                <td className="px-4 py-3 font-medium">{report.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{report.reportType}</td>
-                <td className="px-4 py-3 text-muted-foreground">{report.year ?? '-'}</td>
-                <td className="px-4 py-3">
-                  <span className="rounded-full bg-muted px-2 py-1 text-xs">{report.status}</span>
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">
-                  {formatDate(report.updatedAt ?? report.createdAt)}
-                </td>
-                <td className="px-4 py-3">
-                  {canWriteReports && !isFallback && (
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      aria-label="删除报告"
-                      onClick={() => setDeleteTarget(report)}
-                    >
-                      <Trash2 className="size-3 text-destructive" />
-                    </Button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>确定删除此报告？</DialogTitle>
-            <DialogDescription>
-              {deleteTarget?.name
-                ? `即将删除报告"${deleteTarget.name}"。此操作不可撤销。`
-                : '此操作不可撤销。'}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              取消
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? '删除中...' : '确认删除'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        cancelLabel="取消"
+        confirmLabel="确认删除"
+        description={
+          deleteTarget?.name
+            ? `即将删除报告"${deleteTarget.name}"。此操作不可撤销。`
+            : '此操作不可撤销。'
+        }
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+        open={Boolean(deleteTarget)}
+        pending={deleteMutation.isPending}
+        pendingLabel="删除中..."
+        title="确定删除此报告？"
+        variant="destructive"
+      />
     </div>
   )
 }

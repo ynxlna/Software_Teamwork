@@ -1,6 +1,7 @@
 import { Ban, Download, FileText, Loader2, PencilLine, Play, RefreshCw, Save } from 'lucide-react'
 import { type FormEvent, useEffect, useMemo, useState } from 'react'
 
+import { ProgressSummary } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type {
@@ -865,22 +866,21 @@ export function ReportGeneratePage() {
                   {effectiveJob ? statusText[effectiveJob.status] : '-'}
                 </span>
               </div>
-              <div>
-                <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                  <span>进度</span>
-                  <span>{progressPercent}%</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className={cn(
-                      'h-full rounded-full transition-all',
-                      effectiveJob?.status === 'canceled' ? 'bg-yellow-500' : 'bg-primary',
-                      effectiveJob?.status === 'failed' && 'bg-destructive',
-                    )}
-                    style={{ width: `${progressPercent}%` }}
-                  />
-                </div>
-              </div>
+              <ProgressSummary
+                label="任务进度"
+                percent={progressPercent}
+                status={effectiveJob ? statusText[effectiveJob.status] : '-'}
+                tone={
+                  effectiveJob?.status === 'failed'
+                    ? 'error'
+                    : effectiveJob?.status === 'canceled'
+                      ? 'warning'
+                      : effectiveJob?.status === 'succeeded' ||
+                          effectiveJob?.status === 'partial_succeeded'
+                        ? 'success'
+                        : 'default'
+                }
+              />
               {(effectiveJob?.status === 'pending' || effectiveJob?.status === 'running') && (
                 <Button
                   variant="destructive"

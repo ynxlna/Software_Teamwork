@@ -37,6 +37,20 @@ type DocumentStatusBadgeProps = {
 
 ## Product UI Patterns
 
+### Shared State Components
+
+- Use `apps/web/src/components/common/StateBlock` for page or section loading,
+  empty, error, forbidden, success, and warning states.
+- Use `InlineNotice` for compact alert/toast-style feedback inside a page or
+  panel.
+- Use `ConfirmDialog` for destructive confirmations instead of `window.confirm`
+  or one-off dialog markup.
+- Use `ProgressSummary` for long-running task progress and partial-success
+  states.
+- Use `TableSkeleton` for management-list loading placeholders.
+- Shared state components must remain domain-neutral and must not import
+  feature modules.
+
 ### Authentication and Layout
 
 - Use `AppShell` for authenticated pages: `Sidebar + Header + Breadcrumb + Content`.

@@ -2,6 +2,7 @@ import { BookOpen, ChevronDown, ChevronUp, Loader2, Search } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 import { listKnowledgeBases } from '@/api/admin'
+import { InlineNotice, StateBlock } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -194,12 +195,11 @@ export function KnowledgeSearchPage() {
       <div className="mb-4">
         <p className="mb-1.5 text-xs font-medium text-muted-foreground">知识库范围</p>
         {kbsLoading && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 aria-hidden="true" className="size-3 animate-spin" />
+          <InlineNotice icon={Loader2} iconClassName="animate-spin">
             加载知识库...
-          </div>
+          </InlineNotice>
         )}
-        {kbsError && <p className="text-sm text-destructive">加载知识库失败: {kbsError}</p>}
+        {kbsError && <InlineNotice variant="error">加载知识库失败: {kbsError}</InlineNotice>}
         {!kbsLoading && !kbsError && (
           <div className="flex flex-wrap gap-1.5">
             <label className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-border px-2.5 py-1 text-xs transition-colors hover:bg-muted/30">
@@ -363,10 +363,10 @@ export function KnowledgeSearchPage() {
 
       {/* Error */}
       {searchMutation.isError && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+        <InlineNotice variant="error">
           检索失败:{' '}
           {searchMutation.error instanceof Error ? searchMutation.error.message : '未知错误'}
-        </div>
+        </InlineNotice>
       )}
 
       {/* Results */}
@@ -391,13 +391,7 @@ export function KnowledgeSearchPage() {
 
           {/* Empty results */}
           {resultSummary.results.length === 0 && (
-            <div className="rounded-lg border border-dashed border-border p-12 text-center">
-              <BookOpen
-                aria-hidden="true"
-                className="mx-auto mb-3 size-10 text-muted-foreground/40"
-              />
-              <p className="text-sm text-muted-foreground">未找到相关内容，请调整检索条件</p>
-            </div>
+            <StateBlock icon={BookOpen} title="未找到相关内容，请调整检索条件" variant="empty" />
           )}
 
           {/* Result cards */}
@@ -454,20 +448,16 @@ export function KnowledgeSearchPage() {
 
       {/* Empty initial state (no search yet) */}
       {!resultSummary && !searchMutation.isPending && !searchMutation.isError && (
-        <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <Search aria-hidden="true" className="mx-auto mb-3 size-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">
-            输入检索词并选择知识库范围，开始检索相关内容
-          </p>
-        </div>
+        <StateBlock
+          icon={Search}
+          title="输入检索词并选择知识库范围，开始检索相关内容"
+          variant="empty"
+        />
       )}
 
       {/* Loading state */}
       {searchMutation.isPending && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 aria-hidden="true" className="size-6 animate-spin text-muted-foreground" />
-          <span className="ml-2 text-sm text-muted-foreground">检索中...</span>
-        </div>
+        <StateBlock size="compact" title="检索中..." variant="loading" />
       )}
     </div>
   )

@@ -14,6 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { getKnowledgeBase } from '@/api/admin'
+import { ConfirmDialog, InlineNotice, StateBlock, TableSkeleton } from '@/components/common'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -140,41 +141,6 @@ function fileIconForContentType(ct?: string | null): string {
 
 function isProcessing(status: DocumentStatus): boolean {
   return PROCESSING_STATUSES.includes(status)
-}
-
-// ── Skeleton ──
-
-function DocumentListSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="h-7 w-40 rounded bg-muted" />
-        <div className="h-8 w-24 rounded bg-muted" />
-      </div>
-      <div className="flex gap-2">
-        <div className="h-8 flex-1 rounded bg-muted" />
-        <div className="h-8 w-28 rounded bg-muted" />
-      </div>
-      <div className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
-          <div className="grid grid-cols-7 gap-3">
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="h-4 rounded bg-muted" />
-            ))}
-          </div>
-        </div>
-        <div className="divide-y divide-border">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="grid grid-cols-7 gap-3 px-4 py-3">
-              {Array.from({ length: 7 }).map((_, j) => (
-                <div key={j} className="h-4 rounded bg-muted" />
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
 }
 
 // ── Main component ──
@@ -442,57 +408,58 @@ export function KnowledgeDocumentsPage({
 
       {/* KB selector — shown when no KB is pre-selected */}
       {!knowledgeBaseId && (
-        <div className="mb-6 rounded-lg border border-border bg-card p-6 text-center">
-          <FileText aria-hidden="true" className="mx-auto mb-3 size-10 text-muted-foreground/40" />
-          <p className="mb-4 text-sm text-muted-foreground">选择一个知识库以查看和管理其文档</p>
-          <select
-            className="h-9 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-            value=""
-            onChange={(e) => {
-              const id = e.target.value
-              if (id) setActiveKbId(id)
-            }}
-          >
-            <option value="" disabled>
-              选择知识库…
-            </option>
-            {(kbListData?.items ?? []).map((kb) => (
-              <option key={kb.id} value={kb.id}>
-                {kb.name}
+        <StateBlock
+          action={
+            <select
+              className="h-9 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              value=""
+              onChange={(e) => {
+                const id = e.target.value
+                if (id) setActiveKbId(id)
+              }}
+            >
+              <option value="" disabled>
+                选择知识库…
               </option>
-            ))}
-          </select>
-        </div>
+              {(kbListData?.items ?? []).map((kb) => (
+                <option key={kb.id} value={kb.id}>
+                  {kb.name}
+                </option>
+              ))}
+            </select>
+          }
+          className="mb-6"
+          icon={FileText}
+          size="compact"
+          title="选择一个知识库以查看和管理其文档"
+          variant="empty"
+        />
       )}
 
       {/* Toast notification */}
       {notification && (
-        <div
-          role="alert"
-          className={`toast-enter mb-4 rounded-lg border px-4 py-3 text-sm ${
-            notification.type === 'success'
-              ? 'border-emerald-500/50 bg-emerald-50 text-emerald-800 dark:border-emerald-400/30 dark:bg-emerald-950 dark:text-emerald-300'
-              : 'border-destructive/50 bg-destructive/10 text-destructive'
-          }`}
-        >
+        <InlineNotice className="toast-enter mb-4" variant={notification.type}>
           {notification.text}
-        </div>
+        </InlineNotice>
       )}
 
       {/* Loading state */}
-      {isLoading && <DocumentListSkeleton />}
+      {isLoading && <TableSkeleton columns={7} />}
 
       {/* Error state */}
       {isError && !isLoading && (
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-          <p className="mb-3 text-sm text-destructive">
-            加载文档列表失败: {error instanceof Error ? error.message : '未知错误'}
-          </p>
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <Loader2 aria-hidden="true" className="mr-1.5 size-3.5" />
-            重试
-          </Button>
-        </div>
+        <StateBlock
+          action={
+            <Button variant="outline" size="sm" onClick={() => refetch()}>
+              <Loader2 aria-hidden="true" className="mr-1.5 size-3.5" />
+              重试
+            </Button>
+          }
+          description={error instanceof Error ? error.message : '未知错误'}
+          size="compact"
+          title="加载文档列表失败"
+          variant="error"
+        />
       )}
 
       {/* Data area */}
@@ -535,28 +502,25 @@ export function KnowledgeDocumentsPage({
 
           {/* Empty state */}
           {isEmpty && (
-            <div className="rounded-lg border border-dashed border-border p-12 text-center">
-              <FileText
-                aria-hidden="true"
-                className="mx-auto mb-3 size-10 text-muted-foreground/40"
-              />
-              <p className="text-sm text-muted-foreground">
-                {keyword || statusFilter
+            <StateBlock
+              action={
+                !keyword &&
+                !statusFilter &&
+                canUpload && (
+                  <Button variant="outline" size="sm" onClick={() => setUploadOpen(true)}>
+                    <Upload aria-hidden="true" className="mr-1 size-3.5" />
+                    上传文档
+                  </Button>
+                )
+              }
+              icon={FileText}
+              title={
+                keyword || statusFilter
                   ? '未找到匹配的文档，请调整筛选条件'
-                  : '暂无文档，点击上传文档开始'}
-              </p>
-              {!keyword && !statusFilter && canUpload && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setUploadOpen(true)}
-                >
-                  <Upload aria-hidden="true" className="mr-1 size-3.5" />
-                  上传文档
-                </Button>
-              )}
-            </div>
+                  : '暂无文档，点击上传文档开始'
+              }
+              variant="empty"
+            />
           )}
 
           {/* Table */}
@@ -908,37 +872,26 @@ export function KnowledgeDocumentsPage({
         </DialogContent>
       </Dialog>
 
-      {/* ── Delete Confirmation Dialog ── */}
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>确认删除</DialogTitle>
-            <DialogDescription>
-              确定要删除文档 "{deletingDoc?.name}"
-              吗？此操作不可撤销，文档的所有分块和向量数据也将被删除。
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setDeleteOpen(false)
-                setDeletingDoc(null)
-              }}
-              disabled={isMutating}
-            >
-              取消
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} disabled={isMutating}>
-              {deleteMutation.isPending && (
-                <Loader2 aria-hidden="true" className="mr-1.5 size-3.5 animate-spin" />
-              )}
-              确认删除
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ConfirmDialog
+        cancelLabel="取消"
+        confirmLabel="确认删除"
+        description={
+          <>
+            确定要删除文档 "{deletingDoc?.name}"
+            吗？此操作不可撤销，文档的所有分块和向量数据也将被删除。
+          </>
+        }
+        onConfirm={handleDelete}
+        onOpenChange={(open) => {
+          setDeleteOpen(open)
+          if (!open) setDeletingDoc(null)
+        }}
+        open={deleteOpen}
+        pending={deleteMutation.isPending}
+        pendingLabel="删除中..."
+        title="确认删除"
+        variant="destructive"
+      />
     </div>
   )
 }

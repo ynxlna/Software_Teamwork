@@ -356,6 +356,77 @@ Use path filters so unrelated documentation or service changes do not run every
 job. A workflow may still run a cheap detection job to decide which service jobs
 are needed.
 
+## Scenario: Path-Derived Matrix Inputs
+
+### 1. Scope / Trigger
+
+- Trigger: a GitHub Actions workflow derives a job matrix from changed file
+  paths, pull request metadata, issue text, or other contributor-controlled
+  input.
+- Applies to `actions/github-script` detection jobs and downstream shell steps
+  that consume matrix values.
+
+### 2. Signatures
+
+- Detection output: JSON arrays written with `core.setOutput`, for example
+  `dockerfiles` or `compose-files`.
+- Matrix consumption: `${{ fromJSON(needs.detect.outputs.<name>) }}`.
+- Shell consumption: matrix values passed through step `env`, then read as
+  shell variables.
+
+### 3. Contracts
+
+- Detection jobs must whitelist path-derived matrix entries against a known set
+  or a repo-owned manifest before writing outputs.
+- Pattern checks alone are insufficient for contributor-controlled file names.
+- Shell steps must not interpolate `${{ matrix.* }}` directly inside `run`
+  scripts. Pass the value through `env` and quote the shell variable.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required handling |
+| --- | --- |
+| Changed path matches a broad glob but is not in the known set | Exclude it from the matrix output. |
+| Workflow file changes | Expand to the repo-owned known set, not arbitrary matching paths. |
+| Matrix value is consumed by a shell step | Use `env:` and quote the shell variable in `run`. |
+| A path contains quotes, command separators, spaces, or shell metacharacters | It must not reach shell execution unless it is an explicit known path. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: `services/qa/Dockerfile.host` is in the known Dockerfile set and builds
+  through a quoted `DOCKERFILE` env variable.
+- Base: a service `.dockerignore` change maps to that service's known
+  Dockerfiles.
+- Bad: `services/qa/Dockerfile";echo pwned #` matches a broad workflow trigger
+  and is interpolated directly into a `run` script.
+
+### 6. Tests Required
+
+- Parse changed-file detection scripts with `node --check`.
+- Add a local detection regression for valid known paths, workflow-file changes,
+  and malicious path strings containing shell metacharacters.
+- Run `actionlint` and `git diff --check`.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```yaml
+run: |
+  dockerfile="${{ matrix.dockerfile }}"
+  docker build --file "$dockerfile" "$(dirname "$dockerfile")"
+```
+
+#### Correct
+
+```yaml
+env:
+  DOCKERFILE: ${{ matrix.dockerfile }}
+run: |
+  dockerfile="$DOCKERFILE"
+  docker build --file "$dockerfile" "$(dirname "$dockerfile")"
+```
+
 ## Scenario: Gateway Active API Contract Workflow
 
 ### 1. Scope / Trigger

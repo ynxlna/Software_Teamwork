@@ -9,9 +9,10 @@
 3. 实现服务或前端工程能力前，阅读 [技术选型基线](architecture/technology-decisions.md)。
 4. 开始前后端联调前，阅读 [前后端集成契约](architecture/frontend-backend-contract.md)、[本地联调运行手册](runbooks/local-integration.md) 和 [Gateway OpenAPI 契约](services/gateway/api/public.openapi.yaml)。
 5. 提 PR 前，阅读 [测试策略](testing/strategy.md)，选择与改动范围匹配的检查。
-6. 需要实现具体后端服务时，阅读对应服务接口文档。
-7. 新增或调整文档时，先读 [文档维护工作流](collaboration/documentation-workflow.md)，确认内容应落在架构、协作还是服务细则中。
-8. 创建或认领 GitHub Issue 任务、参与协作、分支、PR 或仓库维护时，阅读协作维护文档。
+6. 本地 Docker 构建变慢、镜像源异常或 Compose 启动卡住时，阅读 [Docker 构建环境与镜像源](runbooks/docker-build-environment.md)。中国大陆网络优先从 `deploy/.env.china.example` 和 `python3 scripts/check_docker_environment.py --profile all --clean-env` 开始。
+7. 需要实现具体后端服务时，阅读对应服务接口文档。
+8. 新增或调整文档时，先读 [文档维护工作流](collaboration/documentation-workflow.md)，确认内容应落在架构、协作还是服务细则中。
+9. 创建或认领 GitHub Issue 任务、参与协作、分支、PR 或仓库维护时，阅读协作维护文档。
 
 ## 架构与接口契约
 
@@ -57,6 +58,7 @@
 | 文档 | 内容 |
 | --- | --- |
 | [本地联调运行手册](runbooks/local-integration.md) | 根级本地/演示 Compose、服务级 Compose、host-run 依赖、冒烟顺序、已知缺口和 PR 前联调判断。 |
+| [Docker 构建环境与镜像源](runbooks/docker-build-environment.md) | Docker build 优先级、镜像源、Go sumdb、BuildKit cache、Compose 镜像覆盖和 Docker daemon mirror 排障。 |
 | [测试策略](testing/strategy.md) | Go、migration、Gateway contract、前端、env-gated integration tests 和跨服务 smoke 的当前测试策略。 |
 
 ## 协作与维护

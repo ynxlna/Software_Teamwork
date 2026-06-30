@@ -76,3 +76,37 @@ Fixed PR review findings by separating production and test TypeScript configs, a
 ### Next Steps
 
 - None - task complete
+
+
+## Session 8: Optimize Docker build sources
+
+**Date**: 2026-06-30
+**Task**: Optimize Docker build sources
+**Branch**: `EIR9264/feat/docker-build-sources`
+
+### Summary
+
+Standardized Docker build sources and mainland China registry rewrite path, added Docker environment diagnostics and policy checks, documented validation, and verified full local Compose startup.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `4710aa9` | (see git log) |
+| `f42361e` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

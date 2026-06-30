@@ -28,7 +28,7 @@
 | `go-services.yml` | `services/{ai-gateway,auth,document,file,gateway,knowledge,qa}` | 根据变更路径只选择受影响服务，执行 `go test ./...`、`go build ./cmd/server`；QA 额外 build `./cmd/agent`；Knowledge 或 workflow 变更时额外用 PostgreSQL 16 和 `KNOWLEDGE_TEST_DATABASE_URL` 执行 repository lifecycle integration test。 |
 | `go-migrations.yml` | 有 SQL migration 的后端服务 | 校验 migration 文件名并用 `goose@v3.27.1` 对 PostgreSQL 16 apply。 |
 | `parser-service.yml` | `services/parser/**` | 执行 `uv sync --frozen --group dev`、`uv run ruff check .`、`uv run pytest` 和 `uv run python -m compileall src tests`；当 `services/parser/pyproject.toml`、`uv.lock` 或 `Dockerfile` 变化时额外执行 PaddleOCR extra lock dry-run；测试使用 fake OCR backend，不下载真实 PaddleOCR 模型。 |
-| `docker-deploy-checks.yml` | 服务镜像输入、已有服务 Dockerfile、服务 Compose、`deploy/**` | 对受影响服务的可构建 Dockerfile 执行 `docker build`，对变更的 Compose 文件执行 `docker compose ... config --quiet`；不 push 镜像、不部署。 |
+| `docker-deploy-checks.yml` | Docker/Compose 输入、Docker 相关 runbook/spec、服务 Compose、`deploy/**` | 先执行 `python3 scripts/check_docker_policy.py`；对受影响服务的可构建 Dockerfile 执行 `docker build`，对变更的 Compose 文件执行 `docker compose ... config --quiet`；Docker 文档/spec-only 变更只跑轻量 policy check，不 push 镜像、不部署。 |
 | `gateway-contract.yml` | Gateway OpenAPI active API | 执行 verifier unit tests 和 `python3 scripts/verify_gateway_active_api.py`。 |
 | `check-api-types.yml` | 前端 Gateway 类型漂移 | 在 `apps/web` 执行 `bun run api:generate`，本地等价命令为 `bun run --cwd apps/web api:generate`，并要求 generated diff 干净。 |
 | `commitlint.yml` / `pr-guard.yml` | 协作规则 | 检查提交格式、PR body、issue 关联和 base 更新要求。 |
@@ -45,8 +45,10 @@
 | 前端 API 类型 | `bun run --cwd apps/web api:generate`；确认 generated diff 符合预期。 |
 | 单个 Go 服务 | `cd services/<service> && go test ./...`；`go build ./cmd/server`。 |
 | QA 服务 | `cd services/qa && go test ./...`；`go build ./cmd/server`；`go build ./cmd/agent`。 |
-| Dockerfile | 对变更的可构建 Dockerfile 执行 `docker build --file <Dockerfile> <context>`；不 push 镜像。 |
-| Compose | `docker compose -f <compose-file> config --quiet`。 |
+| Docker policy | `python3 scripts/check_docker_policy.py`；验证 BuildKit、镜像默认值、`GOSUMDB`、`latest`、Parser 容器入口、中国网络 overlay 和 `.dockerignore` 是否回退。 |
+| Docker environment | `python3 scripts/check_docker_environment.py --profile all --clean-env`；用于区分 registry rewrite、daemon mirror、Docker Hub direct 和 shell proxy 的问题。CI 只跑 `--skip-network`，真实 manifest 探测作为本地/排障检查。 |
+| Dockerfile | 对变更的可构建 Dockerfile 执行 `DOCKER_BUILDKIT=1 docker build --file <Dockerfile> <context>`；中国网络优先使用 `deploy/.env.china.example` 或等价 build args。不 push 镜像。若本机 Docker daemon mirror 在 base image metadata 阶段返回 401/超时，应先按 Docker runbook 选择 registry rewrite 或修正 mirror，或在 PR 记录为环境阻断。 |
+| Compose | `docker compose -f <compose-file> config --quiet`；根级 Compose 额外跑 `--env-file deploy/.env.example` 和 `--profile ai`。 |
 | Knowledge repository / SQL | `cd services/knowledge && KNOWLEDGE_TEST_DATABASE_URL='postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable' go test ./internal/repository -count=1`。 |
 | migration | `go run github.com/pressly/goose/v3/cmd/goose@v3.27.1 -dir migrations postgres "$DATABASE_URL" up`。 |
 | Parser 契约 / 文档 / runtime | 检查 `docs/services/parser/api/internal.openapi.yaml`、`services/parser/api/openapi.yaml`（实现本地副本）与 `docs/services/parser/README.md`、Knowledge ingestion 文档一致；如改 runtime，执行 `cd services/parser && uv run ruff check . && uv run pytest && uv run python -m compileall src tests`，并说明是否仅覆盖 fake OCR backend。触碰 PaddleOCR runtime 时，在具备模型环境下追加 `PARSER_PADDLEOCR_SMOKE=1 PARSER_PADDLEOCR_ALLOW_DOWNLOAD=1 uv run pytest -m paddleocr_smoke -s`。 |
@@ -109,6 +111,7 @@ KNOWLEDGE_TEST_DATABASE_URL='postgres://postgres:postgres@localhost:5432/postgre
 | 服务能力、stub/501 状态、worker、provider adapter 或 migration 变化 | 对应服务 `docs/implementation.md`。 |
 | OpenAPI / Gateway active path / 数据模型变化 | OpenAPI、owner map、README、service boundaries 或相关契约文档；契约语义变化需先交管理组决策。 |
 | runtime dependency / Compose / CI 变化 | `technology-decisions.md`、runbook 或本文。 |
+| Dockerfile、Compose image、Docker daemon mirror、registry rewrite、Go proxy/sumdb、apk/apt/PyPI/uv 源变化 | `docs/runbooks/docker-build-environment.md`、`deploy/README.md`、`deploy/.env.china.example`、`docs/architecture/technology-decisions.md`、`scripts/check_docker_policy.py`、`scripts/check_docker_environment.py` 和相关 Trellis spec；Compose 基础镜像覆盖变量必须保持 pinned 默认，不得把正常路径改成 `latest`。 |
 | Parser runtime、PaddleOCR、Python packaging、Parser Docker 或 HTTP tests 变化 | Parser README、`technology-decisions.md`、runbook 和本文。 |
 | open PR 或未合入能力 | 只能写 pending、待合入或 follow-up，不得写成已实现。 |
 

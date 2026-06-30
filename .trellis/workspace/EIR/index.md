@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 7
+- **Total Sessions**: 8
 - **Last Active**: 2026-06-30
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~78 | Active |
+| `journal-1.md` | ~112 | Active |
 | `journal-0.md` | ~170 | Archived |
 <!-- @@@/auto:active-documents -->
 
@@ -30,6 +30,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-06-30 | Optimize Docker build sources | `4710aa9`, `f42361e` | `EIR9264/feat/docker-build-sources` |
 | 7 | 2026-06-30 | PR 258 frontend test isolation review fix | `8ae303e`, `ea50549`, `7b84d41` | `Frontend/test/frontend-test-baseline` |
 | 6 | 2026-06-30 | Issue 163 frontend test baseline | `335a749`, `31c0e40`, `d6b700e`, `fe1bb55` | `Frontend/test/frontend-test-baseline` |
 | 5 | 2026-06-29 | Issue 148 goose migration CI | `abb2c9f` | `Special/chore/goose-migration-ci` |

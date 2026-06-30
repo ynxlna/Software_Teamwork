@@ -4,14 +4,40 @@ on:
   pull_request:
     branches: [develop]
     paths:
+      - 'README.md'
+      - 'AGENTS.md'
       - 'services/**'
       - 'deploy/**'
+      - 'docs/README.md'
+      - 'docs/runbooks/docker-build-environment.md'
+      - 'docs/testing/strategy.md'
+      - 'docs/architecture/technology-decisions.md'
+      - '.trellis/spec/cicd.md'
+      - '.trellis/spec/backend/quality-guidelines.md'
+      - '.github/codex/prompts/review.md'
+      - 'scripts/check_docker_policy.py'
+      - 'scripts/check_docker_environment.py'
+      - 'scripts/tests/test_check_docker_environment.py'
+      - 'scripts/tests/test_check_docker_policy.py'
       - '.github/workflows/docker-deploy-checks.yml'
   push:
     branches: [develop]
     paths:
+      - 'README.md'
+      - 'AGENTS.md'
       - 'services/**'
       - 'deploy/**'
+      - 'docs/README.md'
+      - 'docs/runbooks/docker-build-environment.md'
+      - 'docs/testing/strategy.md'
+      - 'docs/architecture/technology-decisions.md'
+      - '.trellis/spec/cicd.md'
+      - '.trellis/spec/backend/quality-guidelines.md'
+      - '.github/codex/prompts/review.md'
+      - 'scripts/check_docker_policy.py'
+      - 'scripts/check_docker_environment.py'
+      - 'scripts/tests/test_check_docker_environment.py'
+      - 'scripts/tests/test_check_docker_policy.py'
       - '.github/workflows/docker-deploy-checks.yml'
 
 permissions:
@@ -26,6 +52,7 @@ jobs:
       has-dockerfiles: ${{ steps.changed.outputs.has-dockerfiles }}
       compose-files: ${{ steps.changed.outputs.compose-files }}
       has-compose-files: ${{ steps.changed.outputs.has-compose-files }}
+      has-policy-check: ${{ steps.changed.outputs.has-policy-check }}
     steps:
       - name: Detect Docker and Compose changes
         id: changed
@@ -75,6 +102,21 @@ jobs:
             const rootDeployComposeDependencyPattern =
               /^deploy\/(?:\.env\.example|postgres\/init\/.+|seeds\/.+)$/u;
             const workflowPath = '.github/workflows/docker-deploy-checks.yml';
+            const dockerPolicyPaths = new Set([
+              'README.md',
+              'AGENTS.md',
+              'docs/README.md',
+              'docs/runbooks/docker-build-environment.md',
+              'docs/testing/strategy.md',
+              'docs/architecture/technology-decisions.md',
+              '.trellis/spec/cicd.md',
+              '.trellis/spec/backend/quality-guidelines.md',
+              '.github/codex/prompts/review.md',
+              'scripts/check_docker_policy.py',
+              'scripts/check_docker_environment.py',
+              'scripts/tests/test_check_docker_environment.py',
+              'scripts/tests/test_check_docker_policy.py',
+            ]);
 
             const changedFiles = new Set();
             const addChangedFile = (file) => {
@@ -109,6 +151,8 @@ jobs:
 
             const files = [...changedFiles];
             const workflowChanged = files.includes(workflowPath);
+            const dockerPolicyChanged = files.some((file) => dockerPolicyPaths.has(file));
+            const fullDockerCheckChanged = workflowChanged;
             const dockerfiles = new Set();
 
             const addBuildableDockerfilesForService = (service) => {
@@ -128,7 +172,7 @@ jobs:
               }
             };
 
-            if (workflowChanged) {
+            if (fullDockerCheckChanged) {
               for (const dockerfile of currentBuildableDockerfiles) {
                 dockerfiles.add(dockerfile);
               }
@@ -155,7 +199,7 @@ jobs:
               }
             }
             const composeFiles = new Set();
-            if (workflowChanged) {
+            if (fullDockerCheckChanged) {
               for (const composeFile of knownComposeFiles) {
                 composeFiles.add(composeFile);
               }
@@ -178,7 +222,15 @@ jobs:
               }
             }
 
+            const hasPolicyCheck =
+              fullDockerCheckChanged ||
+              dockerPolicyChanged ||
+              dockerfiles.size > 0 ||
+              composeFiles.size > 0;
+
             core.info(`Changed files: ${files.join(', ') || '(none)'}`);
+            core.info(`Full Docker check requested: ${fullDockerCheckChanged}`);
+            core.info(`Docker policy check requested: ${hasPolicyCheck}`);
             core.info(`Dockerfiles: ${[...dockerfiles].join(', ') || '(none)'}`);
             core.info(`Compose files: ${[...composeFiles].join(', ') || '(none)'}`);
             core.setOutput('dockerfiles', JSON.stringify([...dockerfiles].sort()));
@@ -191,9 +243,30 @@ jobs:
               'has-compose-files',
               composeFiles.size > 0 ? 'true' : 'false'
             );
+            core.setOutput(
+              'has-policy-check',
+              hasPolicyCheck ? 'true' : 'false'
+            );
+
+  policy-check:
+    needs: detect
+    if: needs.detect.outputs.has-policy-check == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Docker policy checker
+        run: python3 -m unittest scripts.tests.test_check_docker_policy scripts.tests.test_check_docker_environment
+
+      - name: Validate Docker policy
+        run: python3 scripts/check_docker_policy.py
+
+      - name: Validate Docker environment diagnostic
+        run: python3 scripts/check_docker_environment.py --skip-network --clean-env
 
   docker-build:
-    needs: detect
+    needs: [detect, policy-check]
     if: needs.detect.outputs.has-dockerfiles == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -220,6 +293,7 @@ jobs:
 
       - name: Build Dockerfile
         env:
+          DOCKER_BUILDKIT: '1'
           DOCKERFILE: ${{ matrix.dockerfile }}
         run: |
           dockerfile="$DOCKERFILE"
@@ -227,7 +301,7 @@ jobs:
           docker build --file "$dockerfile" "$context"
 
   compose-config:
-    needs: detect
+    needs: [detect, policy-check]
     if: needs.detect.outputs.has-compose-files == 'true'
     runs-on: ubuntu-latest
     strategy:

@@ -43,6 +43,7 @@ TXT/Markdown 和 Office OpenXML 格式，并把 PDF/image 路径默认路由到 
 PP-StructureV3，以 Markdown 作为结构化文本的主输出。
 Go 服务只通过 HTTP 调用 Parser，不应在 Knowledge 进程中引入 PaddleOCR、
 PaddlePaddle、OpenCV、CUDA 或模型加载依赖。
+Docker 容器入口是 `parser-service`；宿主机直接开发时才使用 `uv run parser-service`。
 
 ## 实现状态
 

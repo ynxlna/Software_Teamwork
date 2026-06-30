@@ -629,6 +629,32 @@ Rules:
 
 - Use multi-stage builds for Go services.
 - Produce small runtime images.
+- Dockerfiles may use BuildKit cache mounts for dependency caches; CI Docker
+  build jobs must set `DOCKER_BUILDKIT=1` when cache mounts are present.
+- Defaults must favor runnable, verified builds over the fastest mirror. Go
+  builds should keep checksum verification enabled and expose mirror choices as
+  explicit build args.
+- Mainland China users should have a first-class explicit registry/package
+  overlay. Prefer `registry rewrite > daemon mirror > proxy`: registry rewrite
+  is repository-visible through `DOCKER_IMAGE_REGISTRY_PREFIX` and `*_IMAGE`
+  variables, daemon mirrors are local machine state, and proxies are last-resort
+  environment state. Keep these paths documented and diagnosable.
+- Compose infrastructure images must keep pinned defaults and may expose
+  full-image override variables for local or enterprise registries. Do not use
+  `latest` as a default or documented normal path.
+- Docker/Compose PR checks must run `python3 scripts/check_docker_policy.py`
+  before image build/config validation. Keep this checker aligned with Docker
+  policy changes so CI blocks obvious regressions without depending on a working
+  Docker daemon mirror.
+- Parser runtime images must avoid recursive `chown -R /app`; use
+  `COPY --chown` for the builder output and create runtime cache directories
+  explicitly before switching to the non-root user.
+- Docker environment diagnostics belong in `scripts/check_docker_environment.py`.
+  CI may run it with `--skip-network`; local investigations may run manifest
+  probes with `--profile all --clean-env`.
+- Docker policy docs/spec changes should trigger the lightweight policy checker
+  even when no Dockerfile changed. Do not force full image builds for docs-only
+  policy edits unless the workflow detection logic itself changed.
 - Build images for changed services on PRs.
 - Treat service source, module/lock files, Dockerfile, and `.dockerignore`
   changes as image inputs for the service's source-backed Dockerfiles.

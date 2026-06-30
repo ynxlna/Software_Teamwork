@@ -151,12 +151,16 @@ func (s *Service) ProcessIngestionTask(ctx context.Context, reqCtx RequestContex
 	chunkingAt := s.now()
 	chunkingStage := "chunking"
 	job, err = s.repo.UpdateJobState(ctx, job.ID, JobStateUpdate{
-		Status:          JobStatusRunning,
-		CurrentStage:    &chunkingStage,
-		ProgressPercent: 60,
-		UpdatedAt:       chunkingAt,
+		Status:           JobStatusRunning,
+		CurrentStage:     &chunkingStage,
+		ProgressPercent:  60,
+		UpdatedAt:        chunkingAt,
+		ExpectedAttempts: &job.Attempts,
 	})
 	if err != nil {
+		if errors.Is(err, ErrConflict) {
+			return job, ConflictError("job attempt is no longer active", err)
+		}
 		return s.failProcessingAndReturn(ctx, job, doc.ID, string(CodeDependency), "job state update failed",
 			DependencyError("job state update failed", err))
 	}
@@ -198,12 +202,16 @@ func (s *Service) ProcessIngestionTask(ctx context.Context, reqCtx RequestContex
 		embeddingAt := s.now()
 		embeddingStage := "embedding"
 		job, err = s.repo.UpdateJobState(ctx, job.ID, JobStateUpdate{
-			Status:          JobStatusRunning,
-			CurrentStage:    &embeddingStage,
-			ProgressPercent: 80,
-			UpdatedAt:       embeddingAt,
+			Status:           JobStatusRunning,
+			CurrentStage:     &embeddingStage,
+			ProgressPercent:  80,
+			UpdatedAt:        embeddingAt,
+			ExpectedAttempts: &job.Attempts,
 		})
 		if err != nil {
+			if errors.Is(err, ErrConflict) {
+				return job, ConflictError("job attempt is no longer active", err)
+			}
 			return s.failProcessingAndReturn(ctx, job, doc.ID, string(CodeDependency), "job state update failed",
 				DependencyError("job state update failed", err))
 		}
@@ -214,7 +222,10 @@ func (s *Service) ProcessIngestionTask(ctx context.Context, reqCtx RequestContex
 			return s.failProcessingAndReturn(ctx, job, doc.ID, string(CodeDependency), "document state update failed",
 				DependencyError("document state update failed", err))
 		}
-		if err := s.embedAndIndex(ctx, reqCtx, doc, chunks); err != nil {
+		if err := s.embedAndIndex(ctx, reqCtx, job, doc, chunks); err != nil {
+			if errors.Is(err, ErrConflict) {
+				return job, ConflictError("job attempt is no longer active", err)
+			}
 			message := sanitizeProcessingFailureMessage(err)
 			return s.failProcessingAndReturn(ctx, job, doc.ID, classifyProcessingDependencyCode(err), message,
 				DependencyError(message, err))
@@ -223,14 +234,18 @@ func (s *Service) ProcessIngestionTask(ctx context.Context, reqCtx RequestContex
 
 	finishedAt := s.now()
 	completed, err := s.repo.CompleteIngestion(ctx, CompleteIngestionRecord{
-		DocumentID:    doc.ID,
-		JobID:         job.ID,
-		ParserBackend: parserBackendPtr,
-		Chunks:        chunks,
-		UpdatedAt:     finishedAt,
-		FinishedAt:    finishedAt,
+		DocumentID:       doc.ID,
+		JobID:            job.ID,
+		ExpectedAttempts: &job.Attempts,
+		ParserBackend:    parserBackendPtr,
+		Chunks:           chunks,
+		UpdatedAt:        finishedAt,
+		FinishedAt:       finishedAt,
 	})
 	if err != nil {
+		if errors.Is(err, ErrConflict) {
+			return job, ConflictError("job attempt is no longer active", err)
+		}
 		if s.vectorIndex != nil {
 			_ = s.vectorIndex.DeleteByDocument(ctx, doc.ID)
 		}
@@ -306,7 +321,7 @@ func (s *Service) ListChunks(ctx context.Context, reqCtx RequestContext, input L
 	return chunks, nil
 }
 
-func (s *Service) embedAndIndex(ctx context.Context, reqCtx RequestContext, doc KnowledgeDocument, chunks []DocumentChunk) error {
+func (s *Service) embedAndIndex(ctx context.Context, reqCtx RequestContext, job ProcessingJob, doc KnowledgeDocument, chunks []DocumentChunk) error {
 	texts := make([]string, 0, len(chunks))
 	for _, chunk := range chunks {
 		texts = append(texts, chunk.Content)
@@ -321,6 +336,16 @@ func (s *Service) embedAndIndex(ctx context.Context, reqCtx RequestContext, doc 
 	}
 	if len(result.Vectors) != len(chunks) {
 		return fmt.Errorf("embedding result count mismatch")
+	}
+	embeddingStage := "embedding"
+	if _, err := s.repo.UpdateJobState(ctx, job.ID, JobStateUpdate{
+		Status:           JobStatusRunning,
+		CurrentStage:     &embeddingStage,
+		ProgressPercent:  90,
+		UpdatedAt:        s.now(),
+		ExpectedAttempts: &job.Attempts,
+	}); err != nil {
+		return err
 	}
 	if err := s.vectorIndex.DeleteByDocument(ctx, doc.ID); err != nil {
 		return err
@@ -361,7 +386,10 @@ func (s *Service) failProcessingAndReturn(ctx context.Context, job ProcessingJob
 
 func (s *Service) failProcessing(ctx context.Context, job ProcessingJob, documentID string, code string, message string) (ProcessingJob, error) {
 	now := s.now()
-	if err := s.repo.MarkDocumentJobFailed(ctx, documentID, job.ID, code, message, now); err != nil {
+	if err := s.repo.MarkDocumentJobFailed(ctx, documentID, job.ID, &job.Attempts, code, message, now); err != nil {
+		if errors.Is(err, ErrConflict) {
+			return job, ConflictError("job attempt is no longer active", err)
+		}
 		return job, DependencyError("failed to persist ingestion failure state", err)
 	}
 	failed, err := s.repo.GetProcessingJob(ctx, job.ID)

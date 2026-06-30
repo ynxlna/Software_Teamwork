@@ -558,14 +558,14 @@ func (r *uploadRepository) CreateDocumentWithJob(ctx context.Context, input serv
 	return r.MemoryRepository.CreateDocumentWithJob(ctx, input, scope)
 }
 
-func (r *uploadRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, code string, message string, failedAt time.Time) error {
+func (r *uploadRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, expectedAttempts *int32, code string, message string, failedAt time.Time) error {
 	r.markFailedCalls = append(r.markFailedCalls, markFailedCall{
 		DocumentID: documentID,
 		JobID:      jobID,
 		Code:       code,
 		Message:    message,
 	})
-	return r.MemoryRepository.MarkDocumentJobFailed(ctx, documentID, jobID, code, message, failedAt)
+	return r.MemoryRepository.MarkDocumentJobFailed(ctx, documentID, jobID, expectedAttempts, code, message, failedAt)
 }
 
 func writeContext(userID string) service.RequestContext {

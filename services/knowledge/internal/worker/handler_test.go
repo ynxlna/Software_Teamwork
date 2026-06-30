@@ -260,6 +260,97 @@ func TestIngestionHandlerReclaimsStaleRunningJob(t *testing.T) {
 	}
 }
 
+func TestIngestionAttemptFencingRejectsStaleCompletionAndFailure(t *testing.T) {
+	repo := repository.NewMemoryRepository()
+	seedKnowledgeBase(t, repo)
+	handoff := seedRunningIngestionJob(t, repo, "file_123", fixedNow())
+	attemptOne := int32(1)
+	claimAt := fixedNow().Add(time.Hour)
+	staleBefore := claimAt.Add(-5 * time.Minute)
+	stage := "parsing"
+
+	claimed, err := repo.ClaimProcessingJob(context.Background(), handoff.jobID, service.JobStateUpdate{
+		Status:             service.JobStatusRunning,
+		CurrentStage:       &stage,
+		ProgressPercent:    20,
+		StartedAt:          &claimAt,
+		UpdatedAt:          claimAt,
+		StaleRunningBefore: &staleBefore,
+	})
+	if err != nil {
+		t.Fatalf("ClaimProcessingJob() error = %v", err)
+	}
+	if claimed.Attempts != 2 {
+		t.Fatalf("claimed attempts = %d, want 2", claimed.Attempts)
+	}
+
+	parserBackend := "router"
+	finishedAt := claimAt.Add(time.Minute)
+	if _, err := repo.CompleteIngestion(context.Background(), service.CompleteIngestionRecord{
+		DocumentID:       handoff.documentID,
+		JobID:            handoff.jobID,
+		ExpectedAttempts: &claimed.Attempts,
+		ParserBackend:    &parserBackend,
+		Chunks: []service.DocumentChunk{{
+			ID:              "chunk_attempt_2",
+			KnowledgeBaseID: handoff.knowledgeBaseID,
+			DocumentID:      handoff.documentID,
+			ChunkIndex:      0,
+			Content:         "new attempt content",
+			CreatedAt:       finishedAt,
+		}},
+		UpdatedAt:  finishedAt,
+		FinishedAt: finishedAt,
+	}); err != nil {
+		t.Fatalf("CompleteIngestion() for active attempt error = %v", err)
+	}
+
+	err = repo.MarkDocumentJobFailed(context.Background(), handoff.documentID, handoff.jobID, &attemptOne, "dependency_error", "old worker failure", finishedAt.Add(time.Minute))
+	if !errors.Is(err, service.ErrConflict) {
+		t.Fatalf("MarkDocumentJobFailed() stale attempt error = %v, want ErrConflict", err)
+	}
+	_, err = repo.CompleteIngestion(context.Background(), service.CompleteIngestionRecord{
+		DocumentID:       handoff.documentID,
+		JobID:            handoff.jobID,
+		ExpectedAttempts: &attemptOne,
+		Chunks: []service.DocumentChunk{{
+			ID:              "chunk_attempt_1",
+			KnowledgeBaseID: handoff.knowledgeBaseID,
+			DocumentID:      handoff.documentID,
+			ChunkIndex:      0,
+			Content:         "stale attempt content",
+			CreatedAt:       finishedAt.Add(time.Minute),
+		}},
+		UpdatedAt:  finishedAt.Add(time.Minute),
+		FinishedAt: finishedAt.Add(time.Minute),
+	})
+	if !errors.Is(err, service.ErrConflict) {
+		t.Fatalf("CompleteIngestion() stale attempt error = %v, want ErrConflict", err)
+	}
+
+	job, err := repo.GetProcessingJob(context.Background(), handoff.jobID)
+	if err != nil {
+		t.Fatalf("GetProcessingJob() error = %v", err)
+	}
+	if job.Status != service.JobStatusSucceeded || job.Attempts != 2 {
+		t.Fatalf("job = %+v", job)
+	}
+	doc, err := repo.GetDocument(context.Background(), handoff.documentID, service.AccessScope{CanReadAll: true})
+	if err != nil {
+		t.Fatalf("GetDocument() error = %v", err)
+	}
+	if doc.Status != service.DocumentStatusReady || doc.ParserBackend == nil || *doc.ParserBackend != "router" {
+		t.Fatalf("doc = %+v", doc)
+	}
+	chunks, err := repo.ListChunks(context.Background(), handoff.documentID, service.AccessScope{CanReadAll: true}, service.PageInput{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("ListChunks() error = %v", err)
+	}
+	if chunks.Page.Total != 1 || chunks.Items[0].ID != "chunk_attempt_2" {
+		t.Fatalf("chunks = %+v", chunks)
+	}
+}
+
 func TestIngestionHandlerRetriesWhenFailureStateCannotPersist(t *testing.T) {
 	source := newSourceStore()
 	source.Put("file_empty", "", "text/plain")
@@ -548,7 +639,7 @@ type markFailureRepository struct {
 	err error
 }
 
-func (r *markFailureRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, code string, message string, failedAt time.Time) error {
+func (r *markFailureRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, expectedAttempts *int32, code string, message string, failedAt time.Time) error {
 	return r.err
 }
 

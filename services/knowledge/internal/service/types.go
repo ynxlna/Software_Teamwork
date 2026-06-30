@@ -363,7 +363,7 @@ type Repository interface {
 	UpdateKnowledgeBase(ctx context.Context, input UpdateKnowledgeBaseRecord, scope AccessScope) (KnowledgeBase, error)
 	SoftDeleteKnowledgeBase(ctx context.Context, id string, deletedAt time.Time, scope AccessScope) error
 	CreateDocumentWithJob(ctx context.Context, input CreateDocumentWithJobRecord, scope AccessScope) (KnowledgeDocument, ProcessingJob, error)
-	MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, code string, message string, failedAt time.Time) error
+	MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, expectedAttempts *int32, code string, message string, failedAt time.Time) error
 	ListDocumentsByKnowledgeBase(ctx context.Context, knowledgeBaseID string, status *DocumentStatus, scope AccessScope, page PageInput) (DocumentList, error)
 	GetDocument(ctx context.Context, id string, scope AccessScope) (KnowledgeDocument, error)
 	ListParserConfigs(ctx context.Context, enabled *bool) ([]ParserConfig, error)
@@ -444,6 +444,7 @@ type JobStateUpdate struct {
 	FinishedAt         *time.Time
 	UpdatedAt          time.Time
 	StaleRunningBefore *time.Time
+	ExpectedAttempts   *int32
 }
 
 type DocumentChunk struct {
@@ -464,10 +465,11 @@ type DocumentChunk struct {
 }
 
 type CompleteIngestionRecord struct {
-	DocumentID    string
-	JobID         string
-	ParserBackend *string
-	Chunks        []DocumentChunk
-	UpdatedAt     time.Time
-	FinishedAt    time.Time
+	DocumentID       string
+	JobID            string
+	ExpectedAttempts *int32
+	ParserBackend    *string
+	Chunks           []DocumentChunk
+	UpdatedAt        time.Time
+	FinishedAt       time.Time
 }

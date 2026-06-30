@@ -409,7 +409,7 @@ func (r *MemoryRepository) CreateDocumentWithJob(ctx context.Context, input serv
 	return cloneDocument(r.hydrateDocumentLocked(doc)), cloneJob(job), nil
 }
 
-func (r *MemoryRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, code string, message string, failedAt time.Time) error {
+func (r *MemoryRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, expectedAttempts *int32, code string, message string, failedAt time.Time) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -421,12 +421,8 @@ func (r *MemoryRepository) MarkDocumentJobFailed(ctx context.Context, documentID
 	if !jobExists {
 		return service.ErrNotFound
 	}
-	if docExists && doc.DeletedAt == nil {
-		doc.Status = service.DocumentStatusFailed
-		doc.ErrorCode = cloneStringPtr(&code)
-		doc.ErrorMessage = cloneStringPtr(&message)
-		doc.UpdatedAt = failedAt
-		r.documents[documentID] = doc
+	if expectedAttempts != nil && (job.Attempts != *expectedAttempts || job.Status != service.JobStatusRunning) {
+		return service.ErrConflict
 	}
 	job.Status = service.JobStatusFailed
 	job.ErrorCode = cloneStringPtr(&code)
@@ -434,6 +430,14 @@ func (r *MemoryRepository) MarkDocumentJobFailed(ctx context.Context, documentID
 	job.FinishedAt = &failedAt
 	job.UpdatedAt = failedAt
 	r.jobs[jobID] = job
+
+	if docExists && doc.DeletedAt == nil {
+		doc.Status = service.DocumentStatusFailed
+		doc.ErrorCode = cloneStringPtr(&code)
+		doc.ErrorMessage = cloneStringPtr(&message)
+		doc.UpdatedAt = failedAt
+		r.documents[documentID] = doc
+	}
 	return nil
 }
 
@@ -461,6 +465,9 @@ func (r *MemoryRepository) UpdateJobState(ctx context.Context, id string, update
 	job, exists := r.jobs[id]
 	if !exists {
 		return service.ProcessingJob{}, service.ErrNotFound
+	}
+	if update.ExpectedAttempts != nil && (job.Attempts != *update.ExpectedAttempts || job.Status != service.JobStatusRunning) {
+		return service.ProcessingJob{}, service.ErrConflict
 	}
 	job.Status = update.Status
 	job.ProgressPercent = update.ProgressPercent
@@ -548,6 +555,9 @@ func (r *MemoryRepository) CompleteIngestion(ctx context.Context, input service.
 	job, jobExists := r.jobs[input.JobID]
 	if !docExists || !jobExists || doc.DeletedAt != nil {
 		return service.ProcessingJob{}, service.ErrNotFound
+	}
+	if input.ExpectedAttempts != nil && (job.Attempts != *input.ExpectedAttempts || job.Status != service.JobStatusRunning) {
+		return service.ProcessingJob{}, service.ErrConflict
 	}
 	for chunkID, chunk := range r.chunks {
 		if chunk.DocumentID == input.DocumentID {

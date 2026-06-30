@@ -392,7 +392,7 @@ func (s *Service) UploadDocument(ctx context.Context, reqCtx RequestContext, inp
 		KnowledgeBaseID: doc.KnowledgeBaseID,
 		UserID:          scope.UserID,
 	}); err != nil {
-		_ = s.repo.MarkDocumentJobFailed(ctx, doc.ID, job.ID, string(CodeDependency), "ingestion queue handoff failed", s.now())
+		_ = s.repo.MarkDocumentJobFailed(ctx, doc.ID, job.ID, nil, string(CodeDependency), "ingestion queue handoff failed", s.now())
 		return KnowledgeDocument{}, DependencyError("ingestion queue handoff failed", err)
 	}
 

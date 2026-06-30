@@ -93,7 +93,7 @@ func TestMemoryRepositoryCreateDocumentWithJobAndMarkFailed(t *testing.T) {
 		t.Fatalf("job = %+v", job)
 	}
 
-	if err := repo.MarkDocumentJobFailed(context.Background(), "doc_1", "job_1", "dependency_error", "queue failed", now.Add(time.Minute)); err != nil {
+	if err := repo.MarkDocumentJobFailed(context.Background(), "doc_1", "job_1", nil, "dependency_error", "queue failed", now.Add(time.Minute)); err != nil {
 		t.Fatalf("MarkDocumentJobFailed() error = %v", err)
 	}
 	failedDoc, err := repo.GetDocument(context.Background(), "doc_1", scope)
@@ -149,7 +149,7 @@ func TestMemoryRepositoryMarkFailedKeepsJobTerminalWhenDocumentWasDeleted(t *tes
 		t.Fatalf("SoftDeleteKnowledgeBase() error = %v", err)
 	}
 
-	if err := repo.MarkDocumentJobFailed(context.Background(), "doc_1", "job_1", "dependency_error", "source content read failed", now.Add(2*time.Minute)); err != nil {
+	if err := repo.MarkDocumentJobFailed(context.Background(), "doc_1", "job_1", nil, "dependency_error", "source content read failed", now.Add(2*time.Minute)); err != nil {
 		t.Fatalf("MarkDocumentJobFailed() error = %v", err)
 	}
 	failedJob, err := repo.GetProcessingJob(context.Background(), "job_1")

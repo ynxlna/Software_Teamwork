@@ -459,7 +459,7 @@ func (r *PostgresRepository) CreateDocumentWithJob(ctx context.Context, input se
 	return documentFromCreateRow(docRow), processingJobFromRow(jobRow), nil
 }
 
-func (r *PostgresRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, code string, message string, failedAt time.Time) error {
+func (r *PostgresRepository) MarkDocumentJobFailed(ctx context.Context, documentID string, jobID string, expectedAttempts *int32, code string, message string, failedAt time.Time) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return wrapPostgresError("begin mark document job failed transaction", err)
@@ -468,28 +468,48 @@ func (r *PostgresRepository) MarkDocumentJobFailed(ctx context.Context, document
 		_ = tx.Rollback(ctx)
 	}()
 
-	qtx := r.queries.WithTx(tx)
 	// A document can be soft-deleted while a worker is running. The processing job
 	// must still reach a terminal state so later redeliveries do not get stuck.
-	if _, err := qtx.MarkDocumentFailed(ctx, sqlc.MarkDocumentFailedParams{
-		ID:           documentID,
-		ErrorCode:    code,
-		ErrorMessage: message,
-		UpdatedAt:    pgTime(failedAt),
-	}); err != nil {
-		return wrapPostgresError("mark document failed", err)
-	}
-	jobRows, err := qtx.MarkProcessingJobFailed(ctx, sqlc.MarkProcessingJobFailedParams{
-		ID:           jobID,
-		ErrorCode:    code,
-		ErrorMessage: message,
-		FinishedAt:   pgTime(failedAt),
-	})
+	jobRows, err := tx.Exec(ctx, `
+UPDATE processing_jobs
+SET status = 'failed',
+    error_code = $3,
+    error_message = $4,
+    finished_at = $5,
+    updated_at = $5
+WHERE id = $1
+  AND document_id = $2
+  AND ($6::int4 IS NULL OR (attempts = $6 AND status = 'running'))`,
+		jobID,
+		documentID,
+		code,
+		message,
+		pgTime(failedAt),
+		pgInt4Ptr(expectedAttempts),
+	)
 	if err != nil {
 		return wrapPostgresError("mark processing job failed", err)
 	}
-	if jobRows == 0 {
+	if jobRows.RowsAffected() == 0 {
+		if expectedAttempts != nil {
+			return service.ErrConflict
+		}
 		return service.ErrNotFound
+	}
+	if _, err := tx.Exec(ctx, `
+UPDATE knowledge_documents
+SET status = 'failed',
+    error_code = $2,
+    error_message = $3,
+    updated_at = $4
+WHERE id = $1
+  AND deleted_at IS NULL`,
+		documentID,
+		code,
+		message,
+		pgTime(failedAt),
+	); err != nil {
+		return wrapPostgresError("mark document failed", err)
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return wrapPostgresError("commit mark document job failed transaction", err)
@@ -523,6 +543,7 @@ SET status = $2,
     finished_at = COALESCE($10, finished_at),
     updated_at = $11
 WHERE id = $1
+  AND ($12::int4 IS NULL OR (attempts = $12 AND status = 'running'))
 RETURNING id, knowledge_base_id, document_id, job_type, status, current_stage, progress_percent,
           message, error_code, error_message, attempts, max_attempts, started_at, finished_at, created_at, updated_at`,
 		id,
@@ -536,7 +557,11 @@ RETURNING id, knowledge_base_id, document_id, job_type, status, current_stage, p
 		pgTimePtr(update.StartedAt),
 		pgTimePtr(update.FinishedAt),
 		pgTime(update.UpdatedAt),
+		pgInt4Ptr(update.ExpectedAttempts),
 	))
+	if errors.Is(err, pgx.ErrNoRows) && update.ExpectedAttempts != nil {
+		return service.ProcessingJob{}, service.ErrConflict
+	}
 	if err != nil {
 		return service.ProcessingJob{}, wrapPostgresError("update processing job", err)
 	}
@@ -619,6 +644,26 @@ func (r *PostgresRepository) CompleteIngestion(ctx context.Context, input servic
 		_ = tx.Rollback(ctx)
 	}()
 
+	var attempts int32
+	var status string
+	if err := tx.QueryRow(ctx, `
+SELECT attempts, status
+FROM processing_jobs
+WHERE id = $1
+  AND document_id = $2
+FOR UPDATE`,
+		input.JobID,
+		input.DocumentID,
+	).Scan(&attempts, &status); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return service.ProcessingJob{}, service.ErrNotFound
+		}
+		return service.ProcessingJob{}, wrapPostgresError("lock processing job for completion", err)
+	}
+	if input.ExpectedAttempts != nil && (attempts != *input.ExpectedAttempts || status != service.JobStatusRunning) {
+		return service.ProcessingJob{}, service.ErrConflict
+	}
+
 	if _, err := tx.Exec(ctx, `DELETE FROM document_chunks WHERE document_id = $1`, input.DocumentID); err != nil {
 		return service.ProcessingJob{}, wrapPostgresError("delete old document chunks", err)
 	}
@@ -686,13 +731,18 @@ SET status = 'succeeded',
     updated_at = $3
 WHERE id = $1
   AND document_id = $4
+  AND ($5::int4 IS NULL OR (attempts = $5 AND status = 'running'))
 RETURNING id, knowledge_base_id, document_id, job_type, status, current_stage, progress_percent,
           message, error_code, error_message, attempts, max_attempts, started_at, finished_at, created_at, updated_at`,
 		input.JobID,
 		pgTime(input.FinishedAt),
 		pgTime(input.UpdatedAt),
 		input.DocumentID,
+		pgInt4Ptr(input.ExpectedAttempts),
 	))
+	if errors.Is(err, pgx.ErrNoRows) && input.ExpectedAttempts != nil {
+		return service.ProcessingJob{}, service.ErrConflict
+	}
 	if err != nil {
 		return service.ProcessingJob{}, wrapPostgresError("mark processing job succeeded", err)
 	}

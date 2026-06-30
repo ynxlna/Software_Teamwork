@@ -26,11 +26,12 @@
 | --- | --- | --- |
 | `go-services.yml` | `services/{ai-gateway,auth,document,file,gateway,knowledge,qa}` | 执行 `go test ./...`、`go build ./cmd/server`；QA 额外 build `./cmd/agent`；Knowledge 额外用 PostgreSQL 16 和 `KNOWLEDGE_TEST_DATABASE_URL` 执行 repository lifecycle integration test。 |
 | `go-migrations.yml` | `services/{ai-gateway,auth,document,file,knowledge,qa}` | 校验 migration 文件名并用 `goose@v3.27.1` 对 PostgreSQL 16 apply；Gateway 和 Parser 当前没有 SQL migration。 |
+| `frontend.yml` | `apps/web/**`、根前端依赖文件和 workflow | 执行 `bun install --frozen-lockfile`、`bun run --cwd apps/web check`、`build`、`test:unit`、安装 Chromium 后执行 `test:e2e`。 |
 | `gateway-contract.yml` | Gateway OpenAPI active API | 执行 verifier unit tests 和 `python3 scripts/verify_gateway_active_api.py`。 |
 | `check-api-types.yml` | 前端 Gateway 类型漂移 | 执行 `bun run api:generate` 并要求 generated diff 干净。 |
 | `commitlint.yml` / `pr-guard.yml` | 协作规则 | 检查提交格式、PR body、issue 关联和 base 更新要求。 |
 
-当前可作为 required checks 的优先候选是 Go service tests、goose migration apply、Gateway contract/API drift 和 API type drift。完整前端 `check/build` CI、Parser Python/runtime CI、Vitest/React Testing Library/Playwright、路径过滤矩阵和跨服务 E2E smoke 仍未落地；在 CI 提供稳定依赖前只能作为 PR 前建议或缺口登记。
+当前可作为 required checks 的优先候选是 Go service tests、goose migration apply、Frontend check/build/unit/E2E、Gateway contract/API drift 和 API type drift。Parser Python/runtime CI、后端路径过滤矩阵和跨服务 E2E smoke 仍未落地；在 CI 提供稳定依赖前只能作为 PR 前建议或缺口登记。
 
 ## 本地命令矩阵
 
@@ -38,7 +39,7 @@
 | --- | --- |
 | 文档 | `git diff --check`；检查新增链接和实现事实。 |
 | Gateway OpenAPI / owner map | `python3 -m unittest scripts.tests.test_verify_gateway_active_api`；`python3 scripts/verify_gateway_active_api.py`。 |
-| 前端 | `bun install --frozen-lockfile`；`bun run --cwd apps/web check`；`bun run --cwd apps/web build`。 |
+| 前端 | `bun install --frozen-lockfile`；`bun run --cwd apps/web check`；`bun run --cwd apps/web build`；`bun run --cwd apps/web test:unit`；`bun run --cwd apps/web test:e2e`。 |
 | 前端 API 类型 | `bun run --cwd apps/web api:generate`；确认 generated diff 符合预期。 |
 | 单个 Go 服务 | `cd services/<service> && go test ./...`；`go build ./cmd/server`。 |
 | QA 服务 | `cd services/qa && go test ./...`；`go build ./cmd/server`；`go build ./cmd/agent`。 |
@@ -81,8 +82,8 @@ KNOWLEDGE_TEST_DATABASE_URL='postgres://postgres:postgres@localhost:5432/postgre
 | Format check | 已落地 | `bun run --cwd apps/web format:check`。 |
 | Build | 已落地 | `bun run --cwd apps/web build`。 |
 | API type generation | 已落地 | `bun run --cwd apps/web api:generate`，以 Gateway OpenAPI 为源。 |
-| Component/unit tests | 待落地 | Vitest + React Testing Library 仍待固定和接入。 |
-| Browser/E2E tests | 待落地 | Playwright 仍待固定和接入。 |
+| Component/unit tests | 已落地 | `bun run --cwd apps/web test:unit`，使用 Vitest + React Testing Library。 |
+| Browser/E2E tests | 已落地 | `bun run --cwd apps/web test:e2e`，CI 先安装 Playwright Chromium 后执行。 |
 
 前端不得直接调用服务内部地址。涉及 QA SSE、上传、报告任务进度或 admin model/parser configuration 的改动，应同时检查 `docs/architecture/frontend-backend-contract.md` 和 Gateway OpenAPI。
 

@@ -125,7 +125,7 @@ go run ./cmd/server
 | Document 真实 AI 生成和富 DOCX 工具链未落地 | 报告 job 状态机和基础 DOCX 导出可用；真实大纲/正文生成、Pandoc/LibreOffice 富 DOCX 转换和跨服务内容读取 smoke 仍需补齐。 | #160、#223 |
 | Document 跨服务 smoke 仍缺失 | settings/statistics/logs 已在服务端落地，但管理端、Gateway、File Service、Document worker 串联 smoke 仍未一键化。 | #159、#221 |
 | QA Agent Run MVP 和权限一致性仍在推进 | QA 会话/消息基础可用，完整 Agent 编排和 403 一致性仍需收口。 | #157、#217 |
-| 前端测试基线未落地 | 前端当前以 typecheck/lint/format/build 为主，缺 Vitest/RTL/Playwright。 | #117、#163 |
+| 前端跨后端真实 E2E smoke 缺失 | 前端 CI 已覆盖 check/build、Vitest unit/component tests 和 Playwright E2E smoke；但浏览器测试仍以 mock/前端关键流为主，不能替代真实 Gateway/多服务联调。 | #125 |
 
 ## PR 前判断
 
@@ -134,4 +134,4 @@ go run ./cmd/server
 - 改 migration：执行 goose apply；如果服务有 env-gated repository integration tests，尽量使用本地 PostgreSQL 跑一遍。
 - 改 Parser 契约或运行时规划：检查 `services/parser/api/openapi.yaml`、Parser README 和 Knowledge ingestion 文档是否一致；runtime 落地前不要记录 `pytest`、PaddleOCR smoke 或 Parser build 结果。
 - 改 Gateway OpenAPI：执行 `python3 scripts/verify_gateway_active_api.py`，前端类型相关改动还要执行 `bun run --cwd apps/web api:generate` 并检查生成 diff。
-- 改前端：执行 `bun install --frozen-lockfile`、`bun run --cwd apps/web check`、`bun run --cwd apps/web build`。
+- 改前端：执行 `bun install --frozen-lockfile`、`bun run --cwd apps/web check`、`bun run --cwd apps/web build`、`bun run --cwd apps/web test:unit`；涉及关键浏览器流程时执行 `bun run --cwd apps/web playwright install --with-deps chromium` 和 `bun run --cwd apps/web test:e2e`。

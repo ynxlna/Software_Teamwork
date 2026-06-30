@@ -1,8 +1,12 @@
 package httpapi
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -33,6 +37,22 @@ func registerProfile(t *testing.T, server *Server, body string) {
 	server.ServeHTTP(rec, req)
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("register profile status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+}
+
+func assertInvocationDoesNotContain(t *testing.T, invocation service.ProviderInvocation, forbidden ...string) {
+	t.Helper()
+	encoded, err := json.Marshal(invocation)
+	if err != nil {
+		t.Fatalf("marshal invocation: %v", err)
+	}
+	for _, item := range forbidden {
+		if item == "" {
+			continue
+		}
+		if bytes.Contains(encoded, []byte(item)) {
+			t.Fatalf("invocation leaked %q: %s", item, encoded)
+		}
 	}
 }
 
@@ -289,6 +309,103 @@ func TestChatSmoke_APIKeyNotExposedToProvider(t *testing.T) {
 	}
 }
 
+// TestEmbeddingSmoke_ControlledProviderOpenAIShapeRecordsSummary verifies the
+// downstream Knowledge embedding path against a controlled provider using the
+// real HTTP adapter. It documents the reusable fake-provider seed profile and
+// expected OpenAI-compatible response shape for issue #287.
+func TestEmbeddingSmoke_ControlledProviderOpenAIShapeRecordsSummary(t *testing.T) {
+	var providerRequest struct {
+		Model          string   `json:"model"`
+		Input          []string `json:"input"`
+		Dimensions     int      `json:"dimensions"`
+		EncodingFormat string   `json:"encoding_format"`
+		User           string   `json:"user"`
+	}
+	var receivedRequestID string
+	var receivedAuth string
+	fakeProvider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/embeddings" {
+			t.Errorf("unexpected provider path = %s", r.URL.Path)
+		}
+		receivedRequestID = r.Header.Get("X-Request-Id")
+		receivedAuth = r.Header.Get("Authorization")
+		if err := json.NewDecoder(r.Body).Decode(&providerRequest); err != nil {
+			t.Errorf("decode provider request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"object":"list","data":[{"object":"embedding","index":0,"embedding":[0.11,0.12]},{"object":"embedding","index":1,"embedding":[0.21,0.22]}],"model":"BAAI/bge-m3","usage":{"prompt_tokens":7,"total_tokens":7}}`))
+	}))
+	defer fakeProvider.Close()
+
+	server, repo := newTestServerWithProvidersAndRepo(t, nil, provider.NewHTTPClient(fakeProvider.Client()))
+	registerProfile(t, server, embeddingProfileBody(fakeProvider.URL))
+
+	req := authedRequest(http.MethodPost, "/internal/v1/embeddings", strings.NewReader(`{"model":"BAAI/bge-m3","input":["transformer secret text","second chunk"],"user":"knowledge-smoke"}`))
+	req.Header.Set("X-Caller-Service", "knowledge")
+	req.Header.Set("X-Request-Id", "embedding-smoke-req-01")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{`"object":"list"`, `"model":"BAAI/bge-m3"`, `"total_tokens":7`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("response missing %s: %s", expected, body)
+		}
+	}
+	for _, forbidden := range []string{"sk-smoke-secret", "transformer secret text"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("response leaked %q: %s", forbidden, body)
+		}
+	}
+	if receivedRequestID != "embedding-smoke-req-01" {
+		t.Fatalf("provider X-Request-Id = %q, want embedding-smoke-req-01", receivedRequestID)
+	}
+	if receivedAuth != "Bearer sk-smoke-secret" {
+		t.Fatalf("provider Authorization = %q, want Bearer sk-smoke-secret", receivedAuth)
+	}
+	if providerRequest.Model != "BAAI/bge-m3" {
+		t.Fatalf("provider model = %q, want BAAI/bge-m3", providerRequest.Model)
+	}
+	if len(providerRequest.Input) != 2 || providerRequest.Input[0] != "transformer secret text" {
+		t.Fatalf("provider input = %#v, want original input texts", providerRequest.Input)
+	}
+	if providerRequest.Dimensions != 1024 {
+		t.Fatalf("provider dimensions = %d, want profile default 1024", providerRequest.Dimensions)
+	}
+	if providerRequest.EncodingFormat != "float" {
+		t.Fatalf("provider encoding_format = %q, want float default", providerRequest.EncodingFormat)
+	}
+	if providerRequest.User != "knowledge-smoke" {
+		t.Fatalf("provider user = %q, want knowledge-smoke", providerRequest.User)
+	}
+	if len(repo.invocations) != 1 {
+		t.Fatalf("invocations = %d, want 1", len(repo.invocations))
+	}
+	invocation := repo.invocations[0]
+	if invocation.Operation != service.OperationEmbedding || invocation.Status != service.InvocationSucceeded {
+		t.Fatalf("invocation = %+v, want successful embedding", invocation)
+	}
+	if invocation.CallerService != "knowledge" || invocation.RequestID != "embedding-smoke-req-01" {
+		t.Fatalf("invocation context = %+v, want knowledge request id", invocation)
+	}
+	if invocation.InputCount == nil || *invocation.InputCount != 2 {
+		t.Fatalf("InputCount = %#v, want 2", invocation.InputCount)
+	}
+	if invocation.EmbeddingDimensions == nil || *invocation.EmbeddingDimensions != 1024 {
+		t.Fatalf("EmbeddingDimensions = %#v, want 1024", invocation.EmbeddingDimensions)
+	}
+	if invocation.TotalTokens == nil || *invocation.TotalTokens != 7 {
+		t.Fatalf("TotalTokens = %#v, want 7", invocation.TotalTokens)
+	}
+	if invocation.ProviderStatusCode == nil || *invocation.ProviderStatusCode != http.StatusOK {
+		t.Fatalf("ProviderStatusCode = %#v, want 200", invocation.ProviderStatusCode)
+	}
+	assertInvocationDoesNotContain(t, invocation, "sk-smoke-secret", "transformer secret text", "0.11", "0.12")
+}
+
 // TestEmbeddingSmoke_Provider429NormalizesRateLimit verifies that a 429 from the
 // embedding provider HTTP adapter is normalized to a rate_limited error and the raw
 // provider body is not leaked. Uses the real provider.HTTPClient so the full production
@@ -360,6 +477,111 @@ func TestEmbeddingSmoke_Provider5xxNormalizesError(t *testing.T) {
 	if !strings.Contains(body, `"dependency_error"`) && !strings.Contains(body, `"upstream_error"`) {
 		t.Fatalf("response missing dependency_error: %s", body)
 	}
+}
+
+// TestRerankSmoke_ControlledProviderResultsShapeRecordsSummary verifies the
+// downstream Knowledge rerank path against a controlled provider using the real
+// HTTP adapter. The fake provider returns the common results[] / relevance_score
+// shape so response normalization stays covered.
+func TestRerankSmoke_ControlledProviderResultsShapeRecordsSummary(t *testing.T) {
+	var providerRequest struct {
+		Model           string            `json:"model"`
+		Query           string            `json:"query"`
+		Documents       []string          `json:"documents"`
+		TopN            int               `json:"top_n"`
+		ReturnDocuments bool              `json:"return_documents"`
+		Metadata        map[string]string `json:"metadata"`
+	}
+	var receivedRequestID string
+	var receivedAuth string
+	fakeProvider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/rerank" {
+			t.Errorf("unexpected provider path = %s", r.URL.Path)
+		}
+		receivedRequestID = r.Header.Get("X-Request-Id")
+		receivedAuth = r.Header.Get("Authorization")
+		if err := json.NewDecoder(r.Body).Decode(&providerRequest); err != nil {
+			t.Errorf("decode provider request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"results":[{"index":1,"relevance_score":0.91},{"index":0,"relevance_score":0.42},{"index":2,"relevance_score":0.11}],"model":"BAAI/bge-reranker-v2-m3","meta":{"tokens":{"input_tokens":9,"output_tokens":1}}}`))
+	}))
+	defer fakeProvider.Close()
+
+	server, repo := newTestServerWithProvidersAndRepo(t, nil, provider.NewHTTPClient(fakeProvider.Client()))
+	registerProfile(t, server, rerankProfileBody(fakeProvider.URL))
+
+	reqBody := `{"model":"BAAI/bge-reranker-v2-m3","query":"protection relay settings","documents":[{"id":"chunk-1","text":"first sensitive chunk"},{"id":"chunk-2","text":"best matching transformer chunk"},{"id":"chunk-3","text":"third chunk"}],"top_n":2,"metadata":{"knowledgeBaseId":"kb-smoke"}}`
+	req := authedRequest(http.MethodPost, "/internal/v1/rerankings", strings.NewReader(reqBody))
+	req.Header.Set("X-Caller-Service", "knowledge")
+	req.Header.Set("X-Request-Id", "rerank-smoke-req-01")
+	rec := httptest.NewRecorder()
+	server.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, expected := range []string{`"object":"list"`, `"document_id":"chunk-2"`, `"document_id":"chunk-1"`, `"total_tokens":10`} {
+		if !strings.Contains(body, expected) {
+			t.Fatalf("response missing %s: %s", expected, body)
+		}
+	}
+	if strings.Contains(body, `"document_id":"chunk-3"`) {
+		t.Fatalf("response was not limited to top_n=2: %s", body)
+	}
+	for _, forbidden := range []string{"sk-smoke-secret", "best matching transformer chunk", "first sensitive chunk"} {
+		if strings.Contains(body, forbidden) {
+			t.Fatalf("response leaked %q: %s", forbidden, body)
+		}
+	}
+	if receivedRequestID != "rerank-smoke-req-01" {
+		t.Fatalf("provider X-Request-Id = %q, want rerank-smoke-req-01", receivedRequestID)
+	}
+	if receivedAuth != "Bearer sk-smoke-secret" {
+		t.Fatalf("provider Authorization = %q, want Bearer sk-smoke-secret", receivedAuth)
+	}
+	if providerRequest.Model != "BAAI/bge-reranker-v2-m3" {
+		t.Fatalf("provider model = %q, want BAAI/bge-reranker-v2-m3", providerRequest.Model)
+	}
+	if providerRequest.Query != "protection relay settings" {
+		t.Fatalf("provider query = %q, want original query", providerRequest.Query)
+	}
+	if len(providerRequest.Documents) != 3 || providerRequest.Documents[1] != "best matching transformer chunk" {
+		t.Fatalf("provider documents = %#v, want original document texts", providerRequest.Documents)
+	}
+	if providerRequest.TopN != 2 {
+		t.Fatalf("provider top_n = %d, want request top_n 2", providerRequest.TopN)
+	}
+	if providerRequest.ReturnDocuments {
+		t.Fatalf("provider return_documents = true, want false")
+	}
+	if providerRequest.Metadata["knowledgeBaseId"] != "kb-smoke" {
+		t.Fatalf("provider metadata = %#v, want knowledgeBaseId", providerRequest.Metadata)
+	}
+	if len(repo.invocations) != 1 {
+		t.Fatalf("invocations = %d, want 1", len(repo.invocations))
+	}
+	invocation := repo.invocations[0]
+	if invocation.Operation != service.OperationReranking || invocation.Status != service.InvocationSucceeded {
+		t.Fatalf("invocation = %+v, want successful reranking", invocation)
+	}
+	if invocation.CallerService != "knowledge" || invocation.RequestID != "rerank-smoke-req-01" {
+		t.Fatalf("invocation context = %+v, want knowledge request id", invocation)
+	}
+	if invocation.InputCount == nil || *invocation.InputCount != 3 {
+		t.Fatalf("InputCount = %#v, want 3", invocation.InputCount)
+	}
+	if invocation.RerankTopN == nil || *invocation.RerankTopN != 2 {
+		t.Fatalf("RerankTopN = %#v, want 2", invocation.RerankTopN)
+	}
+	if invocation.TotalTokens == nil || *invocation.TotalTokens != 10 {
+		t.Fatalf("TotalTokens = %#v, want 10", invocation.TotalTokens)
+	}
+	if invocation.ProviderStatusCode == nil || *invocation.ProviderStatusCode != http.StatusOK {
+		t.Fatalf("ProviderStatusCode = %#v, want 200", invocation.ProviderStatusCode)
+	}
+	assertInvocationDoesNotContain(t, invocation, "sk-smoke-secret", "best matching transformer chunk", "protection relay settings", "0.91")
 }
 
 // TestRerankSmoke_Provider429NormalizesRateLimit verifies that a 429 from the rerank
@@ -481,4 +703,118 @@ func TestChatSmoke_InvocationRecordsCallerService(t *testing.T) {
 	if repo.invocations[0].CallerService != "document" {
 		t.Fatalf("CallerService = %q, want document", repo.invocations[0].CallerService)
 	}
+}
+
+// TestRealProviderSmoke_ExplicitEnvOnly exercises real provider adapters only
+// when explicitly requested. Ordinary CI should report this test as skipped.
+func TestRealProviderSmoke_ExplicitEnvOnly(t *testing.T) {
+	if os.Getenv("AI_GATEWAY_REAL_PROVIDER_SMOKE") != "1" {
+		t.Skip("set AI_GATEWAY_REAL_PROVIDER_SMOKE=1 and provider env vars to run real provider smoke")
+	}
+	baseURL := strings.TrimSpace(os.Getenv("AI_GATEWAY_REAL_PROVIDER_BASE_URL"))
+	apiKey := strings.TrimSpace(os.Getenv("AI_GATEWAY_REAL_PROVIDER_API_KEY"))
+	if baseURL == "" || apiKey == "" {
+		t.Fatalf("real provider smoke requires AI_GATEWAY_REAL_PROVIDER_BASE_URL and AI_GATEWAY_REAL_PROVIDER_API_KEY")
+	}
+
+	httpClient := &http.Client{Timeout: 30 * time.Second}
+	server, repo := newTestServerWithProvidersAndRepo(t, provider.NewHTTPChatClient(httpClient), provider.NewHTTPClient(httpClient))
+
+	if chatModel := strings.TrimSpace(os.Getenv("AI_GATEWAY_REAL_CHAT_MODEL")); chatModel != "" {
+		t.Run("chat", func(t *testing.T) {
+			registerProfile(t, server, realChatProfileBody(baseURL, chatModel, apiKey))
+			body := `{"model":` + jsonQuote(chatModel) + `,"messages":[{"role":"user","content":"Return the single word ok."}],"temperature":0}`
+			req := authedRequest(http.MethodPost, "/internal/v1/chat/completions", strings.NewReader(body))
+			req.Header.Set("X-Caller-Service", "qa")
+			req.Header.Set("X-Request-Id", "real-chat-smoke")
+			rec := httptest.NewRecorder()
+			server.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("chat status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"object":"chat.completion"`) {
+				t.Fatalf("chat response missing chat.completion object: %s", rec.Body.String())
+			}
+		})
+	} else {
+		t.Log("skip chat real smoke: AI_GATEWAY_REAL_CHAT_MODEL is not set")
+	}
+
+	if embeddingModel := strings.TrimSpace(os.Getenv("AI_GATEWAY_REAL_EMBEDDING_MODEL")); embeddingModel != "" {
+		t.Run("embeddings", func(t *testing.T) {
+			dimensions := 1024
+			if raw := strings.TrimSpace(os.Getenv("AI_GATEWAY_REAL_EMBEDDING_DIMENSIONS")); raw != "" {
+				parsed, err := strconv.Atoi(raw)
+				if err != nil || parsed <= 0 {
+					t.Fatalf("AI_GATEWAY_REAL_EMBEDDING_DIMENSIONS must be a positive integer, got %q", raw)
+				}
+				dimensions = parsed
+			}
+			registerProfile(t, server, realEmbeddingProfileBody(baseURL, embeddingModel, apiKey, dimensions))
+			body := `{"model":` + jsonQuote(embeddingModel) + `,"input":["AI Gateway real provider smoke"]}`
+			req := authedRequest(http.MethodPost, "/internal/v1/embeddings", strings.NewReader(body))
+			req.Header.Set("X-Caller-Service", "knowledge")
+			req.Header.Set("X-Request-Id", "real-embedding-smoke")
+			rec := httptest.NewRecorder()
+			server.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("embedding status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"object":"list"`) || !strings.Contains(rec.Body.String(), `"embedding"`) {
+				t.Fatalf("embedding response missing OpenAI list shape: %s", rec.Body.String())
+			}
+		})
+	} else {
+		t.Log("skip embeddings real smoke: AI_GATEWAY_REAL_EMBEDDING_MODEL is not set")
+	}
+
+	if rerankModel := strings.TrimSpace(os.Getenv("AI_GATEWAY_REAL_RERANK_MODEL")); rerankModel != "" {
+		t.Run("rerank", func(t *testing.T) {
+			registerProfile(t, server, realRerankProfileBody(baseURL, rerankModel, apiKey))
+			body := `{"model":` + jsonQuote(rerankModel) + `,"query":"electrical relay protection","documents":[{"id":"doc-a","text":"relay protection settings and fault isolation"},{"id":"doc-b","text":"cafeteria menu"}],"top_n":1}`
+			req := authedRequest(http.MethodPost, "/internal/v1/rerankings", strings.NewReader(body))
+			req.Header.Set("X-Caller-Service", "knowledge")
+			req.Header.Set("X-Request-Id", "real-rerank-smoke")
+			rec := httptest.NewRecorder()
+			server.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("rerank status = %d, body = %s", rec.Code, rec.Body.String())
+			}
+			if !strings.Contains(rec.Body.String(), `"object":"list"`) || !strings.Contains(rec.Body.String(), `"document_id"`) {
+				t.Fatalf("rerank response missing OpenAI-style list shape: %s", rec.Body.String())
+			}
+		})
+	} else {
+		t.Log("skip rerank real smoke: AI_GATEWAY_REAL_RERANK_MODEL is not set")
+	}
+
+	if len(repo.invocations) == 0 {
+		t.Fatalf("real provider smoke ran with no operation model env vars set; set at least one of AI_GATEWAY_REAL_CHAT_MODEL, AI_GATEWAY_REAL_EMBEDDING_MODEL, AI_GATEWAY_REAL_RERANK_MODEL")
+	}
+	for _, invocation := range repo.invocations {
+		if invocation.Status != service.InvocationSucceeded {
+			t.Fatalf("real provider invocation failed: %+v", invocation)
+		}
+		assertInvocationDoesNotContain(t, invocation, apiKey)
+	}
+}
+
+func realChatProfileBody(baseURL, model, apiKey string) string {
+	return `{"name":"real-chat-smoke","purpose":"chat","provider":"openai_compatible","baseUrl":` + jsonQuote(baseURL) + `,"model":` + jsonQuote(model) + `,"apiKey":` + jsonQuote(apiKey) + `,"enabled":true,"isDefault":true,"supportsStreaming":false,"timeoutMs":30000}`
+}
+
+func realEmbeddingProfileBody(baseURL, model, apiKey string, dimensions int) string {
+	return `{"name":"real-embedding-smoke","purpose":"embedding","provider":"openai_compatible","baseUrl":` + jsonQuote(baseURL) + `,"model":` + jsonQuote(model) + `,"apiKey":` + jsonQuote(apiKey) + `,"enabled":true,"isDefault":true,"dimensions":` + strconv.Itoa(dimensions) + `,"timeoutMs":30000}`
+}
+
+func realRerankProfileBody(baseURL, model, apiKey string) string {
+	return `{"name":"real-rerank-smoke","purpose":"rerank","provider":"openai_compatible","baseUrl":` + jsonQuote(baseURL) + `,"model":` + jsonQuote(model) + `,"apiKey":` + jsonQuote(apiKey) + `,"enabled":true,"isDefault":true,"topN":1,"timeoutMs":30000}`
+}
+
+func jsonQuote(value string) string {
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return `""`
+	}
+	return string(encoded)
 }

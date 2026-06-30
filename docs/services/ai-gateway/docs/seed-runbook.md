@@ -151,7 +151,87 @@ cd services/ai-gateway
 go test ./...
 ```
 
-若需要对真实 provider 做手动 smoke 验证，直接使用第 6 节的 curl 示例即可。
+如果只需要验证 provider adapter 回归样本，可运行更窄的命令：
+
+```bash
+cd services/ai-gateway
+go test ./internal/http -run 'Test(ChatSmoke|ChatStreamSmoke|EmbeddingSmoke|RerankSmoke)' -count=1
+```
+
+### 4.1 受控 fake provider seed profile
+
+HTTP smoke 测试在内存 repository 中注册以下 profile，不需要外部数据库或真实密钥：
+
+| 用途 | provider | baseUrl | model | 关键默认值 |
+| --- | --- | --- | --- | --- |
+| chat | `openai_compatible` | `<httptest>/v1` | `provider-model` | `supportsStreaming=true` |
+| embedding | `siliconflow` | `<httptest>/v1` | `BAAI/bge-m3` | `dimensions=1024` |
+| rerank | `siliconflow` | `<httptest>/v1` | `BAAI/bge-reranker-v2-m3` | `topN=3` |
+
+### 4.2 受控 fake provider 预期响应形态
+
+Chat 成功样本返回 OpenAI-compatible chat completion：
+
+```json
+{
+  "id": "chatcmpl_test",
+  "object": "chat.completion",
+  "model": "provider-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": "ok" },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2 }
+}
+```
+
+Embedding 成功样本返回 OpenAI-compatible list；AI Gateway 校验 `data[]` 数量、`index` 顺序、`object=embedding` 和 embedding payload：
+
+```json
+{
+  "object": "list",
+  "data": [
+    { "object": "embedding", "index": 0, "embedding": [0.11, 0.12] },
+    { "object": "embedding", "index": 1, "embedding": [0.21, 0.22] }
+  ],
+  "model": "BAAI/bge-m3",
+  "usage": { "prompt_tokens": 7, "total_tokens": 7 }
+}
+```
+
+Rerank 成功样本覆盖 provider `results[]` / `relevance_score` 形态；AI Gateway 会归一化为 `data[]`、补齐输入文档 ID、映射 `meta.tokens` 到 usage，并按 `top_n` 截断：
+
+```json
+{
+  "results": [
+    { "index": 1, "relevance_score": 0.91 },
+    { "index": 0, "relevance_score": 0.42 }
+  ],
+  "model": "BAAI/bge-reranker-v2-m3",
+  "meta": { "tokens": { "input_tokens": 9, "output_tokens": 1 } }
+}
+```
+
+### 4.3 真实 provider smoke（显式启用）
+
+真实 provider smoke 默认跳过，只有显式设置开关和凭证时才会外联：
+
+```bash
+cd services/ai-gateway
+AI_GATEWAY_REAL_PROVIDER_SMOKE=1 \
+AI_GATEWAY_REAL_PROVIDER_BASE_URL="https://api.siliconflow.cn/v1" \
+AI_GATEWAY_REAL_PROVIDER_API_KEY="$SILICONFLOW_API_KEY" \
+AI_GATEWAY_REAL_CHAT_MODEL="Qwen/Qwen2.5-72B-Instruct" \
+AI_GATEWAY_REAL_EMBEDDING_MODEL="BAAI/bge-m3" \
+AI_GATEWAY_REAL_EMBEDDING_DIMENSIONS="1024" \
+AI_GATEWAY_REAL_RERANK_MODEL="BAAI/bge-reranker-v2-m3" \
+go test ./internal/http -run TestRealProviderSmoke_ExplicitEnvOnly -count=1 -v
+```
+
+只需要跑单项时，可以只设置对应的 `AI_GATEWAY_REAL_*_MODEL`。如果没有设置任何 operation model，测试会失败并提示至少设置 chat、embedding 或 rerank 的一个模型变量。
 
 ---
 
@@ -166,7 +246,21 @@ go test ./...
 
 ---
 
-## 6. 下游服务接入示例
+## 6. 常见失败与诊断
+
+| 场景 | 表现 | 排查方向 |
+| --- | --- | --- |
+| 服务令牌缺失或错误 | HTTP 管理接口返回 `unauthorized`；模型调用接口返回 OpenAI-style `authentication_error` / `unauthorized`。 | 检查 `X-Service-Token` 明文是否和 `AI_GATEWAY_SERVICE_TOKEN_HASHES` 的 SHA-256 hash 匹配。 |
+| `X-Caller-Service` 缺失或不允许 | 返回 `unauthorized` 或 `permission_error` / `forbidden`。 | 使用 `gateway` 创建 profile；模型调用使用 `qa`、`knowledge` 或 `document` 等允许值。 |
+| 默认 profile 缺失 | 模型调用返回 `not_found` / `default model profile not found`；`/readyz` 中对应 check 为 `missing`。 | 按第 2 节创建默认 profile，或在请求中传入正确 `profile_id`。 |
+| credential 未配置或被禁用 | 返回 `dependency_error` / `model profile credential is not configured`。 | 重新写入 profile `apiKey`，确认 credential 状态为 active。 |
+| provider 认证失败 | fake/真实 provider smoke 返回 `authentication_error` 或 `dependency_error`，不会透传 provider 原始 body。 | 检查 provider API key、baseUrl 和账号权限；测试响应中不应出现 API key 或 provider 原始错误。 |
+| provider 响应格式不匹配 | 返回 `dependency_error` / `provider returned an invalid response`，调用摘要 status 为 failed。 | Chat 需 `object=chat.completion` 且 `choices` 非空；embedding 需 `object=list`、数量和 index 与输入一致；rerank 需合法 `data[]` 或 `results[]`、score 和 index。 |
+| 真实 provider smoke 被跳过 | `go test -v` 显示 skip real provider smoke。 | 设置 `AI_GATEWAY_REAL_PROVIDER_SMOKE=1`、base URL、API key 和至少一个 operation model 环境变量。 |
+
+---
+
+## 7. 下游服务接入示例
 
 QA / Knowledge / Document 服务接入 AI Gateway 时，在请求头中携带：
 

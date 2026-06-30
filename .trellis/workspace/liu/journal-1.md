@@ -370,3 +370,36 @@ Removed report frontend fallback data, routed report pages through Gateway Docum
 ### Next Steps
 
 - None - task complete
+
+
+## Session 12: Address PR 290 review
+
+**Date**: 2026-06-30
+**Task**: Address PR 290 review
+**Branch**: `Frontend/feat/report-real-document-api`
+
+### Summary
+
+Handled PR #290 review feedback by reusing draft reports after outline job failures, surfacing delete mutation gateway errors, and adding regression coverage.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `e6223fd` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -510,7 +510,7 @@ func (r *Postgres) replaceCitations(ctx context.Context, tx pgx.Tx, runID, messa
 	)`,
 				item.ID, item.MessageID, item.CitationNo,
 				item.KnowledgeBaseID, item.DocumentID, item.ChunkID, item.DocumentName,
-				item.SectionPath, item.Text, item.Context, nullableInt(item.PageNumber),
+				item.SectionPath, coalesceFirst(item.Text, item.ContentPreview, item.Context), item.Context, nullableInt(item.PageNumber),
 				nullableFloat(item.Score), nullableFloat(item.RerankScore), item.ChunkType,
 				metadata)
 		}
@@ -526,6 +526,15 @@ func nullableInt(value *int) any {
 		return nil
 	}
 	return *value
+}
+
+func coalesceFirst(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func nullableFloat(value *float64) any {

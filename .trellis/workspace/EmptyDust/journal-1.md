@@ -279,3 +279,36 @@ Archived the PR review follow-up task for PR #132 after updating the remote PR b
 ### Next Steps
 
 - None - task complete
+
+
+## Session 9: CI path filters
+
+**Date**: 2026-06-30
+**Task**: CI path filters
+**Branch**: `Special/chore/ci-path-filters`
+
+### Summary
+
+Implemented issue #123 CI path filtering for Go services, Docker/Compose checks, frontend test setup stability, and CI documentation updates.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `6f2d7c9` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

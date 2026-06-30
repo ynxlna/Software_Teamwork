@@ -481,3 +481,36 @@ Addressed PR review finding by applying monotonic SSE sequence validation to ans
 ### Next Steps
 
 - None - task complete
+
+
+## Session 14: F-016 stream sequence preservation
+
+**Date**: 2026-06-30
+**Task**: F-016 stream sequence preservation
+**Branch**: `Frontend/feat/qa-capability-aligned-chat`
+
+### Summary
+
+Preserved the remote stream-ordering fix by preventing message payload sequenceNo from overriding cross-event SSE sequence numbers, kept archived task files unchanged, and reran frontend checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `5410d12` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -1,16 +1,7 @@
-import {
-  AlertTriangle,
-  Check,
-  Edit3,
-  Loader2,
-  MessageSquare,
-  Plus,
-  RefreshCw,
-  Trash2,
-  X,
-} from 'lucide-react'
+import { Check, Edit3, MessageSquare, Plus, Trash2, X } from 'lucide-react'
 import { type KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
 
+import { ConfirmDialog, StateBlock } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import type { QASessionListItem } from '@/lib/types'
@@ -41,6 +32,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   // Focus and select the inline edit input when entering edit mode
@@ -84,16 +76,7 @@ export default function ChatSidebar({
     [confirmEdit, cancelEdit],
   )
 
-  // ── Delete with confirmation ──
-
-  const handleDelete = useCallback(
-    (sessionId: string) => {
-      if (window.confirm('确定删除该会话？')) {
-        onDelete(sessionId)
-      }
-    },
-    [onDelete],
-  )
+  const deleteTarget = sessions.find((session) => session.id === deleteTargetId)
 
   // ── Render ──
 
@@ -116,27 +99,28 @@ export default function ChatSidebar({
         <div className="flex flex-col gap-1 p-2">
           {/* Fetch error state */}
           {fetchError && !isLoading && (
-            <div className="flex flex-col items-center gap-2 py-8 px-4">
-              <AlertTriangle className="size-5 text-red-500" aria-hidden="true" />
-              <p className="text-center text-xs text-red-600 dark:text-red-400">{fetchError}</p>
-              <Button variant="outline" size="sm" onClick={onRetryFetch}>
-                <RefreshCw className="size-3" />
-                重新加载
-              </Button>
-            </div>
+            <StateBlock
+              action={
+                <Button variant="outline" size="sm" onClick={onRetryFetch}>
+                  重新加载
+                </Button>
+              }
+              className="mx-2"
+              description={fetchError}
+              size="compact"
+              title="会话列表加载失败"
+              variant="error"
+            />
           )}
 
           {/* Loading state */}
           {!fetchError && isLoading && sessions.length === 0 && (
-            <div className="flex flex-col items-center gap-2 py-8">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" aria-label="加载中" />
-              <span className="text-xs text-muted-foreground">加载会话列表…</span>
-            </div>
+            <StateBlock className="mx-2" size="compact" title="加载会话列表..." variant="loading" />
           )}
 
           {/* Empty state (after loading) */}
           {!fetchError && !isLoading && sessions.length === 0 && (
-            <p className="px-4 py-8 text-center text-sm text-muted-foreground">暂无对话记录</p>
+            <StateBlock className="mx-2" size="compact" title="暂无对话记录" variant="empty" />
           )}
 
           {/* Session items */}
@@ -240,13 +224,13 @@ export default function ChatSidebar({
                         title="删除对话"
                         onClick={(e) => {
                           e.stopPropagation()
-                          handleDelete(sess.id)
+                          setDeleteTargetId(sess.id)
                         }}
                         tabIndex={0}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.stopPropagation()
-                            handleDelete(sess.id)
+                            setDeleteTargetId(sess.id)
                           }
                         }}
                       >
@@ -260,6 +244,25 @@ export default function ChatSidebar({
           })}
         </div>
       </ScrollArea>
+      <ConfirmDialog
+        cancelLabel="取消"
+        confirmLabel="确认删除"
+        description={
+          deleteTarget?.title
+            ? `即将删除会话"${deleteTarget.title}"。此操作不可撤销。`
+            : '此操作不可撤销。'
+        }
+        onConfirm={() => {
+          if (deleteTargetId) onDelete(deleteTargetId)
+          setDeleteTargetId(null)
+        }}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTargetId(null)
+        }}
+        open={Boolean(deleteTargetId)}
+        title="确定删除该会话？"
+        variant="destructive"
+      />
     </aside>
   )
 }

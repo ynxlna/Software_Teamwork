@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowUpRight, Check, ChevronDown, ChevronRight } from 'lucide-react'
+import { ArrowUpRight, Check, ChevronDown, ChevronRight } from 'lucide-react'
 import { type ReactNode, useEffect, useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
+import { InlineNotice, StateBlock } from '@/components/common'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -272,19 +273,6 @@ function MessageBubble({ msg, isStreaming }: { msg: QAMessage; isStreaming: bool
   )
 }
 
-/* ── Error banner ── */
-function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <div className="mx-10 flex items-center gap-3 rounded-md border border-red-200 bg-red-50 px-4 py-3 dark:border-red-800 dark:bg-red-950">
-      <AlertTriangle className="size-4 shrink-0 text-red-500" aria-hidden="true" />
-      <span className="flex-1 text-sm text-red-700 dark:text-red-300">{message}</span>
-      <Button variant="destructive" size="sm" onClick={onRetry}>
-        重试
-      </Button>
-    </div>
-  )
-}
-
 // ══════════════════════════════════════════════════════════════════════════════
 // Main component
 // ══════════════════════════════════════════════════════════════════════════════
@@ -306,36 +294,41 @@ export default function ChatMessages({
   onSuggestedClick,
   onRetry,
 }: ChatMessagesProps) {
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll to bottom when messages or streaming updates
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const element = scrollRef.current
+    if (element) element.scrollTop = element.scrollHeight
   }, [messages, streaming])
 
   const isEmpty = messages.length === 0
 
   return (
-    <div className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
+    <div ref={scrollRef} className="flex flex-1 flex-col gap-6 overflow-y-auto p-6">
       {/* ── Welcome / empty state ── */}
       {isEmpty && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-4 text-muted-foreground">
-          <h2 className="text-3xl font-bold text-foreground">智能问答系统</h2>
-          <p className="text-lg">基于 RAG 的电力行业知识问答助手</p>
-
-          <div className="mt-4 flex w-full max-w-[420px] flex-col gap-2">
-            {suggestedPrompts.map((p, i) => (
-              <button
-                key={i}
-                type="button"
-                className="w-full rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-left text-sm text-primary transition-all hover:bg-primary/10 hover:border-primary/50"
-                onClick={() => onSuggestedClick(p)}
-              >
-                <ArrowUpRight className="mr-1 inline-block size-3.5 shrink-0" />
-                {p}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-1 items-center justify-center">
+          <StateBlock
+            className="w-full max-w-xl"
+            description="基于 RAG 的电力行业知识问答助手"
+            title="智能问答系统"
+            variant="empty"
+          >
+            <div className="flex w-full flex-col gap-2">
+              {suggestedPrompts.map((p, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="w-full rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-left text-sm text-primary transition-all hover:bg-primary/10 hover:border-primary/50"
+                  onClick={() => onSuggestedClick(p)}
+                >
+                  <ArrowUpRight className="mr-1 inline-block size-3.5 shrink-0" />
+                  {p}
+                </button>
+              ))}
+            </div>
+          </StateBlock>
         </div>
       )}
 
@@ -351,10 +344,19 @@ export default function ChatMessages({
       })}
 
       {/* ── Error ── */}
-      {error && <ErrorBanner message={error} onRetry={onRetry} />}
-
-      {/* ── Scroll anchor ── */}
-      <div ref={bottomRef} />
+      {error && (
+        <InlineNotice
+          action={
+            <Button variant="destructive" size="sm" onClick={onRetry}>
+              重试
+            </Button>
+          }
+          className="mx-4"
+          variant="error"
+        >
+          {error}
+        </InlineNotice>
+      )}
     </div>
   )
 }

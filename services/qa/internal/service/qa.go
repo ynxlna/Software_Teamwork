@@ -504,6 +504,7 @@ func (s *QAService) Ask(ctx context.Context, userID, conversationID string, inpu
 	assistantMessage.Content = result.Final.Content
 	assistantMessage.Status = "completed"
 	citations := citationsFromAgentMessages(assistantMessage.ID, run.ID, result.Messages)
+	citations = revalidateCitationSources(ctx, userID, s.sourceChecker, citations)
 	assistantMessage.Citations = citations
 	emit("answer.delta", map[string]any{"messageId": assistantMessage.ID, "text": assistantMessage.Content, "index": 0})
 	for _, citation := range citations {

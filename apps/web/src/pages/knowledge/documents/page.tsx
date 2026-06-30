@@ -686,7 +686,10 @@ export function KnowledgeDocumentsPage({
                                         URL.revokeObjectURL(url)
                                       })
                                       .catch(() => {
-                                        setNotification({ type: 'error', text: '下载失败，请检查网络连接' })
+                                        setNotification({
+                                          type: 'error',
+                                          text: '下载失败，请检查网络连接',
+                                        })
                                       })
                                   })
                                 }

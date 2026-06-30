@@ -195,12 +195,9 @@ export function ParserConfigsPage() {
 
   // ── Handlers ──
 
-  const updateField = useCallback(
-    <K extends keyof FormData>(field: K, value: FormData[K]) => {
-      setForm((prev) => ({ ...prev, [field]: value }))
-    },
-    [],
-  )
+  const updateField = useCallback(<K extends keyof FormData>(field: K, value: FormData[K]) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
 
   const openCreate = useCallback(() => {
     setForm(EMPTY_FORM)
@@ -335,13 +332,8 @@ export function ParserConfigsPage() {
       {/* Empty state */}
       {isEmpty && (
         <div className="rounded-lg border border-dashed border-border p-12 text-center">
-          <FileCode
-            aria-hidden="true"
-            className="mx-auto mb-3 size-10 text-muted-foreground/40"
-          />
-          <p className="text-sm text-muted-foreground">
-            暂无解析器配置，点击新建配置开始
-          </p>
+          <FileCode aria-hidden="true" className="mx-auto mb-3 size-10 text-muted-foreground/40" />
+          <p className="text-sm text-muted-foreground">暂无解析器配置，点击新建配置开始</p>
           <Button variant="outline" size="sm" className="mt-3" onClick={openCreate}>
             <Plus aria-hidden="true" className="mr-1 size-3.5" />
             新建配置
@@ -355,9 +347,7 @@ export function ParserConfigsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  名称
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">名称</th>
                 <th className="hidden px-4 py-2.5 text-left font-medium text-muted-foreground sm:table-cell">
                   后端
                 </th>
@@ -370,26 +360,17 @@ export function ParserConfigsPage() {
                 <th className="hidden px-4 py-2.5 text-left font-medium text-muted-foreground sm:table-cell">
                   分块重叠
                 </th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  状态
-                </th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-                  操作
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">状态</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {items.map((config) => {
-                const chunkSize =
-                  (config.defaultParameters?.chunk_size as number) ?? '-'
-                const chunkOverlap =
-                  (config.defaultParameters?.chunk_overlap as number) ?? '-'
+                const chunkSize = (config.defaultParameters?.chunk_size as number) ?? '-'
+                const chunkOverlap = (config.defaultParameters?.chunk_overlap as number) ?? '-'
 
                 return (
-                  <tr
-                    key={config.id}
-                    className="transition-colors duration-150 hover:bg-muted/30"
-                  >
+                  <tr key={config.id} className="transition-colors duration-150 hover:bg-muted/30">
                     <td className="max-w-36 truncate px-4 py-2.5 font-medium text-foreground">
                       {config.name}
                     </td>
@@ -568,9 +549,7 @@ export function ParserConfigsPage() {
                 placeholder="512"
                 min={1}
                 value={form.chunkSize}
-                onChange={(e) =>
-                  updateField('chunkSize', Math.max(1, Number(e.target.value) || 1))
-                }
+                onChange={(e) => updateField('chunkSize', Math.max(1, Number(e.target.value) || 1))}
               />
             </div>
 
@@ -619,10 +598,7 @@ export function ParserConfigsPage() {
             <Button variant="outline" onClick={() => setCreateOpen(false)} disabled={isMutating}>
               取消
             </Button>
-            <Button
-              onClick={handleCreate}
-              disabled={!form.name.trim() || isMutating}
-            >
+            <Button onClick={handleCreate} disabled={!form.name.trim() || isMutating}>
               {createMutation.isPending && (
                 <Loader2 aria-hidden="true" className="mr-1.5 size-3.5 animate-spin" />
               )}
@@ -637,9 +613,7 @@ export function ParserConfigsPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>编辑解析器配置</DialogTitle>
-            <DialogDescription>
-              修改 "{editingConfig?.name}" 的配置信息。
-            </DialogDescription>
+            <DialogDescription>修改 "{editingConfig?.name}" 的配置信息。</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -759,9 +733,7 @@ export function ParserConfigsPage() {
                 placeholder="512"
                 min={1}
                 value={form.chunkSize}
-                onChange={(e) =>
-                  updateField('chunkSize', Math.max(1, Number(e.target.value) || 1))
-                }
+                onChange={(e) => updateField('chunkSize', Math.max(1, Number(e.target.value) || 1))}
               />
             </div>
 

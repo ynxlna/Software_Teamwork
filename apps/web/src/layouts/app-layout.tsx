@@ -110,7 +110,9 @@ export function AppLayout({ children }: PropsWithChildren) {
       void fetch(`${apiClient.baseUrl}/sessions/current`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
-      }).catch(() => { /* best-effort */ })
+      }).catch(() => {
+        /* best-effort */
+      })
     }
   }
 

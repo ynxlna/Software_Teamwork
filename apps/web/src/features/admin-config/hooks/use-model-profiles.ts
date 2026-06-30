@@ -14,10 +14,7 @@ import {
   listModelProfiles,
   updateModelProfile,
 } from '@/api/admin'
-import type {
-  CreateModelProfileRequest,
-  UpdateModelProfileRequest,
-} from '@/lib/types'
+import type { CreateModelProfileRequest, UpdateModelProfileRequest } from '@/lib/types'
 
 // ── Query keys ──
 
@@ -70,10 +67,7 @@ export function useUpdateModelProfile() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({
-      id,
-      ...params
-    }: { id: string } & UpdateModelProfileRequest) =>
+    mutationFn: ({ id, ...params }: { id: string } & UpdateModelProfileRequest) =>
       updateModelProfile(id, params),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

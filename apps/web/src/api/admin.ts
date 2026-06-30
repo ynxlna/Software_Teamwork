@@ -35,7 +35,13 @@ import type {
   UpdateParserConfigRequest,
 } from '@/lib/types'
 
-import { buildQuery, gatewayFileRequest, gatewayPageRequest, gatewayRequest, requestVoid } from './client'
+import {
+  buildQuery,
+  gatewayFileRequest,
+  gatewayPageRequest,
+  gatewayRequest,
+  requestVoid,
+} from './client'
 
 export { createUserSession as createUser, getCurrentUser } from './auth'
 
@@ -323,9 +329,7 @@ export async function createModelProfile(params: CreateModelProfileRequest): Pro
 
 /** GET /admin/model-profiles/{profileId} */
 export async function getModelProfile(profileId: string): Promise<ModelProfile> {
-  return gatewayRequest<ModelProfile>(
-    `/admin/model-profiles/${encodeURIComponent(profileId)}`,
-  )
+  return gatewayRequest<ModelProfile>(`/admin/model-profiles/${encodeURIComponent(profileId)}`)
 }
 
 /** PATCH /admin/model-profiles/{profileId} */
@@ -333,18 +337,15 @@ export async function updateModelProfile(
   profileId: string,
   params: UpdateModelProfileRequest,
 ): Promise<ModelProfile> {
-  return gatewayRequest<ModelProfile>(
-    `/admin/model-profiles/${encodeURIComponent(profileId)}`,
-    { method: 'PATCH', body: params },
-  )
+  return gatewayRequest<ModelProfile>(`/admin/model-profiles/${encodeURIComponent(profileId)}`, {
+    method: 'PATCH',
+    body: params,
+  })
 }
 
 /** DELETE /admin/model-profiles/{profileId} */
 export async function deleteModelProfile(profileId: string): Promise<void> {
-  await requestVoid(
-    `/admin/model-profiles/${encodeURIComponent(profileId)}`,
-    { method: 'DELETE' },
-  )
+  await requestVoid(`/admin/model-profiles/${encodeURIComponent(profileId)}`, { method: 'DELETE' })
 }
 
 // =========================================================================
@@ -352,18 +353,14 @@ export async function deleteModelProfile(profileId: string): Promise<void> {
 // =========================================================================
 
 /** GET /admin/parser-configs?enabled= */
-export async function listParserConfigs(params?: {
-  enabled?: boolean
-}): Promise<ParserConfig[]> {
+export async function listParserConfigs(params?: { enabled?: boolean }): Promise<ParserConfig[]> {
   return gatewayRequest<ParserConfig[]>(
     `/admin/parser-configs${buildQuery({ enabled: params?.enabled })}`,
   )
 }
 
 /** POST /admin/parser-configs */
-export async function createParserConfig(
-  params: CreateParserConfigRequest,
-): Promise<ParserConfig> {
+export async function createParserConfig(params: CreateParserConfigRequest): Promise<ParserConfig> {
   return gatewayRequest<ParserConfig>('/admin/parser-configs', {
     method: 'POST',
     body: params,
@@ -372,9 +369,7 @@ export async function createParserConfig(
 
 /** GET /admin/parser-configs/{parserConfigId} */
 export async function getParserConfig(parserConfigId: string): Promise<ParserConfig> {
-  return gatewayRequest<ParserConfig>(
-    `/admin/parser-configs/${encodeURIComponent(parserConfigId)}`,
-  )
+  return gatewayRequest<ParserConfig>(`/admin/parser-configs/${encodeURIComponent(parserConfigId)}`)
 }
 
 /** PATCH /admin/parser-configs/{parserConfigId} */
@@ -390,10 +385,9 @@ export async function updateParserConfig(
 
 /** DELETE /admin/parser-configs/{parserConfigId} */
 export async function deleteParserConfig(parserConfigId: string): Promise<void> {
-  await requestVoid(
-    `/admin/parser-configs/${encodeURIComponent(parserConfigId)}`,
-    { method: 'DELETE' },
-  )
+  await requestVoid(`/admin/parser-configs/${encodeURIComponent(parserConfigId)}`, {
+    method: 'DELETE',
+  })
 }
 
 // =========================================================================

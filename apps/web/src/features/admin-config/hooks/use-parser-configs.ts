@@ -13,18 +13,14 @@ import {
   listParserConfigs,
   updateParserConfig,
 } from '@/api/admin'
-import type {
-  CreateParserConfigRequest,
-  UpdateParserConfigRequest,
-} from '@/lib/types'
+import type { CreateParserConfigRequest, UpdateParserConfigRequest } from '@/lib/types'
 
 // ── Query keys ──
 
 export const parserConfigKeys = {
   all: ['admin', 'parser-configs'] as const,
   lists: () => [...parserConfigKeys.all, 'list'] as const,
-  list: (enabled?: boolean) =>
-    [...parserConfigKeys.lists(), { enabled }] as const,
+  list: (enabled?: boolean) => [...parserConfigKeys.lists(), { enabled }] as const,
   details: () => [...parserConfigKeys.all, 'detail'] as const,
   detail: (id: string) => [...parserConfigKeys.details(), id] as const,
 }
@@ -55,8 +51,7 @@ export function useCreateParserConfig() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (params: CreateParserConfigRequest) =>
-      createParserConfig(params),
+    mutationFn: (params: CreateParserConfigRequest) => createParserConfig(params),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: parserConfigKeys.lists(),
@@ -70,10 +65,7 @@ export function useUpdateParserConfig() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({
-      id,
-      ...params
-    }: { id: string } & UpdateParserConfigRequest) =>
+    mutationFn: ({ id, ...params }: { id: string } & UpdateParserConfigRequest) =>
       updateParserConfig(id, params),
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({

@@ -91,13 +91,17 @@ const menuItems: AdminNavigationItem[] = [
         key: 'qa-settings',
         label: 'QA / LLM 配置',
         path: '/admin/qa-settings',
-        requirement: { any: ['admin:model-profile:write', 'admin:parser-config:write', 'system:admin'] },
+        requirement: {
+          any: ['admin:model-profile:write', 'admin:parser-config:write', 'system:admin'],
+        },
       },
       {
         key: 'qa-retrieval-test',
         label: 'QA 检索测试',
         path: '/admin/qa-retrieval-test',
-        requirement: { any: ['admin:model-profile:write', 'admin:parser-config:write', 'system:admin'] },
+        requirement: {
+          any: ['admin:model-profile:write', 'admin:parser-config:write', 'system:admin'],
+        },
       },
       {
         key: 'model-profiles',

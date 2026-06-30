@@ -360,8 +360,12 @@ const adminStatsRoute = createRoute({
   component: StatsOverviewPage,
 })
 
-const modelProfilesPerm: PermissionRequirement = { any: ['admin:model-profile:write', 'system:admin'] }
-const parserConfigsPerm: PermissionRequirement = { any: ['admin:parser-config:write', 'system:admin'] }
+const modelProfilesPerm: PermissionRequirement = {
+  any: ['admin:model-profile:write', 'system:admin'],
+}
+const parserConfigsPerm: PermissionRequirement = {
+  any: ['admin:parser-config:write', 'system:admin'],
+}
 
 const adminModelProfilesRoute = createRoute({
   getParentRoute: () => adminRoute,

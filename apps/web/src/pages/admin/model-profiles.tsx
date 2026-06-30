@@ -192,12 +192,9 @@ export function ModelProfilesPage() {
 
   // ── Handlers ──
 
-  const updateField = useCallback(
-    <K extends keyof FormData>(field: K, value: FormData[K]) => {
-      setForm((prev) => ({ ...prev, [field]: value }))
-    },
-    [],
-  )
+  const updateField = useCallback(<K extends keyof FormData>(field: K, value: FormData[K]) => {
+    setForm((prev) => ({ ...prev, [field]: value }))
+  }, [])
 
   const openCreate = useCallback(() => {
     setForm(EMPTY_FORM)
@@ -334,9 +331,7 @@ export function ModelProfilesPage() {
       {isEmpty && (
         <div className="rounded-lg border border-dashed border-border p-12 text-center">
           <Cpu aria-hidden="true" className="mx-auto mb-3 size-10 text-muted-foreground/40" />
-          <p className="text-sm text-muted-foreground">
-            暂无模型配置，点击新建模型开始
-          </p>
+          <p className="text-sm text-muted-foreground">暂无模型配置，点击新建模型开始</p>
           <Button variant="outline" size="sm" className="mt-3" onClick={openCreate}>
             <Plus aria-hidden="true" className="mr-1 size-3.5" />
             新建模型
@@ -350,35 +345,22 @@ export function ModelProfilesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/30">
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  名称
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  用途
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">名称</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">用途</th>
                 <th className="hidden px-4 py-2.5 text-left font-medium text-muted-foreground sm:table-cell">
                   服务商
                 </th>
                 <th className="hidden px-4 py-2.5 text-left font-medium text-muted-foreground md:table-cell">
                   模型名称
                 </th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  API Key
-                </th>
-                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">
-                  状态
-                </th>
-                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">
-                  操作
-                </th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">API Key</th>
+                <th className="px-4 py-2.5 text-left font-medium text-muted-foreground">状态</th>
+                <th className="px-4 py-2.5 text-right font-medium text-muted-foreground">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {items.map((profile) => (
-                <tr
-                  key={profile.id}
-                  className="transition-colors duration-150 hover:bg-muted/30"
-                >
+                <tr key={profile.id} className="transition-colors duration-150 hover:bg-muted/30">
                   <td className="max-w-36 truncate px-4 py-2.5 font-medium text-foreground">
                     {profile.name}
                   </td>
@@ -595,9 +577,7 @@ export function ModelProfilesPage() {
                   placeholder="3"
                   min={1}
                   value={form.topN || ''}
-                  onChange={(e) =>
-                    updateField('topN', Math.max(0, Number(e.target.value) || 0))
-                  }
+                  onChange={(e) => updateField('topN', Math.max(0, Number(e.target.value) || 0))}
                 />
               </div>
             )}
@@ -632,9 +612,7 @@ export function ModelProfilesPage() {
                 type="number"
                 placeholder="60000"
                 value={form.timeoutMs}
-                onChange={(e) =>
-                  updateField('timeoutMs', Math.max(1000, Number(e.target.value)))
-                }
+                onChange={(e) => updateField('timeoutMs', Math.max(1000, Number(e.target.value)))}
               />
             </div>
 
@@ -651,9 +629,7 @@ export function ModelProfilesPage() {
                 type="number"
                 placeholder="0 表示不限制"
                 value={form.maxTokens}
-                onChange={(e) =>
-                  updateField('maxTokens', Math.max(0, Number(e.target.value)))
-                }
+                onChange={(e) => updateField('maxTokens', Math.max(0, Number(e.target.value)))}
               />
             </div>
           </div>
@@ -680,9 +656,7 @@ export function ModelProfilesPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>编辑模型配置</DialogTitle>
-            <DialogDescription>
-              修改 "{editingProfile?.name}" 的配置信息。
-            </DialogDescription>
+            <DialogDescription>修改 "{editingProfile?.name}" 的配置信息。</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-3">
@@ -832,9 +806,7 @@ export function ModelProfilesPage() {
                   placeholder="3"
                   min={1}
                   value={form.topN || ''}
-                  onChange={(e) =>
-                    updateField('topN', Math.max(0, Number(e.target.value) || 0))
-                  }
+                  onChange={(e) => updateField('topN', Math.max(0, Number(e.target.value) || 0))}
                 />
               </div>
             )}
@@ -872,9 +844,7 @@ export function ModelProfilesPage() {
                 type="number"
                 placeholder="60000"
                 value={form.timeoutMs}
-                onChange={(e) =>
-                  updateField('timeoutMs', Math.max(1000, Number(e.target.value)))
-                }
+                onChange={(e) => updateField('timeoutMs', Math.max(1000, Number(e.target.value)))}
               />
             </div>
 
@@ -891,9 +861,7 @@ export function ModelProfilesPage() {
                 type="number"
                 placeholder="0 表示不限制"
                 value={form.maxTokens}
-                onChange={(e) =>
-                  updateField('maxTokens', Math.max(0, Number(e.target.value)))
-                }
+                onChange={(e) => updateField('maxTokens', Math.max(0, Number(e.target.value)))}
               />
             </div>
           </div>

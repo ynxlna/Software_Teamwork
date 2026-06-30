@@ -27,3 +27,8 @@ Managed by Trellis. Edits outside this block are preserved; edits inside may be 
 - 面向团队成员的协作流程见 `docs/collaboration/frontend-workflow.md`。
 - 面向 agent 的前端规范见 `.trellis/spec/frontend/index.md`。
 - 涉及前端开发、分支、PR、Lint 或 CI 时，优先加载项目级 `frontend-workflow` skill。
+
+## 本地私有说明
+
+- Agent 可在存在时读取 `.agents/local/AGENTS.local.md` 作为本机私有补充说明。
+- 该文件应保持 Git 忽略状态，用于记录机器特定的代理、账号或凭据相关要求。

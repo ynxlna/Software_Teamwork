@@ -38,7 +38,8 @@ func TestCompleteSendsFunctionToolsAndParsesToolCalls(t *testing.T) {
           "choices":[{
             "message":{"role":"assistant","tool_calls":[{"id":"call-1","type":"function","function":{"name":"add","arguments":"{\"a\":1}"}}]},
             "finish_reason":"tool_calls"
-          }]
+          }],
+          "usage":{"prompt_tokens":7,"completion_tokens":5,"total_tokens":12,"completion_tokens_details":{"reasoning_tokens":2}}
         }`))
 	}))
 	defer server.Close()
@@ -56,6 +57,9 @@ func TestCompleteSendsFunctionToolsAndParsesToolCalls(t *testing.T) {
 	}
 	if completion.FinishReason != "tool_calls" || completion.Message.ToolCalls[0].Function.Name != "add" {
 		t.Fatalf("unexpected completion: %+v", completion)
+	}
+	if completion.Usage.PromptTokens != 7 || completion.Usage.CompletionTokens != 3 || completion.Usage.ReasoningTokens != 2 || completion.Usage.TotalTokens != 12 {
+		t.Fatalf("unexpected usage: %+v", completion.Usage)
 	}
 }
 

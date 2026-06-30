@@ -15,6 +15,9 @@ import (
 type fakeQAService struct {
 	create       func(context.Context, string, string) (service.Conversation, error)
 	list         func(context.Context, string, service.ConversationListOptions) (service.Page[service.Conversation], error)
+	get          func(context.Context, string, string) (service.Conversation, error)
+	update       func(context.Context, string, string, string, string) (service.Conversation, error)
+	delete       func(context.Context, string, string) error
 	listMessages func(context.Context, string, string, service.MessageListOptions) (service.Page[service.Message], error)
 	ask          func(context.Context, string, string, service.AskInput, service.ProgressObserver) (service.AskResult, error)
 }
@@ -56,10 +59,16 @@ func (f fakeQAService) ListConversations(ctx context.Context, userID string, opt
 	}
 	return service.Page[service.Conversation]{Items: []service.Conversation{}, Page: 1, PageSize: 20}, nil
 }
-func (fakeQAService) GetConversation(context.Context, string, string) (service.Conversation, error) {
+func (f fakeQAService) GetConversation(ctx context.Context, userID, sessionID string) (service.Conversation, error) {
+	if f.get != nil {
+		return f.get(ctx, userID, sessionID)
+	}
 	return service.Conversation{}, nil
 }
-func (fakeQAService) UpdateConversation(context.Context, string, string, string, string) (service.Conversation, error) {
+func (f fakeQAService) UpdateConversation(ctx context.Context, userID, sessionID, title, status string) (service.Conversation, error) {
+	if f.update != nil {
+		return f.update(ctx, userID, sessionID, title, status)
+	}
 	return service.Conversation{}, nil
 }
 func (fakeResourceService) GetResponseRun(context.Context, string, string) (service.ResponseRun, error) {
@@ -116,7 +125,12 @@ func (fakeResourceService) GetTopQueries(context.Context, int, int) ([]service.T
 func (fakeResourceService) GetIntentDistribution(context.Context, int) ([]service.IntentDistribution, error) {
 	return []service.IntentDistribution{}, nil
 }
-func (fakeQAService) DeleteConversation(context.Context, string, string) error { return nil }
+func (f fakeQAService) DeleteConversation(ctx context.Context, userID, sessionID string) error {
+	if f.delete != nil {
+		return f.delete(ctx, userID, sessionID)
+	}
+	return nil
+}
 func (f fakeQAService) ListMessages(ctx context.Context, userID, sessionID string, options service.MessageListOptions) (service.Page[service.Message], error) {
 	if f.listMessages != nil {
 		return f.listMessages(ctx, userID, sessionID, options)
@@ -345,6 +359,47 @@ func TestListMessagesPropagatesCrossUserForbidden(t *testing.T) {
 	}
 	if !strings.Contains(recorder.Body.String(), `"code":"forbidden"`) {
 		t.Fatalf("unexpected error response: %s", recorder.Body.String())
+	}
+}
+
+func TestSessionOperationsReturnForbiddenForNonOwnerEvenWithAdminRole(t *testing.T) {
+	forbidden := service.NewError(service.CodeForbidden, "conversation access denied", nil)
+	qa := fakeQAService{
+		get: func(context.Context, string, string) (service.Conversation, error) {
+			return service.Conversation{}, forbidden
+		},
+		update: func(context.Context, string, string, string, string) (service.Conversation, error) {
+			return service.Conversation{}, forbidden
+		},
+		delete: func(context.Context, string, string) error {
+			return forbidden
+		},
+	}
+	tests := []struct {
+		name   string
+		method string
+		body   string
+	}{
+		{name: "detail", method: http.MethodGet},
+		{name: "update", method: http.MethodPatch, body: `{"title":"private"}`},
+		{name: "delete", method: http.MethodDelete},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			server := newTestServer(t, qa)
+			recorder := httptest.NewRecorder()
+			request := httptest.NewRequest(test.method, "/internal/v1/qa-sessions/other-session", strings.NewReader(test.body))
+			request.Header.Set("X-User-Id", "user-1")
+			request.Header.Set("X-User-Roles", "admin")
+			request.Header.Set("X-Service-Token", "test-service-token")
+			server.ServeHTTP(recorder, request)
+			if recorder.Code != http.StatusForbidden {
+				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+			if !strings.Contains(recorder.Body.String(), `"code":"forbidden"`) {
+				t.Fatalf("unexpected error response: %s", recorder.Body.String())
+			}
+		})
 	}
 }
 

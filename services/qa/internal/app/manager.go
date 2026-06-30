@@ -26,11 +26,15 @@ type ManagerConfig struct {
 }
 
 type runtimeState struct {
-	runner       *agent.Runner
-	prompt       string
-	llmModel     string
-	llmProfileID string
-	clients      []*mcpclient.Client
+	runner             *agent.Runner
+	prompt             string
+	llmModel           string
+	llmProfileID       string
+	qaConfigVersionID  string
+	llmConfigVersionID string
+	maxIterations      int
+	overallTimeout     time.Duration
+	clients            []*mcpclient.Client
 }
 
 type Manager struct {
@@ -64,6 +68,8 @@ func (m *Manager) Acquire() (service.RuntimeSnapshot, func(), error) {
 	return service.RuntimeSnapshot{
 		Runner: m.state.runner, SystemPrompt: m.state.prompt,
 		LLMModel: m.state.llmModel, LLMProfileID: m.state.llmProfileID,
+		QAConfigVersionID: m.state.qaConfigVersionID, LLMConfigVersionID: m.state.llmConfigVersionID,
+		MaxIterations: m.state.maxIterations, OverallTimeout: m.state.overallTimeout,
 	}, m.stateMu.RUnlock, nil
 }
 
@@ -154,11 +160,19 @@ func (m *Manager) buildState(ctx context.Context, runtimeConfig service.RuntimeC
 		return nil, err
 	}
 	toolTimeout := m.cfg.DefaultToolTimeout
+	if runtimeConfig.Agent.ToolTimeoutSeconds > 0 {
+		toolTimeout = time.Duration(runtimeConfig.Agent.ToolTimeoutSeconds) * time.Second
+	}
 	if toolTimeout <= 0 {
 		toolTimeout = 30 * time.Second
 	}
+	maxIterations := runtimeConfig.Agent.MaxIterations
+	if maxIterations <= 0 {
+		maxIterations = m.cfg.MaxIterations
+	}
+	overallTimeout := time.Duration(runtimeConfig.Agent.OverallTimeoutSeconds) * time.Second
 	runner, err := agent.NewRunner(model, tools, agent.Config{
-		MaxIterations: m.cfg.MaxIterations, ToolTimeout: toolTimeout,
+		MaxIterations: maxIterations, ToolTimeout: toolTimeout,
 		MaxToolResultBytes: m.cfg.MaxToolResultBytes,
 	})
 	if err != nil {
@@ -168,6 +182,8 @@ func (m *Manager) buildState(ctx context.Context, runtimeConfig service.RuntimeC
 	return &runtimeState{
 		runner: runner, prompt: runtimeConfig.SystemPrompt, clients: clients,
 		llmModel: runtimeConfig.LLM.Model, llmProfileID: runtimeConfig.LLM.ProfileID,
+		qaConfigVersionID: runtimeConfig.QAConfigVersionID, llmConfigVersionID: runtimeConfig.LLMConfigVersionID,
+		maxIterations: maxIterations, overallTimeout: overallTimeout,
 	}, nil
 }
 

@@ -193,9 +193,12 @@ type RuntimeMCPConfig struct {
 }
 
 type RuntimeConfiguration struct {
-	LLM          RuntimeLLMConfig
-	SystemPrompt string
-	MCPServers   []RuntimeMCPConfig
+	LLM                RuntimeLLMConfig
+	SystemPrompt       string
+	MCPServers         []RuntimeMCPConfig
+	QAConfigVersionID  string
+	LLMConfigVersionID string
+	Agent              AgentConfig
 }
 
 type BootstrapSettings struct {
@@ -216,8 +219,10 @@ type AuditLog struct {
 
 type SettingsRepository interface {
 	GetActiveQAConfig(context.Context) (RetrievalSettings, []string, error)
+	GetActiveQAConfigVersion(context.Context) (QAConfigVersion, error)
 	CreateQAConfigVersion(context.Context, string, RetrievalSettings, []string) error
 	GetActiveLLMConfig(context.Context) (StoredLLMConfig, error)
+	GetActiveLLMConfigVersion(context.Context) (LLMConfigVersion, error)
 	CreateLLMConfigVersion(context.Context, string, StoredLLMConfig) error
 	GetRuntimeSetting(context.Context, string) (string, error)
 	UpsertRuntimeSetting(context.Context, string, string) error

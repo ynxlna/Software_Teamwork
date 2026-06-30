@@ -42,6 +42,21 @@ type JobSvc interface {
 	ListEvents(ctx context.Context, rctx service.RequestContext, reportID string) ([]service.ReportEvent, error)
 }
 
+type AdminSvc interface {
+	GetReportSettings(context.Context, service.RequestContext) (service.ReportSettings, error)
+	UpdateReportSettings(context.Context, service.RequestContext, service.UpdateReportSettingsInput) (service.ReportSettings, error)
+	GetStatisticsOverview(context.Context, service.RequestContext, int) (service.ReportStatisticsOverview, error)
+	ListDailyStatistics(context.Context, service.RequestContext, int) ([]service.ReportDailyStatistic, error)
+	ListOperationLogs(context.Context, service.RequestContext, service.OperationLogListFilter) (service.OperationLogListResult, error)
+}
+
+type ReportFileSvc interface {
+	ListReportFiles(ctx context.Context, rctx service.RequestContext, filter service.ReportFileListFilter) (service.ReportFileListResult, error)
+	CreateReportFile(ctx context.Context, rctx service.RequestContext, input service.CreateReportFileInput) (service.ReportFile, error)
+	GetReportFile(ctx context.Context, rctx service.RequestContext, id string) (service.ReportFile, error)
+	ReadReportFileContent(ctx context.Context, rctx service.RequestContext, id string) (service.FileContent, error)
+}
+
 const defaultMaxUploadBytes = int64(32 << 20)
 
 type Config struct {
@@ -50,6 +65,8 @@ type Config struct {
 	DocumentService DocumentService
 	ReportService   ReportService
 	JobSvc          JobSvc
+	AdminService    AdminSvc
+	ReportFileSvc   ReportFileSvc
 	MaxUploadBytes  int64
 }
 
@@ -59,6 +76,8 @@ type Server struct {
 	documents      DocumentService
 	reportService  ReportService
 	jobSvc         JobSvc
+	adminService   AdminSvc
+	reportFileSvc  ReportFileSvc
 	maxUploadBytes int64
 	mux            *http.ServeMux
 }
@@ -76,6 +95,8 @@ func NewServer(cfg Config) *Server {
 		documents:      cfg.DocumentService,
 		reportService:  cfg.ReportService,
 		jobSvc:         cfg.JobSvc,
+		adminService:   cfg.AdminService,
+		reportFileSvc:  cfg.ReportFileSvc,
 		maxUploadBytes: cfg.MaxUploadBytes,
 		mux:            http.NewServeMux(),
 	}
@@ -106,16 +127,15 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /report-jobs/{jobId}/attempts", s.handleListAttempts)
 	s.mux.HandleFunc("POST /report-jobs/{jobId}/attempts", s.handleRetryJob)
 	s.mux.HandleFunc("GET /reports/{reportId}/events", s.handleListEvents)
-	// Remaining report-generation resources stay scaffolded until their tasks land.
-	s.mux.HandleFunc("GET /report-files", s.handleNotImplemented)
-	s.mux.HandleFunc("POST /report-files", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-files/{reportFileId}", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-files/{reportFileId}/content", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-statistics/overview", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-statistics/daily", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-operation-logs", s.handleNotImplemented)
-	s.mux.HandleFunc("GET /report-settings", s.handleNotImplemented)
-	s.mux.HandleFunc("PATCH /report-settings", s.handleNotImplemented)
+	s.mux.HandleFunc("GET /report-files", s.handleListReportFiles)
+	s.mux.HandleFunc("POST /report-files", s.handleCreateReportFile)
+	s.mux.HandleFunc("GET /report-files/{reportFileId}", s.handleGetReportFile)
+	s.mux.HandleFunc("GET /report-files/{reportFileId}/content", s.handleGetReportFileContent)
+	s.mux.HandleFunc("GET /report-statistics/overview", s.handleGetReportStatisticsOverview)
+	s.mux.HandleFunc("GET /report-statistics/daily", s.handleListReportDailyStatistics)
+	s.mux.HandleFunc("GET /report-operation-logs", s.handleListReportOperationLogs)
+	s.mux.HandleFunc("GET /report-settings", s.handleGetReportSettings)
+	s.mux.HandleFunc("PATCH /report-settings", s.handleUpdateReportSettings)
 	s.mux.HandleFunc("/", s.handleNotFound)
 }
 

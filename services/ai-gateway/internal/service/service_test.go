@@ -358,6 +358,150 @@ func TestCreateEmbeddingsRejectsInvalidProviderIndexes(t *testing.T) {
 	}
 }
 
+func TestCreateEmbeddingsValidatesProviderEmbeddingPayloadShape(t *testing.T) {
+	cases := []struct {
+		name           string
+		encodingFormat string
+		payload        json.RawMessage
+	}{
+		{
+			name:           "float rejects null",
+			encodingFormat: "float",
+			payload:        json.RawMessage(`null`),
+		},
+		{
+			name:           "float rejects object",
+			encodingFormat: "float",
+			payload:        json.RawMessage(`{"value":0.1}`),
+		},
+		{
+			name:           "float rejects number",
+			encodingFormat: "float",
+			payload:        json.RawMessage(`0.1`),
+		},
+		{
+			name:           "float rejects string",
+			encodingFormat: "float",
+			payload:        json.RawMessage(`"AQIDBA=="`),
+		},
+		{
+			name:           "base64 rejects plain string",
+			encodingFormat: "base64",
+			payload:        json.RawMessage(`"not base64"`),
+		},
+		{
+			name:           "base64 rejects array",
+			encodingFormat: "base64",
+			payload:        json.RawMessage(`[0.1,0.2]`),
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newMemoryRepository()
+			invoker := &fakeInvoker{
+				embeddingFn: func(context.Context, ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error) {
+					return EmbeddingResponse{
+						Object: "list",
+						Data: []EmbeddingVector{{
+							Object:    "embedding",
+							Index:     0,
+							Embedding: tc.payload,
+						}},
+						Model: "BAAI/bge-m3",
+					}, ProviderCallMetadata{StatusCode: 200}, nil
+				},
+			}
+			svc := New(repo, mustEncryptor(t), 60000, invoker)
+			dimensions := 1024
+			isDefault := true
+			if _, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+				Name:       "default-embedding",
+				Purpose:    PurposeEmbedding,
+				Provider:   ProviderSiliconFlow,
+				BaseURL:    "https://api.siliconflow.cn/v1",
+				Model:      "BAAI/bge-m3",
+				APIKey:     "sk-secret-value",
+				IsDefault:  &isDefault,
+				Dimensions: &dimensions,
+			}); err != nil {
+				t.Fatalf("CreateModelProfile() error = %v", err)
+			}
+
+			_, err := svc.CreateEmbeddings(context.Background(), RequestContext{RequestID: "req-payload", CallerService: "knowledge"}, EmbeddingInput{
+				Model:          "BAAI/bge-m3",
+				Input:          []string{"first chunk"},
+				EncodingFormat: tc.encodingFormat,
+			})
+			appErr, ok := Classify(err)
+			if !ok || appErr.Code != CodeDependency {
+				t.Fatalf("CreateEmbeddings() error = %#v, want dependency_error", err)
+			}
+			if invoker.embeddingReq.EncodingFormat != tc.encodingFormat {
+				t.Fatalf("provider encoding format = %q, want %q", invoker.embeddingReq.EncodingFormat, tc.encodingFormat)
+			}
+			if len(repo.invocations) != 1 {
+				t.Fatalf("invocations = %d, want 1", len(repo.invocations))
+			}
+			invocation := repo.invocations[0]
+			if invocation.Status != InvocationFailed || invocation.NormalizedErrorCode != string(CodeDependency) {
+				t.Fatalf("invocation = %#v, want failed dependency_error summary", invocation)
+			}
+		})
+	}
+}
+
+func TestCreateEmbeddingsAcceptsBase64ProviderEmbeddingPayload(t *testing.T) {
+	repo := newMemoryRepository()
+	invoker := &fakeInvoker{
+		embeddingFn: func(context.Context, ProviderEmbeddingRequest) (EmbeddingResponse, ProviderCallMetadata, error) {
+			return EmbeddingResponse{
+				Object: "list",
+				Data: []EmbeddingVector{{
+					Object:    "embedding",
+					Index:     0,
+					Embedding: json.RawMessage(`"AQIDBA=="`),
+				}},
+				Model: "BAAI/bge-m3",
+				Usage: &TokenUsage{PromptTokens: 8, TotalTokens: 8},
+			}, ProviderCallMetadata{StatusCode: 200}, nil
+		},
+	}
+	svc := New(repo, mustEncryptor(t), 60000, invoker)
+	dimensions := 1024
+	isDefault := true
+	if _, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+		Name:       "default-embedding",
+		Purpose:    PurposeEmbedding,
+		Provider:   ProviderSiliconFlow,
+		BaseURL:    "https://api.siliconflow.cn/v1",
+		Model:      "BAAI/bge-m3",
+		APIKey:     "sk-secret-value",
+		IsDefault:  &isDefault,
+		Dimensions: &dimensions,
+	}); err != nil {
+		t.Fatalf("CreateModelProfile() error = %v", err)
+	}
+
+	response, err := svc.CreateEmbeddings(context.Background(), RequestContext{RequestID: "req-base64", CallerService: "knowledge"}, EmbeddingInput{
+		Model:          "BAAI/bge-m3",
+		Input:          []string{"first chunk"},
+		EncodingFormat: "base64",
+	})
+	if err != nil {
+		t.Fatalf("CreateEmbeddings() error = %v", err)
+	}
+	if invoker.embeddingReq.EncodingFormat != "base64" {
+		t.Fatalf("provider encoding format = %q, want base64", invoker.embeddingReq.EncodingFormat)
+	}
+	if string(response.Data[0].Embedding) != `"AQIDBA=="` {
+		t.Fatalf("embedding payload = %s, want base64 string", response.Data[0].Embedding)
+	}
+	if len(repo.invocations) != 1 || repo.invocations[0].Status != InvocationSucceeded {
+		t.Fatalf("invocations = %#v, want successful invocation", repo.invocations)
+	}
+}
+
 func TestCreateEmbeddingsRejectsWrongPurposeProfile(t *testing.T) {
 	svc := New(newMemoryRepository(), mustEncryptor(t), 60000, &fakeInvoker{})
 	profile, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
@@ -490,6 +634,55 @@ func TestCreateRerankingRejectsModelOutsideExplicitProfile(t *testing.T) {
 	}
 	if len(repo.invocations) != 0 {
 		t.Fatalf("invocations = %d, want 0", len(repo.invocations))
+	}
+}
+
+func TestCreateRerankingLimitsProviderResultsToTopN(t *testing.T) {
+	repo := newMemoryRepository()
+	invoker := &fakeInvoker{
+		rerankingFn: func(context.Context, ProviderRerankingRequest) (RerankingResponse, ProviderCallMetadata, error) {
+			return RerankingResponse{
+				Object: "list",
+				Data: []RerankingResult{
+					{Index: 1, DocumentID: "chunk-2", Score: 0.93},
+					{Index: 0, DocumentID: "chunk-1", Score: 0.82},
+				},
+				Model: "BAAI/bge-reranker-v2-m3",
+			}, ProviderCallMetadata{StatusCode: 200}, nil
+		},
+	}
+	svc := New(repo, mustEncryptor(t), 60000, invoker)
+	topN := 1
+	isDefault := true
+	if _, err := svc.CreateModelProfile(context.Background(), RequestContext{}, CreateModelProfileInput{
+		Name:      "default-rerank",
+		Purpose:   PurposeRerank,
+		Provider:  ProviderSiliconFlow,
+		BaseURL:   "https://api.siliconflow.cn/v1",
+		Model:     "BAAI/bge-reranker-v2-m3",
+		APIKey:    "sk-secret-value",
+		IsDefault: &isDefault,
+		TopN:      &topN,
+	}); err != nil {
+		t.Fatalf("CreateModelProfile() error = %v", err)
+	}
+
+	response, err := svc.CreateReranking(context.Background(), RequestContext{RequestID: "req-rerank-topn", CallerService: "knowledge"}, RerankingInput{
+		Model: "BAAI/bge-reranker-v2-m3",
+		Query: "query",
+		Documents: []RerankingDocument{
+			{ID: "chunk-1", Text: "first document"},
+			{ID: "chunk-2", Text: "second document"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateReranking() error = %v", err)
+	}
+	if len(response.Data) != topN || response.Data[0].DocumentID != "chunk-2" {
+		t.Fatalf("response data = %#v, want only top result", response.Data)
+	}
+	if len(repo.invocations) != 1 || repo.invocations[0].Status != InvocationSucceeded {
+		t.Fatalf("invocations = %#v, want one successful invocation", repo.invocations)
 	}
 }
 

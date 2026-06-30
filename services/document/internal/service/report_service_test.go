@@ -13,6 +13,7 @@ type fakeReportRepository struct {
 	outlines       map[string]ReportOutline
 	sections       map[string]ReportSection
 	sectionVersion map[string][]ReportSectionVersion
+	operationLogs  []OperationLog
 }
 
 func newFakeReportRepository() *fakeReportRepository {
@@ -150,6 +151,11 @@ func (f *fakeReportRepository) ListReportSectionVersions(_ context.Context, sect
 	return f.sectionVersion[sectionID], nil
 }
 
+func (f *fakeReportRepository) CreateOperationLog(_ context.Context, log OperationLog) (OperationLog, error) {
+	f.operationLogs = append(f.operationLogs, log)
+	return log, nil
+}
+
 func newTestService() (*ReportService, *fakeReportRepository) {
 	repo := newFakeReportRepository()
 	svc := NewReportService(repo)
@@ -177,6 +183,42 @@ func TestCreateReportValidatesRequiredFields(t *testing.T) {
 	appErr, ok := Classify(err)
 	if !ok || appErr.Code != CodeValidation {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestReportMutationsRecordOperationLogs(t *testing.T) {
+	svc, repo := newTestService()
+	reqCtx := RequestContext{UserID: "owner-1", RequestID: "req-report-audit"}
+
+	report, err := svc.CreateReport(context.Background(), reqCtx, CreateReportInput{
+		Name:       "June report",
+		ReportType: "summer_peak_inspection",
+		TemplateID: "tpl-1",
+		Topic:      "summer peak",
+	})
+	if err != nil {
+		t.Fatalf("CreateReport() error = %v", err)
+	}
+	if len(repo.operationLogs) != 1 {
+		t.Fatalf("operation log count after create report = %d, want 1", len(repo.operationLogs))
+	}
+	if got := repo.operationLogs[0]; got.OperationType != OperationCreateReport || got.TargetID != report.ID {
+		t.Fatalf("unexpected create report operation log: %+v", got)
+	}
+
+	topic := "updated"
+	if _, err := svc.UpdateReport(context.Background(), reqCtx, report.ID, UpdateReportInput{Topic: &topic}); err != nil {
+		t.Fatalf("UpdateReport() error = %v", err)
+	}
+	if got := repo.operationLogs[len(repo.operationLogs)-1]; got.OperationType != OperationUpdateReport || got.TargetType != "report" {
+		t.Fatalf("unexpected update report operation log: %+v", got)
+	}
+
+	if err := svc.SoftDeleteReport(context.Background(), reqCtx, report.ID); err != nil {
+		t.Fatalf("SoftDeleteReport() error = %v", err)
+	}
+	if got := repo.operationLogs[len(repo.operationLogs)-1]; got.OperationType != OperationDeleteReport || got.TargetID != report.ID {
+		t.Fatalf("unexpected delete report operation log: %+v", got)
 	}
 }
 

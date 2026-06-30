@@ -1,6 +1,6 @@
 # Document 生成工作流
 
-日期：2026-06-29
+日期：2026-06-30
 
 本文说明 `document` 服务报告生成链路的目标工作流、当前已实现部分和未实现缺口。它用于帮助前端、后端和部署同学判断“现在能联调什么”，不是替代 README、OpenAPI 或 implementation。
 
@@ -13,7 +13,7 @@
 | asynq worker | 部分实现 | worker 会把 job/attempt 从 pending 推进到 running/succeeded/failed。 |
 | 真实大纲/正文生成 | 未实现 | worker 当前不调用 AI Gateway，也不写入 AI 生成的大纲或章节正文。 |
 | 报告文件 / DOCX 导出 | 未实现 / 待合入 | 当前 `develop` 还没有 report file content 闭环；PR #223 仍 open。 |
-| settings / statistics / operation logs | 未实现 / 待合入 | PR #221 仍 open，当前不要当作已实现能力。 |
+| settings / statistics / operation logs | 已实现 | 支持 settings 持久化、AI Gateway profile 校验、统计查询和脱敏操作日志读写。 |
 
 ## 核心资源
 
@@ -27,7 +27,7 @@
 | `ReportJobAttempt` | 每次执行或重试。 | 已实现。 |
 | `ReportEvent` | 进度、状态和审计事件。 | 已实现列表读取。 |
 | `ReportFile` | 生成文件业务资源。 | 当前未闭环。 |
-| `ReportSettings` | AI Gateway profile、默认模板和导出配置。 | 当前未闭环。 |
+| `ReportSettings` | AI Gateway profile、默认模板和导出配置。 | 已实现。 |
 
 ## Job 类型
 
@@ -75,8 +75,8 @@ jobType=outline_generation
 
 目标实现还需要：
 
-1. 读取报告、模板结构、材料摘要和报告配置。
-2. 调用 AI Gateway chat completion。
+1. 读取报告、模板结构、材料摘要和已保存的报告配置。
+2. 使用 `ReportSettings` 中的 profile 引用调用 AI Gateway chat completion。
 3. 校验模型输出为合法章节树。
 4. 写入新的 `ReportOutline` 和对应事件。
 
@@ -152,11 +152,11 @@ GET /api/v1/reports/{reportId}/events
 | 大纲生成 | job succeeded 后产生合法 `ReportOutline`；失败时错误摘要脱敏；用户编辑不被隐式覆盖。 |
 | 正文生成 | 按章节保存内容和版本；部分失败保留已生成章节；引用和材料摘要不泄露内部 object key。 |
 | DOCX 创建 | `POST /report-files` 生成元数据，content endpoint 能返回文件流；底层 bytes 通过 File Service 保存。 |
-| 配置/统计/日志 | settings 可持久化 AI Gateway profile 引用；statistics 和 operation logs 不读取 provider/API key 等敏感字段。 |
+| 配置/统计/日志 | settings 可持久化 AI Gateway profile 引用；statistics 和 operation logs 不读取 provider/API key 等敏感字段。当前已完成服务端基础闭环。 |
 
 ## 当前不可承诺事项
 
 - 不能承诺一键本地环境可以完整生成 DOCX。
 - 不能承诺 report job succeeded 后已有大纲、正文或文件内容。
 - 不能承诺 Document 已经调用 AI Gateway。
-- 不能承诺 report files、settings、statistics、operation logs 已在当前 `develop` 闭环。
+- 不能承诺 report files 已在当前 `develop` 闭环。

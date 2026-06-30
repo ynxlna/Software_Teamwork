@@ -16,16 +16,31 @@ INSERT INTO response_runs (
     conversation_id,
     user_message_id,
     assistant_message_id,
+    qa_config_version_id,
+    llm_config_version_id,
+    request_id,
     intent_type,
     route,
-    status
+    status,
+    max_iterations
 ) VALUES (
     $1::uuid,
     $2::uuid,
     $3::uuid,
-    NULLIF($4, ''),
+    COALESCE(NULLIF($4, '')::uuid, (SELECT id FROM qa_config_versions WHERE is_active = true ORDER BY version_no DESC LIMIT 1)),
+    COALESCE(NULLIF($5, '')::uuid, (SELECT id FROM llm_config_versions WHERE is_active = true ORDER BY version_no DESC LIMIT 1)),
+    NULLIF($6, ''),
+    NULLIF($7, ''),
     'agent',
-    'running'
+    'running',
+    GREATEST(
+        COALESCE(
+            NULLIF($8, 0),
+            (SELECT max_iterations FROM qa_config_versions WHERE is_active = true ORDER BY version_no DESC LIMIT 1),
+            5
+        ),
+        1
+    )
 )
 RETURNING
     id::text,
@@ -33,6 +48,8 @@ RETURNING
     user_message_id::text,
     assistant_message_id::text,
     status,
+    current_iteration,
+    max_iterations,
     started_at
 `
 
@@ -42,6 +59,8 @@ type InsertResponseRunRow struct {
 	UserMessageID      string    `json:"user_message_id"`
 	AssistantMessageID string    `json:"assistant_message_id"`
 	Status             string    `json:"status"`
+	CurrentIteration   int32     `json:"current_iteration"`
+	MaxIterations      int32     `json:"max_iterations"`
 	StartedAt          time.Time `json:"started_at"`
 }
 
@@ -49,13 +68,35 @@ type InsertResponseRunParams struct {
 	ConversationID     string `json:"conversation_id"`
 	UserMessageID      string `json:"user_message_id"`
 	AssistantMessageID string `json:"assistant_message_id"`
+	QaConfigVersionID  string `json:"qa_config_version_id"`
+	LlmConfigVersionID string `json:"llm_config_version_id"`
+	RequestID          string `json:"request_id"`
 	IntentType         string `json:"intent_type"`
+	MaxIterations      int32  `json:"max_iterations"`
 }
 
 func (q *Queries) InsertResponseRun(ctx context.Context, arg InsertResponseRunParams) (InsertResponseRunRow, error) {
-	row := q.db.QueryRow(ctx, insertResponseRun, arg.ConversationID, arg.UserMessageID, arg.AssistantMessageID, arg.IntentType)
+	row := q.db.QueryRow(ctx, insertResponseRun,
+		arg.ConversationID,
+		arg.UserMessageID,
+		arg.AssistantMessageID,
+		arg.QaConfigVersionID,
+		arg.LlmConfigVersionID,
+		arg.RequestID,
+		arg.IntentType,
+		arg.MaxIterations,
+	)
 	var item InsertResponseRunRow
-	err := row.Scan(&item.ID, &item.ConversationID, &item.UserMessageID, &item.AssistantMessageID, &item.Status, &item.StartedAt)
+	err := row.Scan(
+		&item.ID,
+		&item.ConversationID,
+		&item.UserMessageID,
+		&item.AssistantMessageID,
+		&item.Status,
+		&item.CurrentIteration,
+		&item.MaxIterations,
+		&item.StartedAt,
+	)
 	return item, err
 }
 
@@ -151,6 +192,85 @@ WHERE assistant_message_id = $2::uuid
 func (q *Queries) UpdateResponseRunByAssistantMessage(ctx context.Context, status string, assistantMessageID string) error {
 	_, err := q.db.Exec(ctx, updateResponseRunByAssistantMessage, status, assistantMessageID)
 	return err
+}
+
+const finalizeResponseRun = `-- name: FinalizeResponseRun :one
+UPDATE response_runs rr
+SET status = $1,
+    stop_reason = NULLIF($2, ''),
+    current_iteration = GREATEST(rr.current_iteration, $3),
+    prompt_tokens = COALESCE(NULLIF($4, 0), (
+        SELECT SUM(prompt_tokens)::integer FROM agent_model_invocations WHERE response_run_id = rr.id
+    ), rr.prompt_tokens),
+    completion_tokens = COALESCE(NULLIF($5, 0), (
+        SELECT SUM(completion_tokens)::integer FROM agent_model_invocations WHERE response_run_id = rr.id
+    ), rr.completion_tokens),
+    reasoning_tokens = COALESCE(NULLIF($6, 0), (
+        SELECT SUM(reasoning_tokens)::integer FROM agent_model_invocations WHERE response_run_id = rr.id
+    ), rr.reasoning_tokens),
+    completed_at = $7,
+    latency_ms = EXTRACT(EPOCH FROM ($7 - rr.started_at)) * 1000
+FROM conversations c
+WHERE rr.id::text = $8::text
+    AND c.id = rr.conversation_id
+    AND c.external_user_id = $9
+    AND c.deleted_at IS NULL
+    AND rr.status = 'running'
+RETURNING
+    rr.id::text,
+    rr.conversation_id::text,
+    rr.user_message_id::text,
+    rr.assistant_message_id::text,
+    rr.status,
+    COALESCE(rr.current_iteration, 0)::integer,
+    COALESCE(rr.max_iterations, 5)::integer,
+    rr.stop_reason,
+    COALESCE(rr.prompt_tokens, 0) + COALESCE(rr.completion_tokens, 0) + COALESCE(rr.reasoning_tokens, 0),
+    COALESCE(rr.latency_ms, 0)::bigint,
+    rr.started_at,
+    rr.completed_at
+`
+
+type FinalizeResponseRunParams struct {
+	Status            string    `json:"status"`
+	TerminationReason string    `json:"termination_reason"`
+	CurrentIteration  int32     `json:"current_iteration"`
+	PromptTokens      int32     `json:"prompt_tokens"`
+	CompletionTokens  int32     `json:"completion_tokens"`
+	ReasoningTokens   int32     `json:"reasoning_tokens"`
+	CompletedAt       time.Time `json:"completed_at"`
+	ID                string    `json:"id"`
+	ExternalUserID    string    `json:"external_user_id"`
+}
+
+func (q *Queries) FinalizeResponseRun(ctx context.Context, arg FinalizeResponseRunParams) (ResponseRunRow, error) {
+	row := q.db.QueryRow(ctx, finalizeResponseRun,
+		arg.Status,
+		arg.TerminationReason,
+		arg.CurrentIteration,
+		arg.PromptTokens,
+		arg.CompletionTokens,
+		arg.ReasoningTokens,
+		arg.CompletedAt,
+		arg.ID,
+		arg.ExternalUserID,
+	)
+	var item ResponseRunRow
+	err := row.Scan(
+		&item.ID,
+		&item.ConversationID,
+		&item.UserMessageID,
+		&item.AssistantMessageID,
+		&item.Status,
+		&item.CurrentIteration,
+		&item.MaxIterations,
+		&item.StopReason,
+		&item.TotalTokens,
+		&item.LatencyMs,
+		&item.StartedAt,
+		&item.CompletedAt,
+	)
+	return item, err
 }
 
 const updateResponseRunIteration = `-- name: UpdateResponseRunIteration :exec

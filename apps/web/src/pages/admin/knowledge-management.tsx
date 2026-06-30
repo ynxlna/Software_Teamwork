@@ -1,8 +1,10 @@
+import { Link } from '@tanstack/react-router'
 import {
   BookOpen,
   ChevronLeft,
   ChevronRight,
   Edit,
+  FileText,
   Loader2,
   Plus,
   Search,
@@ -418,6 +420,15 @@ export function KnowledgeManagement() {
                         </td>
                         <td className="px-4 py-2.5">
                           <div className="flex items-center justify-end gap-1">
+                            <Link
+                              to="/admin/knowledge/documents"
+                              search={{ knowledgeBaseId: kb.id }}
+                              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                              title="文档管理"
+                              aria-label={`管理 ${kb.name} 的文档`}
+                            >
+                              <FileText aria-hidden="true" className="size-3.5" />
+                            </Link>
                             <Button
                               variant="ghost"
                               size="icon-sm"

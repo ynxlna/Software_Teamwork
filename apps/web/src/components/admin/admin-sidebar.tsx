@@ -33,19 +33,7 @@ const menuItems: AdminNavigationItem[] = [
     key: 'system',
     label: '系统管理',
     requirement: { any: ['system:admin'] },
-    children: [
-      { key: 'users', label: '用户管理', path: '/admin/users' },
-      { key: 'roles', label: '角色管理', path: '/admin/roles' },
-      { key: 'styles', label: '样式管理', path: '/admin/styles' },
-      { key: 'report-categories', label: '报告类别', path: '/admin/report-categories' },
-      { key: 'files', label: '文件管理', path: '/admin/files' },
-    ],
-  },
-  {
-    key: 'stats',
-    label: 'QA 统计',
-    path: '/admin/stats',
-    requirement: { any: ['system:admin'] },
+    children: [{ key: 'styles', label: '样式管理', path: '/admin/styles' }],
   },
   {
     key: 'reports',
@@ -62,30 +50,11 @@ const menuItems: AdminNavigationItem[] = [
     ],
   },
   {
-    key: 'templates',
-    label: '模板管理',
-    path: '/admin/templates',
-    requirement: { any: ['report:write', 'reports:write'] },
-  },
-  {
-    key: 'materials',
-    label: '材料管理',
-    path: '/admin/materials',
-    requirement: { any: ['report:write', 'reports:write'] },
-  },
-  {
-    key: 'prompts',
-    label: '提示词管理',
-    path: '/admin/prompts',
-    requirement: {
-      any: ['admin:model-profile:write', 'admin:parser-config:write', 'system:admin'],
-    },
-  },
-  {
     key: 'rag',
     label: 'RAG 知识库',
     requirement: {
       any: [
+        'system:admin',
         'knowledge:read',
         'knowledge:write',
         'document:upload',
@@ -101,16 +70,22 @@ const menuItems: AdminNavigationItem[] = [
         requirement: { any: ['knowledge:write'] },
       },
       {
-        key: 'knowledge-config',
-        label: '知识配置',
-        path: '/admin/knowledge-config',
+        key: 'knowledge-documents',
+        label: '文档管理',
+        path: '/admin/knowledge/documents',
         requirement: { any: ['knowledge:read', 'knowledge:write', 'document:upload'] },
       },
       {
-        key: 'knowledge-experience',
-        label: '知识体验',
-        path: '/admin/knowledge-experience',
-        requirement: { any: ['knowledge:read', 'knowledge:write', 'document:upload'] },
+        key: 'knowledge-search',
+        label: '知识检索',
+        path: '/admin/knowledge/search',
+        requirement: { any: ['knowledge:read'] },
+      },
+      {
+        key: 'knowledge-config',
+        label: '知识配置',
+        path: '/admin/knowledge-config',
+        requirement: { any: ['knowledge:read'] },
       },
       {
         key: 'parser-configs',
@@ -134,7 +109,25 @@ const menuItems: AdminNavigationItem[] = [
           any: ['admin:model-profile:write', 'admin:parser-config:write', 'system:admin'],
         },
       },
+      {
+        key: 'model-profiles',
+        label: '模型管理',
+        path: '/admin/model-profiles',
+        requirement: { any: ['admin:model-profile:write', 'system:admin'] },
+      },
+      {
+        key: 'parser-configs',
+        label: '解析器配置',
+        path: '/admin/parser-configs',
+        requirement: { any: ['admin:parser-config:write', 'system:admin'] },
+      },
     ],
+  },
+  {
+    key: 'stats',
+    label: 'QA 统计',
+    path: '/admin/stats',
+    requirement: { any: ['system:admin'] },
   },
   {
     key: 'settings',

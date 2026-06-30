@@ -49,6 +49,14 @@ type FunctionTool struct {
 type Completion struct {
 	Message      Message
 	FinishReason string
+	Usage        TokenUsage
+}
+
+type TokenUsage struct {
+	PromptTokens     int
+	CompletionTokens int
+	ReasoningTokens  int
+	TotalTokens      int
 }
 
 // ToolResult is a normalized MCP result suitable for a role=tool message.

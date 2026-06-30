@@ -58,7 +58,7 @@
 | 出入点 | 文档要求 | 当前实现 | 风险 | 建议处理 |
 | --- | --- | --- | --- | --- |
 | README 状态记录 | README 曾称 `services/auth/` 代码尚未落地 | 实际已有 Go module、migrations、repository、HTTP routes；本次已回写 README | 后续若重复写实现状态，容易再次漂移 | README 只链接 implementation，当前状态在本文维护。 |
-| 技术选型 pgx 版本 | 技术基线早期以 `pgx/v4` 为唯一已固定版本 | Auth 使用 `pgx/v4`，其他服务多用 `pgx/v5` | 后续统一升级范围不清 | 技术基线改为记录混用现状并提出统一决策。 |
+| 技术选型 pgx 版本 | 技术基线已统一目标为 `pgx/v5@v5.7.6` | Auth 仍使用 `pgx/v4`，其他 PostgreSQL 服务多已使用 `pgx/v5` | Auth 与目标基线不一致，后续迁移时可能触及 repository、tests 和 go.mod | 将 Auth 迁移到 `pgx/v5`；迁移完成前不得把 Auth 的 v4 用法复制到新服务。 |
 | 无 DB 时 runtime | README 允许无 `AUTH_DATABASE_URL` 启动但 ready 503 | 当前 handlers 无 auth service 时业务 routes 会依赖缺失服务 | 本地误以为可用 | README/implementation 说明无 DB 仅用于进程启动检查。 |
 
 ## 6. MVP / mock / memory backend / 占位
@@ -93,7 +93,7 @@
 | --- | --- | --- | --- | --- |
 | 补 Auth DB migration smoke | 新任务 | P0 | Auth 是 gateway 鉴权上游 | 验证 migrations、seed roles、create session。 |
 | 补管理员账号初始化说明 | 新任务 | P1 | 管理端需要管理员身份 | 形成本地和演示环境 bootstrap。 |
-| 明确 pgx 统一策略 | 回写文档 | P1 | 当前服务混用 pgx/v4/v5 | 更新技术基线或制定升级任务。 |
+| 迁移 Auth 到 pgx/v5 | 实现任务 | P1 | 技术基线已统一为 `pgx/v5@v5.7.6` | 更新 `services/auth/go.mod`、repository/import、测试和迁移 smoke。 |
 
 ## 10. 最近检查记录
 

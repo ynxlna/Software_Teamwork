@@ -34,8 +34,12 @@ func (r *Postgres) ListStreamEvents(ctx context.Context, userID, sessionID, runI
 		items = append(items, item)
 	}
 	if len(items) == 0 {
-		if _, err := r.GetResponseRun(ctx, userID, runID); err != nil {
+		run, err := r.GetResponseRun(ctx, userID, runID)
+		if err != nil {
 			return nil, err
+		}
+		if run.SessionID != sessionID {
+			return nil, service.NewError(service.CodeNotFound, "response run not found", nil)
 		}
 	}
 	return items, nil
@@ -49,7 +53,17 @@ func (r *Postgres) ListMessageCitations(ctx context.Context, userID, messageID s
 		return nil, fmt.Errorf("list message citations: %w", err)
 	}
 	defer rows.Close()
-	return scanCitations(rows)
+	items, err := scanCitations(rows)
+	if err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if len(items) == 0 {
+		if err := r.authorizeMessageForUser(ctx, userID, messageID); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
 }
 func (r *Postgres) GetCitation(ctx context.Context, userID, id string) (service.Citation, error) {
 	return scanCitation(r.pool.QueryRow(ctx, citationSelect+` WHERE ci.id::text=$1 AND c.external_user_id=$2 AND c.deleted_at IS NULL`, id, userID))
@@ -133,7 +147,36 @@ func (r *Postgres) ListToolCalls(ctx context.Context, userID, runID string) ([]s
 		_ = json.Unmarshal(result, &item.ResultSummary)
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if len(items) == 0 {
+		if _, err := r.GetResponseRun(ctx, userID, runID); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
+}
+
+func (r *Postgres) authorizeMessageForUser(ctx context.Context, userID, messageID string) error {
+	var authorized bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM messages m
+			JOIN conversations c ON c.id = m.conversation_id
+			WHERE m.id::text = $1
+				AND c.external_user_id = $2
+				AND c.deleted_at IS NULL
+		)`, messageID, userID).Scan(&authorized)
+	if err != nil {
+		return fmt.Errorf("authorize message access: %w", err)
+	}
+	if !authorized {
+		return service.NewError(service.CodeNotFound, "message not found", nil)
+	}
+	return nil
 }
 
 func (r *Postgres) GetActiveQAConfigVersion(ctx context.Context) (service.QAConfigVersion, error) {

@@ -1,0 +1,15 @@
+{"file":".trellis/spec/backend/index.md","reason":"Backend pre-development checklist and applicable guideline routing."}
+{"file":".trellis/spec/backend/directory-structure.md","reason":"Document service package boundaries and file placement."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"PostgreSQL migrations, repository, transactions, and audit-safe persistence rules."}
+{"file":".trellis/spec/backend/api-contracts.md","reason":"Gateway/Document envelope, route ownership, and downstream context contract."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"HTTP error classification and response envelope mapping."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Sensitive data restrictions for logs and operation-log summaries."}
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Required service-local verification commands and quality gates."}
+{"file":".trellis/spec/guides/index.md","reason":"Cross-layer and code-reuse thinking guide entry point."}
+{"file":"docs/architecture/service-boundaries.md","reason":"Document owns report settings/statistics/logs; gateway only routes and injects context."}
+{"file":"docs/architecture/technology-decisions.md","reason":"Go/PostgreSQL/asynq/AI Gateway baseline and current Document service state."}
+{"file":"docs/services/gateway/api/openapi.yaml","reason":"Public contract for report settings, statistics, and operation-log DTOs."}
+{"file":"docs/services/document/docs/requirements.md","reason":"Original business requirements for statistics, settings context, and audit logs."}
+{"file":"docs/services/document/docs/data-models.md","reason":"Logical models for ReportSettings-adjacent defaults, statistics, and OperationLog."}
+{"file":"docs/services/document/docs/implementation.md","reason":"Current Document implementation status and missing C-08 capability."}
+{"file":"docs/services/document/docs/generation-workflow.md","reason":"Workflow constraints around jobs, settings, statistics, and operation logs."}

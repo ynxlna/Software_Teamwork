@@ -162,7 +162,7 @@ func (r *Postgres) ListMessages(ctx context.Context, userID, conversationID stri
 	return service.Page[service.Message]{Items: items, Page: options.Page, PageSize: options.PageSize, Total: int(total)}, nil
 }
 
-func (r *Postgres) AppendMessages(ctx context.Context, userID, conversationID string, messages ...service.Message) (service.ResponseRun, error) {
+func (r *Postgres) AppendMessages(ctx context.Context, userID, conversationID string, start service.ResponseRunStart, messages ...service.Message) (service.ResponseRun, error) {
 	if len(messages) == 0 {
 		return service.ResponseRun{}, nil
 	}
@@ -210,16 +210,36 @@ func (r *Postgres) AppendMessages(ctx context.Context, userID, conversationID st
 	}
 	var run service.ResponseRun
 	if userMessageID != "" && assistantMessageID != "" {
+		requestID := start.RequestID
+		if requestID == "" {
+			requestID = service.RequestIDFromContext(ctx)
+		}
 		inserted, err := q.InsertResponseRun(ctx, sqlc.InsertResponseRunParams{
 			ConversationID: conversationID, UserMessageID: userMessageID,
-			AssistantMessageID: assistantMessageID, IntentType: intent,
+			AssistantMessageID: assistantMessageID, QaConfigVersionID: start.QAConfigVersionID,
+			LlmConfigVersionID: start.LLMConfigVersionID, RequestID: requestID,
+			IntentType: intent, MaxIterations: int32(start.MaxIterations),
 		})
 		if err != nil {
 			return service.ResponseRun{}, fmt.Errorf("insert response run: %w", err)
 		}
 		run = service.ResponseRun{
 			ID: inserted.ID, SessionID: inserted.ConversationID, UserMessageID: inserted.UserMessageID,
-			AssistantMessageID: inserted.AssistantMessageID, Status: inserted.Status, CreatedAt: inserted.StartedAt, MaxIterations: 5,
+			AssistantMessageID: inserted.AssistantMessageID, Status: inserted.Status, CreatedAt: inserted.StartedAt,
+			CurrentIteration: int(inserted.CurrentIteration), MaxIterations: int(inserted.MaxIterations),
+		}
+		payload, err := json.Marshal(map[string]any{
+			"responseRunId": run.ID, "userMessageId": userMessageID,
+			"assistantMessageId": assistantMessageID, "status": "running",
+		})
+		if err != nil {
+			return service.ResponseRun{}, fmt.Errorf("encode initial stream event: %w", err)
+		}
+		if err := q.InsertStreamEvent(ctx, sqlc.InsertStreamEventParams{
+			ResponseRunID: run.ID, EventSeq: 1, EventType: "message.created",
+			Payload: payload, CreatedAt: inserted.StartedAt,
+		}); err != nil {
+			return service.ResponseRun{}, fmt.Errorf("insert initial stream event: %w", err)
 		}
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -256,6 +276,61 @@ func (r *Postgres) UpdateMessage(ctx context.Context, userID string, message ser
 	return nil
 }
 
+func (r *Postgres) FinalizeResponseRun(ctx context.Context, userID string, final service.ResponseRunFinalization) (service.ResponseRun, error) {
+	if final.CompletedAt.IsZero() {
+		final.CompletedAt = time.Now().UTC()
+	}
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return service.ResponseRun{}, fmt.Errorf("begin finalize response run: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	q := r.queries.WithTx(tx)
+	row, err := q.FinalizeResponseRun(ctx, sqlc.FinalizeResponseRunParams{
+		Status: final.Status, TerminationReason: final.TerminationReason,
+		CurrentIteration: int32(final.CurrentIteration),
+		PromptTokens:     int32(final.PromptTokens), CompletionTokens: int32(final.CompletionTokens),
+		ReasoningTokens: int32(final.ReasoningTokens), CompletedAt: final.CompletedAt,
+		ID: final.RunID, ExternalUserID: userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		existing, loadErr := q.GetResponseRunForUser(ctx, final.RunID, userID)
+		if errors.Is(loadErr, pgx.ErrNoRows) {
+			return service.ResponseRun{}, service.NewError(service.CodeNotFound, "response run not found", err)
+		}
+		if loadErr != nil {
+			return service.ResponseRun{}, fmt.Errorf("load response run finalization state: %w", loadErr)
+		}
+		return responseRunFromRow(existing), service.NewError(service.CodeConflict, "response run already finalized", err)
+	}
+	if err != nil {
+		return service.ResponseRun{}, fmt.Errorf("finalize response run: %w", err)
+	}
+	rowsAffected, err := q.UpdateMessageStatus(ctx, sqlc.UpdateMessageStatusParams{
+		Status: final.AssistantMessage.Status, Intent: final.AssistantMessage.Intent,
+		ID: final.AssistantMessage.ID, ExternalUserID: userID,
+	})
+	if err != nil {
+		return service.ResponseRun{}, fmt.Errorf("update assistant message: %w", err)
+	}
+	if rowsAffected == 0 {
+		return service.ResponseRun{}, service.NewError(service.CodeNotFound, "message not found", nil)
+	}
+	if err := q.UpdateMessageContentBlock(ctx, final.AssistantMessage.Content, blockStatus(final.AssistantMessage.Status), final.AssistantMessage.ID); err != nil {
+		return service.ResponseRun{}, fmt.Errorf("update assistant content: %w", err)
+	}
+	if err := replaceReasoningSteps(ctx, q, final.RunID, final.ReasoningSteps); err != nil {
+		return service.ResponseRun{}, err
+	}
+	if err := replaceStreamEvents(ctx, q, final.RunID, final.StreamEvents); err != nil {
+		return service.ResponseRun{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return service.ResponseRun{}, fmt.Errorf("commit finalize response run: %w", err)
+	}
+	return responseRunFromRow(row), nil
+}
+
 func (r *Postgres) SaveReasoningSteps(ctx context.Context, userID, assistantMessageID string, steps []service.ReasoningStep) error {
 	if len(steps) == 0 {
 		return nil
@@ -273,16 +348,8 @@ func (r *Postgres) SaveReasoningSteps(ctx context.Context, userID, assistantMess
 	if err != nil {
 		return fmt.Errorf("find response run: %w", err)
 	}
-	if err := q.DeleteProcessStepsByRun(ctx, runID); err != nil {
-		return fmt.Errorf("replace reasoning steps: %w", err)
-	}
-	for index, step := range steps {
-		if err := q.InsertProcessStep(ctx, sqlc.InsertProcessStepParams{
-			ID: step.ID, ResponseRunID: runID, StepOrder: int32(index + 1),
-			StepType: step.Type, Label: step.Title, Detail: step.Summary, Status: step.Status, CreatedAt: step.CreatedAt,
-		}); err != nil {
-			return fmt.Errorf("insert reasoning step: %w", err)
-		}
+	if err := replaceReasoningSteps(ctx, q, runID, steps); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit reasoning steps: %w", err)
@@ -305,6 +372,34 @@ func (r *Postgres) SaveStreamEvents(ctx context.Context, userID, runID string, e
 	} else if err != nil {
 		return fmt.Errorf("authorize stream events: %w", err)
 	}
+	if err := replaceStreamEvents(ctx, q, runID, events); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit stream events: %w", err)
+	}
+	return nil
+}
+
+func replaceReasoningSteps(ctx context.Context, q *sqlc.Queries, runID string, steps []service.ReasoningStep) error {
+	if err := q.DeleteProcessStepsByRun(ctx, runID); err != nil {
+		return fmt.Errorf("replace reasoning steps: %w", err)
+	}
+	for index, step := range steps {
+		if err := q.InsertProcessStep(ctx, sqlc.InsertProcessStepParams{
+			ID: step.ID, ResponseRunID: runID, StepOrder: int32(index + 1),
+			StepType: step.Type, Label: step.Title, Detail: step.Summary, Status: step.Status, CreatedAt: step.CreatedAt,
+		}); err != nil {
+			return fmt.Errorf("insert reasoning step: %w", err)
+		}
+	}
+	return nil
+}
+
+func replaceStreamEvents(ctx context.Context, q *sqlc.Queries, runID string, events []service.StreamEvent) error {
+	if len(events) == 0 {
+		return nil
+	}
 	if err := q.DeleteStreamEventsByRun(ctx, runID); err != nil {
 		return fmt.Errorf("replace stream events: %w", err)
 	}
@@ -317,7 +412,8 @@ func (r *Postgres) SaveStreamEvents(ctx context.Context, userID, runID string, e
 			return fmt.Errorf("encode stream event: %w", err)
 		}
 		if err := q.InsertStreamEvent(ctx, sqlc.InsertStreamEventParams{
-			ResponseRunID: runID, EventSeq: int32(event.EventSeq), EventType: event.EventType, Payload: payload, CreatedAt: event.CreatedAt,
+			ResponseRunID: runID, EventSeq: int32(event.EventSeq), EventType: event.EventType,
+			Payload: payload, CreatedAt: event.CreatedAt,
 		}); err != nil {
 			return fmt.Errorf("insert stream event: %w", err)
 		}
@@ -347,9 +443,6 @@ func (r *Postgres) SaveStreamEvents(ctx context.Context, userID, runID string, e
 				return fmt.Errorf("save tool call summary: %w", err)
 			}
 		}
-	}
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit stream events: %w", err)
 	}
 	return nil
 }
@@ -411,6 +504,11 @@ func (r *Postgres) CancelResponseRun(ctx context.Context, userID, runID string) 
 	q := r.queries.WithTx(tx)
 	assistantID, err := q.CancelResponseRun(ctx, runID, userID)
 	if errors.Is(err, pgx.ErrNoRows) {
+		if _, accessErr := q.GetResponseRunForUser(ctx, runID, userID); errors.Is(accessErr, pgx.ErrNoRows) {
+			return service.ResponseRun{}, service.NewError(service.CodeNotFound, "response run not found", accessErr)
+		} else if accessErr != nil {
+			return service.ResponseRun{}, fmt.Errorf("authorize response run cancellation: %w", accessErr)
+		}
 		return service.ResponseRun{}, service.NewError(service.CodeConflict, "response run cannot be cancelled", err)
 	}
 	if err != nil {

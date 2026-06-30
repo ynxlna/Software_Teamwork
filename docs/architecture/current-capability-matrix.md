@@ -21,7 +21,8 @@
 | PR #224 `docs(services): add implementation status docs` | merged | 已补实现状态、缺口、能力矩阵、联调 runbook、测试策略和 provider/generation 细则。 |
 | PR #223 `feat(document): add report file docx export` | open | DOCX 导出仍不能写成当前能力。 |
 | PR #221 `feat(document): implement C-08 report settings, statistics and operation logs` | open | settings、statistics、operation logs 仍按未合入能力处理。 |
-| PR #217 `feat(qa): implement B-03 QA Agent Run MVP with termination handling` | open | QA 基础 `Ask()` / Runner / SSE / model invocation 链路已在 `develop`；B-03 验收收口仍按待合入能力处理。 |
+| PR #217 `feat(qa): implement B-03 QA Agent Run MVP with termination handling` | open | 早期 B-03 PR 未合入，不作为当前 `develop` 能力依据；本分支改由 Issue #89 收口。 |
+| Issue #89 `B-03 QA ResponseRun 与非流式 Agent Loop MVP` | branch implemented | QA ResponseRun、非流式 Agent Loop MVP、终止原因、模型调用摘要和基础测试已在本分支补齐；合入后计入 `develop` 能力。 |
 | PR #222、#220、#219、#212、#210、#208、#204、#202、#200、#199 | merged | 分别补齐前端导航、Document job 状态机、QA 配置对齐、前端 shell/RBAC、QA 会话消息、AI Gateway chat/profile、Document 大纲章节、Knowledge upload job、Gateway active proxy 基础。 |
 
 ## 能力矩阵
@@ -32,7 +33,7 @@
 | Gateway active route proxy 和 session cache | 部分实现 | `services/gateway/` active proxy matrix、Redis session cache、Auth routes。 | Gateway OpenAPI 是前端权威契约。 | 部分 Knowledge active routes 仍是阶段性 501；跨服务 smoke 未自动化。 | #153、#199、#125 |
 | File 基础文件对象 | 部分实现 | `services/file/` 内部 `/internal/v1/files/**`、memory/local object store、file metadata migration。 | File service 内部 API；业务服务不得暴露 object key。 | runtime metadata repository 和 MinIO adapter 未完全闭环；真实对象存储集成缺失。 | #154 |
 | Knowledge 知识库 CRUD 和上传 handoff | 部分实现 | Knowledge PostgreSQL repository、知识库 CRUD、文档上传、File handoff、asynq ingestion 入队。 | Gateway Knowledge active paths；Knowledge service OpenAPI。 | ingestion worker、解析、embedding、Qdrant、retrieval、rerank 闭环未落地。 | #152、#200 |
-| QA 会话、消息、配置、引用和统计资源 | 部分实现 | `services/qa/` 会话/消息 API、SSE 事件、config versions、citations、retrieval test/metrics 资源、AI Gateway chat client、`Ask()` / Runner / model invocation 基础链路。 | Gateway QA active paths；QA service OpenAPI。 | B-03 验收收口（`termination_reason`、maxIterations 生效、migration、单测）、真实 Knowledge retrieval、权限一致性和跨服务 smoke 待收口。 | #157、#217、#219、#210 |
+| QA 会话、消息、配置、引用和统计资源 | 部分实现 | `services/qa/` 会话/消息 API、SSE 事件、config versions、citations、retrieval test/metrics 资源、AI Gateway chat client、B-03 非流式 ResponseRun / Agent Loop MVP（本分支）。 | Gateway QA active paths；QA service OpenAPI。 | 真实 Knowledge retrieval、RAG 引用闭环、权限一致性和跨服务 smoke 待收口。 | #157、#89、#217、#219、#210 |
 | QA MCP/local tool 基础 | 部分实现 | `services/qa/internal/platform/mcpclient`、local tools、安全摘要。 | QA README 和数据模型。 | MCP SDK/sidecar 版本、工具白名单运维和完整审计仍待决策。 | #151、#105 |
 | AI Gateway model profile 和 credential 安全 | 已实现 | Model profile CRUD、provider credential AES-GCM 加密列、revision、service-token auth。 | AI Gateway `/internal/v1/model-profiles`；Gateway admin model profile routes。 | 真实部署的 secret manager、token 轮换和 profile 运维流程仍需补。 | #119、#204 |
 | AI Gateway chat completions | 已实现 | OpenAI-compatible non-stream/stream chat、function-calling 字段透传、provider invocation 记录。 | `POST /internal/v1/chat/completions`。 | 真实 provider smoke、stream cancel 和 provider 特异行为回归仍需扩展。 | #120、#208 |
@@ -51,5 +52,6 @@
 
 1. 本地联调要明确“没有根级一键 Compose”，否则团队会把 QA/Document 局部 Compose 误认为全链路环境。
 2. AI Gateway provider adapter 要记录 model exact-match、embedding/rerank 响应校验、脱敏和 usage aggregate，避免 Knowledge/QA/Document 接入时绕过 profile 边界。
-3. Document 生成工作流要区分“job 状态机已实现”和“真实生成未实现”，避免前端或部署方误判 DOCX 已可用。
-4. 测试策略要把当前 CI 覆盖、PR 前建议和缺口分开；不要把跨服务 smoke、DB integration、E2E 或完整前端 CI 写成已 required。
+3. QA B-03 已有 ResponseRun / Agent Loop MVP（本分支），但真实 Knowledge retrieval、RAG 引用闭环和跨服务 smoke 仍要单独追踪，避免把非流式直答误判成完整 RAG 闭环。
+4. Document 生成工作流要区分“job 状态机已实现”和“真实生成未实现”，避免前端或部署方误判 DOCX 已可用。
+5. 测试策略要把 Go、migration、Gateway contract、frontend check/build 和 env-gated integration tests 放在一张可执行清单里。

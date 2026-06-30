@@ -327,6 +327,18 @@ func (s *ConfigService) LoadRuntimeConfiguration(ctx context.Context) (RuntimeCo
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
+	qaConfig, err := s.repository.GetActiveQAConfigVersion(ctx)
+	if err != nil {
+		if appErr, ok := Classify(err); !ok || appErr.Code != CodeNotFound {
+			return RuntimeConfiguration{}, err
+		}
+	}
+	llmConfig, err := s.repository.GetActiveLLMConfigVersion(ctx)
+	if err != nil {
+		if appErr, ok := Classify(err); !ok || appErr.Code != CodeNotFound {
+			return RuntimeConfiguration{}, err
+		}
+	}
 	prompt, err := s.runtimePrompt(ctx)
 	if err != nil {
 		return RuntimeConfiguration{}, err
@@ -349,7 +361,10 @@ func (s *ConfigService) LoadRuntimeConfiguration(ctx context.Context) (RuntimeCo
 	if len(records) == 0 && s.bootstrap.MCPServer != nil {
 		servers = append(servers, *s.bootstrap.MCPServer)
 	}
-	return RuntimeConfiguration{LLM: llm, SystemPrompt: prompt, MCPServers: servers}, nil
+	return RuntimeConfiguration{
+		LLM: llm, SystemPrompt: prompt, MCPServers: servers,
+		QAConfigVersionID: qaConfig.ID, LLMConfigVersionID: llmConfig.ID, Agent: qaConfig.Agent,
+	}, nil
 }
 
 func (s *ConfigService) activeLLM(ctx context.Context) (StoredLLMConfig, error) {

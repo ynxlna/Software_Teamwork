@@ -21,13 +21,14 @@ Implemented now:
 - `PATCH /internal/v1/documents/{documentId}`
 - `DELETE /internal/v1/documents/{documentId}`
 - `GET /internal/v1/documents/{documentId}/content`
+- Memory, local, and MinIO object-store adapters behind `service.ObjectStore`
 
 
 Out of scope for this MVP:
 
-- Local MinIO setup
-- Production MinIO adapter
+- Local MinIO server / `mc` setup
 - Production PostgreSQL repository adapter; `sqlc.yaml`, first query file, and a `goose` migration are present as the contract scaffold
+- Async object cleanup worker
 - Knowledge ingestion handoff and knowledge document state
 - Report template, report material, and generated report file business state
 - Public knowledge-owned document list/detail/chunks/content contracts
@@ -59,15 +60,22 @@ context returns `401 unauthorized`; missing operation permission returns
 | --- | --- | --- |
 | `FILE_HTTP_ADDR` | `:8082` | HTTP listen address. |
 | `FILE_MAX_UPLOAD_BYTES` | `33554432` | Multipart upload limit in bytes. |
-| `FILE_STORAGE_BACKEND` | `memory` | Supported values: `memory`, `local`. |
+| `FILE_STORAGE_BACKEND` | `memory` | Supported values: `memory`, `local`, `minio`. |
 | `FILE_LOCAL_STORAGE_DIR` | `.file-storage` | Local object-store root when `FILE_STORAGE_BACKEND=local`. |
+| `FILE_MINIO_ENDPOINT` | empty | Required when `FILE_STORAGE_BACKEND=minio`; host and port without scheme. |
+| `FILE_MINIO_ACCESS_KEY` | empty | Required when `FILE_STORAGE_BACKEND=minio`; never returned in responses. |
+| `FILE_MINIO_SECRET_KEY` | empty | Required when `FILE_STORAGE_BACKEND=minio`; never returned in responses or logs. |
+| `FILE_MINIO_BUCKET` | empty | Required when `FILE_STORAGE_BACKEND=minio`; internal storage detail. |
+| `FILE_MINIO_USE_SSL` | `false` | Whether the MinIO endpoint uses TLS. |
+| `FILE_MINIO_REGION` | empty | Optional MinIO/S3 region. |
+| `FILE_MINIO_TIMEOUT` | `10s` | Per-request MinIO client timeout. |
 | `FILE_SHUTDOWN_TIMEOUT` | `10s` | Graceful shutdown timeout. |
 
 ## Storage Port
 
-Object storage is behind `service.ObjectStore`. The current `memory` adapter exists only for tests and early local integration. The `local` adapter stores objects under `FILE_LOCAL_STORAGE_DIR` for local durable smoke tests. Neither adapter exposes object keys or storage paths through API responses.
+Object storage is behind `service.ObjectStore`. The `memory` adapter exists only for tests and early local integration. The `local` adapter stores objects under `FILE_LOCAL_STORAGE_DIR` for local durable smoke tests. The `minio` adapter uses the official `github.com/minio/minio-go/v7@v7.2.1` SDK and expects an existing MinIO or S3-compatible endpoint.
 
-A future MinIO adapter should be added under `internal/platform/storage/minio` and wired through `internal/config` without changing `internal/http` handlers or service use cases.
+Storage adapters do not expose object keys, bucket names, storage paths, internal URLs, access keys, or secret keys through API responses. MinIO SDK usage stays inside `internal/platform/storage` and `cmd/server` wiring; `internal/http` handlers and service use cases continue to depend on the `service.ObjectStore` port.
 
 ## Metadata Port
 

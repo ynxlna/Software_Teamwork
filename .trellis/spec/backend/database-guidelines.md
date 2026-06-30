@@ -19,7 +19,7 @@ Confirmed Go infrastructure target stack:
 - Qdrant: a short-term hand-written HTTP client until usage justifies an official or generated client.
 - Object storage: File Service owns an `ObjectStore` port. Production target is
   MinIO or an equivalent persistent object-store adapter; the MinIO adapter is
-  not implemented yet.
+  implemented behind the same port.
 
 Current repository facts from `docs/architecture/technology-decisions.md`:
 
@@ -32,7 +32,7 @@ Current repository facts from `docs/architecture/technology-decisions.md`:
   follow-up decision, not an implementation-PR side effect.
 - Knowledge and Document have fixed `asynq v0.26.0`; new asynchronous jobs
   should reuse that version unless a documented decision upgrades it.
-- File Service runtime currently has memory/local object-store adapters.
+- File Service runtime currently has memory/local/MinIO object-store adapters.
   PostgreSQL metadata repository files and migrations exist, but
   `cmd/server` still uses a memory metadata repository until the runtime
   integration lands.
@@ -292,8 +292,14 @@ Rules:
 - Prefer pre-signed URLs only after checking ownership and permission in the service.
 - `FILE_STORAGE_BACKEND=memory` is for tests and early local development only.
   `local` is acceptable for durable local smoke tests. Production must use
-  MinIO or an equivalent persistent object-store adapter after that adapter
-  lands.
+  MinIO or an equivalent persistent object-store adapter.
+- MinIO SDK usage must stay inside the File Service platform/storage adapter and
+  process wiring. Handlers, owner-service clients, and service use cases depend
+  only on the service-owned `ObjectStore` port.
+- When adding an HTTP transport timeout for object-store clients, do not cancel
+  the request context immediately when `RoundTrip` returns. For streaming
+  responses, wrap the response body and cancel on `Body.Close()` so content
+  reads are not interrupted.
 
 ---
 
@@ -319,6 +325,13 @@ Rules:
   - `GET /internal/v1/files/{fileId}`.
   - `DELETE /internal/v1/files/{fileId}`.
   - `GET /internal/v1/files/{fileId}/content`.
+- Runtime environment:
+  - `FILE_STORAGE_BACKEND=memory|local|minio`.
+  - `FILE_LOCAL_STORAGE_DIR` when using `local`.
+  - `FILE_MINIO_ENDPOINT`, `FILE_MINIO_ACCESS_KEY`,
+    `FILE_MINIO_SECRET_KEY`, and `FILE_MINIO_BUCKET` when using `minio`.
+  - Optional `FILE_MINIO_USE_SSL`, `FILE_MINIO_REGION`, and
+    `FILE_MINIO_TIMEOUT`.
 - Database files:
   - `services/file/sqlc.yaml`.
   - `services/file/internal/repository/queries/file_objects.sql`.
@@ -332,6 +345,13 @@ Rules:
 - PostgreSQL is the durable source of metadata, deletion status, purge timestamps, and sanitized purge failure summaries.
 - Object keys are generated server-side from file IDs, never from user filenames.
 - `FILE_STORAGE_BACKEND=memory` is test/local-only; `local` is acceptable for local durable smoke tests; production should use MinIO or an equivalent persistent object store adapter.
+- MinIO adapter errors returned from the storage layer must be sanitized:
+  `NoSuchKey` / missing object maps to `service.ErrNotFound`, timeout and
+  cancellation preserve `context` errors, and other SDK failures map to a
+  dependency error without embedding bucket names, object keys, endpoints, or
+  credentials.
+- MinIO upload calls must preserve content type and enable SDK checksum support
+  such as `PutObjectOptions.SendContentMd5`.
 
 ### 4. Validation & Error Matrix
 
@@ -357,6 +377,8 @@ Rules:
 - Handler tests for malformed multipart, missing file, empty file, oversized file, checksum mismatch, successful content stream headers, and reads after delete.
 - Service tests for checksum computation/validation, object key creation, delete state transitions, and storage dependency error mapping.
 - Storage adapter tests for put/get/delete, size mismatch, context cancellation where practical, and path traversal rejection for local storage.
+- MinIO adapter tests for content type and checksum options, not-found mapping,
+  sanitized dependency errors, size mismatch, and timeout/cancellation behavior.
 - Repository or migration validation once database test tooling is available.
 
 ### 7. Wrong vs Correct
@@ -371,6 +393,18 @@ HTTP handler receives upload -> writes object directly to MinIO -> returns objec
 
 ```text
 HTTP handler parses multipart -> service validates checksum and creates FileObject -> repository stores metadata -> ObjectStore stores bytes -> response returns safe FileObject fields only
+```
+
+#### Wrong
+
+```text
+custom RoundTripper adds context.WithTimeout -> defer cancel() before returning response body -> content reads fail mid-stream
+```
+
+#### Correct
+
+```text
+custom RoundTripper adds context.WithTimeout -> wraps response body -> cancel happens when Body.Close() is called
 ```
 
 ## Scenario: Knowledge Document Upload And Ingestion Job
@@ -540,4 +574,100 @@ asynq task executes -> Redis stores final job status -> API reads Redis as truth
 
 ```text
 API creates report_job -> asynq task id is stored for correlation -> worker updates report_jobs/report_job_attempts/report_events in PostgreSQL
+```
+
+## Scenario: Document Initial Report Defaults Seed
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing Document Service report type seeds, default
+  report templates, singleton `report_settings`, or first-slice local
+  development defaults.
+- Applies to `services/document/migrations`,
+  `services/document/internal/repository`, and `services/document/README.md`.
+
+### 2. Signatures
+
+- Migration files:
+  - `services/document/migrations/0003_seed_initial_report_defaults.sql` or a
+    later ordered migration for seed changes.
+- Database rows:
+  - `report_types.code` values `summer_peak_inspection` and
+    `coal_inventory_audit`.
+  - `report_templates.id` deterministic seed UUIDs when placeholder templates
+    are required.
+  - `report_settings.id = 'default'`.
+- Settings JSON fields:
+  - `llm_json.provider = ai-gateway`.
+  - `default_templates_json` maps `reportType -> reportTemplateId`.
+  - `file_json.defaultFormat = docx`.
+  - `file_json.defaultNumberingMode = global` unless a user value already
+    exists.
+  - `file_json.defaultStyleProfileId` may reference a non-secret style profile
+    identifier.
+
+### 3. Contracts
+
+- Seed migrations must be idempotent. Use `INSERT ... ON CONFLICT DO NOTHING`
+  for stable rows.
+- Seed migrations must not overwrite user modifications. For JSON settings,
+  merge seed defaults on the left and existing JSON on the right so existing
+  keys win, for example `seed_json || existing_json`.
+- Placeholder templates are allowed when formal DOCX templates are missing, but
+  they must be explicitly marked with `needs_decision` metadata and a runnable
+  import path. They must not pretend to be formal business templates.
+- Default settings must not contain provider API keys, provider base URLs,
+  object storage details, `file_ref`, object keys, prompts, or internal file
+  service identifiers.
+- Placeholder template rows should keep `file_ref` null until the File Service
+  owns a real uploaded template object.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required handling |
+| --- | --- |
+| Report type already exists | Keep the existing row; do not update name, enabled state, or defaults. |
+| Placeholder template already exists | Keep the existing row by primary key. |
+| `report_settings` row is missing | Insert the safe singleton default. |
+| `report_settings` row exists with user values | Add only missing keys; preserve existing values. |
+| Formal template file is not available | Store clear `needs_decision` metadata and no `file_ref`. |
+| Seed content includes secrets or internal file references | Reject in review and add/adjust migration tests. |
+
+### 5. Good/Base/Bad Cases
+
+- Good: a follow-up migration seeds missing report types, inserts placeholder
+  template metadata with deterministic IDs, and merges settings so user values
+  win.
+- Base: the first slice can use placeholder templates with no `file_ref` while
+  keeping `defaultTemplates` runnable for local development.
+- Bad: updating existing report type names on every seed run, hard-coding fake
+  production template file references, or storing provider keys in
+  `report_settings`.
+
+### 6. Tests Required
+
+- Migration string tests asserting the seed includes report type codes,
+  deterministic template IDs, `needs_decision` metadata, import path, and no
+  sensitive markers such as API keys or `file_ref`.
+- Repository integration tests, gated by `DOCUMENT_TEST_DATABASE_URL`, that
+  apply migrations, verify the two enabled report types and default settings,
+  re-run the seed migration, and assert no duplicate rows or user-value
+  overwrites.
+- Service-local checks from `services/document`: `go test ./...`,
+  `go build ./cmd/server`, and `git diff --check`.
+- Goose migration apply against a real PostgreSQL database when a local or CI
+  database is available.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+seed rerun -> UPDATE report_types SET enabled = true, default_templates_json = stock_defaults
+```
+
+#### Correct
+
+```text
+seed rerun -> INSERT stable rows ON CONFLICT DO NOTHING -> merge missing settings with existing values taking precedence
 ```

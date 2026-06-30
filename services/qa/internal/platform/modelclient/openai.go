@@ -80,6 +80,14 @@ type completionResponse struct {
 		Message      agent.Message `json:"message"`
 		FinishReason string        `json:"finish_reason"`
 	} `json:"choices"`
+	Usage struct {
+		PromptTokens            int `json:"prompt_tokens"`
+		CompletionTokens        int `json:"completion_tokens"`
+		TotalTokens             int `json:"total_tokens"`
+		CompletionTokensDetails struct {
+			ReasoningTokens int `json:"reasoning_tokens"`
+		} `json:"completion_tokens_details"`
+	} `json:"usage"`
 }
 
 func (c *Client) Complete(ctx context.Context, messages []agent.Message, tools []agent.ToolDefinition) (agent.Completion, error) {
@@ -134,5 +142,19 @@ func (c *Client) Complete(ctx context.Context, messages []agent.Message, tools [
 		return agent.Completion{}, errors.New("completion response has no choices")
 	}
 	choice := decoded.Choices[0]
-	return agent.Completion{Message: choice.Message, FinishReason: choice.FinishReason}, nil
+	reasoningTokens := decoded.Usage.CompletionTokensDetails.ReasoningTokens
+	completionTokens := decoded.Usage.CompletionTokens
+	if reasoningTokens > 0 && completionTokens >= reasoningTokens {
+		completionTokens -= reasoningTokens
+	}
+	usage := agent.TokenUsage{
+		PromptTokens:     decoded.Usage.PromptTokens,
+		CompletionTokens: completionTokens,
+		ReasoningTokens:  reasoningTokens,
+		TotalTokens:      decoded.Usage.TotalTokens,
+	}
+	if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens + usage.ReasoningTokens
+	}
+	return agent.Completion{Message: choice.Message, FinishReason: choice.FinishReason, Usage: usage}, nil
 }

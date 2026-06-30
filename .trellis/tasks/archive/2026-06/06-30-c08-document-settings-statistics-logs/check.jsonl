@@ -1,0 +1,8 @@
+{"file":".trellis/spec/backend/quality-guidelines.md","reason":"Run service-local go test, go build, and diff checks before completion."}
+{"file":".trellis/spec/backend/database-guidelines.md","reason":"Review migration/index/query safety and secret-safe persistence before completion."}
+{"file":".trellis/spec/backend/api-contracts.md","reason":"Verify handler response envelopes and gateway contract alignment."}
+{"file":".trellis/spec/backend/error-handling.md","reason":"Verify validation, forbidden, not-found, dependency, and internal errors map correctly."}
+{"file":".trellis/spec/backend/logging-guidelines.md","reason":"Verify operation logs and ordinary logs do not include sensitive data."}
+{"file":"docs/services/gateway/api/openapi.yaml","reason":"Compare final DTOs and routes against the active gateway contract."}
+{"file":"docs/services/document/docs/implementation.md","reason":"Update current implementation status after C-08 lands."}
+{"file":"docs/services/document/docs/generation-workflow.md","reason":"Update workflow status for settings/statistics/operation logs after implementation."}

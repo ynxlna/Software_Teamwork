@@ -999,10 +999,13 @@ components:
         index:
           type: integer
         embedding:
-          type: array
-          items:
-            type: number
-            format: float
+          oneOf:
+          - type: array
+            items:
+              type: number
+              format: float
+          - type: string
+            description: Base64-encoded embedding when encoding_format is base64.
     OpenAIEmbeddingList:
       type: object
       required:

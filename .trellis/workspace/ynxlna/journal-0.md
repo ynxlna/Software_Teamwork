@@ -42,3 +42,36 @@ after gateway #74/#75 landed.
 - Push `JerryTeam/feat/qa-session-message-api` to the fork.
 - Open a PR to upstream `develop` and note gateway #74/#75 are now included in
   the branch base.
+
+
+## Session 2: QA Agent Run MVP
+
+**Date**: 2026-06-30
+**Task**: QA Agent Run MVP
+**Branch**: `JerryTeam/feat/qa-agent-run-mvp`
+
+### Summary
+
+Implemented QA ResponseRun non-streaming agent loop MVP for issue #89, aligned documentation with latest project guidance, and verified QA tests plus server and agent builds.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `38156aa` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

@@ -4,29 +4,27 @@ import {
   createRouter,
   Outlet,
   redirect,
+  useNavigate,
+  useSearch,
 } from '@tanstack/react-router'
 
 import { AppLayout } from '@/layouts/app-layout'
 import type { PermissionRequirement } from '@/lib/permissions'
 import { canAccess } from '@/lib/permissions'
-import { FileManagement } from '@/pages/admin/file-management'
 import { KnowledgeConfig } from '@/pages/admin/knowledge-config'
-import { KnowledgeExperience } from '@/pages/admin/knowledge-experience'
 import { KnowledgeManagement } from '@/pages/admin/knowledge-management'
-import { MaterialManagement } from '@/pages/admin/material-management'
+import { ModelProfilesPage } from '@/pages/admin/model-profiles'
 import { AdminPage } from '@/pages/admin/page'
 import { ParserConfigsPage } from '@/pages/admin/parser-configs'
-import { PromptManagement } from '@/pages/admin/prompt-management'
 import { QARetrievalTestPage } from '@/pages/admin/qa-retrieval-test'
 import { QASettings } from '@/pages/admin/qa-settings'
-import { ReportCategory } from '@/pages/admin/report-category'
-import { RoleManagement } from '@/pages/admin/role-management'
 import { StatsOverviewPage } from '@/pages/admin/stats-overview'
 import { StyleManagement } from '@/pages/admin/style-management'
 import { SystemSettings } from '@/pages/admin/system-settings'
-import { TemplateManagement } from '@/pages/admin/template-management'
-import { UserManagement } from '@/pages/admin/user-management'
 import { ForbiddenPage } from '@/pages/auth/forbidden'
+import { KnowledgeChunksPage } from '@/pages/knowledge/chunks/page'
+import { KnowledgeDocumentsPage } from '@/pages/knowledge/documents/page'
+import { KnowledgeSearchPage } from '@/pages/knowledge/search/page'
 import { LoginPage } from '@/pages/login/page'
 import { ChatPage } from '@/pages/qa/chat/page'
 import { ReportGeneratePage } from '@/pages/reports/generate/page'
@@ -118,7 +116,7 @@ async function redirectToAdminHome() {
   }
 
   if (canAccess(store.user, qaAdminAccess)) {
-    throw redirect({ to: '/admin/prompts' })
+    throw redirect({ to: '/admin/qa-settings' })
   }
 
   throw redirect({ to: '/forbidden' })
@@ -243,60 +241,11 @@ const adminIndexRoute = createRoute({
   beforeLoad: redirectToAdminHome,
 })
 
-const adminUsersRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'users',
-  beforeLoad: requireAuth(systemAdminAccess),
-  component: UserManagement,
-})
-
-const adminRolesRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'roles',
-  beforeLoad: requireAuth(systemAdminAccess),
-  component: RoleManagement,
-})
-
 const adminStylesRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: 'styles',
   beforeLoad: requireAuth(systemAdminAccess),
   component: StyleManagement,
-})
-
-const adminReportCategoriesRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'report-categories',
-  beforeLoad: requireAuth(systemAdminAccess),
-  component: ReportCategory,
-})
-
-const adminFilesRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'files',
-  beforeLoad: requireAuth(systemAdminAccess),
-  component: FileManagement,
-})
-
-const adminTemplatesRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'templates',
-  beforeLoad: requireAuth(reportWriteAccess),
-  component: TemplateManagement,
-})
-
-const adminMaterialsRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'materials',
-  beforeLoad: requireAuth(reportWriteAccess),
-  component: MaterialManagement,
-})
-
-const adminPromptsRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'prompts',
-  beforeLoad: requireAuth(qaAdminAccess),
-  component: PromptManagement,
 })
 
 const adminKnowledgeRoute = createRoute({
@@ -306,25 +255,81 @@ const adminKnowledgeRoute = createRoute({
   component: KnowledgeManagement,
 })
 
-const adminKnowledgeExperienceRoute = createRoute({
-  getParentRoute: () => adminRoute,
-  path: 'knowledge-experience',
-  beforeLoad: requireAuth(knowledgeAccess),
-  component: KnowledgeExperience,
-})
-
 const adminKnowledgeConfigRoute = createRoute({
-	getParentRoute: () => adminRoute,
-	path: 'knowledge-config',
-	beforeLoad: requireAuth(knowledgeAccess),
-	component: KnowledgeConfig,
+  getParentRoute: () => adminRoute,
+  path: 'knowledge-config',
+  beforeLoad: requireAuth(knowledgeAccess),
+  component: KnowledgeConfig,
 })
 
-const adminParserConfigsRoute = createRoute({
-	getParentRoute: () => adminRoute,
-	path: 'parser-configs',
-	beforeLoad: requireAuth(qaAdminAccess),
-	component: ParserConfigsPage,
+// ── Knowledge sub-pages ──
+
+interface AdminKnowledgeDocumentsSearch {
+  knowledgeBaseId?: string
+}
+
+function AdminKnowledgeDocumentsPage() {
+  const navigate = useNavigate()
+  const search = useSearch({ strict: false }) as AdminKnowledgeDocumentsSearch
+
+  return (
+    <KnowledgeDocumentsPage
+      knowledgeBaseId={search.knowledgeBaseId}
+      onNavigateChunks={(documentId: string) => {
+        void navigate({
+          to: '/admin/knowledge/chunks',
+          search: { documentId },
+        })
+      }}
+    />
+  )
+}
+
+const adminKnowledgeDocumentsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'knowledge/documents',
+  beforeLoad: requireAuth(knowledgeAccess),
+  component: AdminKnowledgeDocumentsPage,
+  validateSearch: (search: Record<string, unknown>): AdminKnowledgeDocumentsSearch => ({
+    knowledgeBaseId:
+      typeof search.knowledgeBaseId === 'string' ? search.knowledgeBaseId : undefined,
+  }),
+})
+
+const adminKnowledgeSearchRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'knowledge/search',
+  beforeLoad: requireAuth({ any: ['knowledge:read'] }),
+  component: KnowledgeSearchPage,
+})
+
+interface AdminKnowledgeChunksSearch {
+  documentId: string
+}
+
+function AdminKnowledgeChunksPage() {
+  const navigate = useNavigate()
+  const search = useSearch({ strict: false }) as AdminKnowledgeChunksSearch
+
+  return (
+    <KnowledgeChunksPage
+      documentId={search.documentId}
+      onNavigateBack={() => {
+        void navigate({ to: '/admin/knowledge/documents' })
+      }}
+    />
+  )
+}
+
+const adminKnowledgeChunksRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'knowledge/chunks',
+  beforeLoad: requireAuth(knowledgeAccess),
+  component: AdminKnowledgeChunksPage,
+  validateSearch: (search: Record<string, unknown>): AdminKnowledgeChunksSearch => {
+    const documentId = typeof search.documentId === 'string' ? search.documentId : ''
+    return { documentId }
+  },
 })
 
 const adminQASettingsRoute = createRoute({
@@ -355,6 +360,27 @@ const adminStatsRoute = createRoute({
   component: StatsOverviewPage,
 })
 
+const modelProfilesPerm: PermissionRequirement = {
+  any: ['admin:model-profile:write', 'system:admin'],
+}
+const parserConfigsPerm: PermissionRequirement = {
+  any: ['admin:parser-config:write', 'system:admin'],
+}
+
+const adminModelProfilesRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'model-profiles',
+  beforeLoad: requireAuth(modelProfilesPerm),
+  component: ModelProfilesPage,
+})
+
+const adminParserConfigsRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: 'parser-configs',
+  beforeLoad: requireAuth(parserConfigsPerm),
+  component: ParserConfigsPage,
+})
+
 const adminReportRecordsRoute = createRoute({
   getParentRoute: () => adminRoute,
   path: 'reports/records',
@@ -383,20 +409,16 @@ const routeTree = rootRoute.addChildren([
     ]),
     adminRoute.addChildren([
       adminIndexRoute,
-      adminUsersRoute,
-      adminRolesRoute,
       adminStylesRoute,
-      adminReportCategoriesRoute,
-      adminFilesRoute,
-      adminTemplatesRoute,
-      adminMaterialsRoute,
-      adminPromptsRoute,
-			adminKnowledgeRoute,
-			adminKnowledgeExperienceRoute,
-			adminKnowledgeConfigRoute,
-			adminParserConfigsRoute,
-			adminQASettingsRoute,
+      adminKnowledgeRoute,
+      adminKnowledgeConfigRoute,
+      adminKnowledgeDocumentsRoute,
+      adminKnowledgeSearchRoute,
+      adminKnowledgeChunksRoute,
+      adminQASettingsRoute,
       adminQARetrievalTestRoute,
+      adminModelProfilesRoute,
+      adminParserConfigsRoute,
       adminSettingsRoute,
       adminStatsRoute,
       adminReportRecordsRoute,

@@ -71,6 +71,19 @@ func newObjectStore(cfg config.Config) (service.ObjectStore, error) {
 		return storage.NewMemoryStore(), nil
 	case "local":
 		return storage.NewLocalStore(cfg.LocalStorageDir)
+	case "minio":
+		client, err := storage.NewMinIOClient(storage.MinIOClientConfig{
+			Endpoint:  cfg.MinIOEndpoint,
+			AccessKey: cfg.MinIOAccessKey,
+			SecretKey: cfg.MinIOSecretKey,
+			UseSSL:    cfg.MinIOUseSSL,
+			Region:    cfg.MinIORegion,
+			Timeout:   cfg.MinIOTimeout,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return storage.NewMinIOStore(client, cfg.MinIOBucket)
 	default:
 		return nil, fmt.Errorf("unsupported storage backend %q", cfg.StorageBackend)
 	}

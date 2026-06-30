@@ -214,6 +214,44 @@ func TestCreateReportMaterialCleansUpFileOnInsertFailure(t *testing.T) {
 	}
 }
 
+func TestDocumentMutationsRecordOperationLogs(t *testing.T) {
+	ctx := context.Background()
+	reqCtx := RequestContext{UserID: "usr_test", RequestID: "req-audit"}
+	repo := &fakeRepository{reportTypeExists: true}
+	files := &fakeFileClient{file: FileObject{ID: "file_internal_template", Filename: "template.docx", SizeBytes: 32}}
+	svc := New(repo, files)
+
+	template, err := svc.CreateReportTemplate(ctx, reqCtx, validTemplateInput())
+	if err != nil {
+		t.Fatalf("CreateReportTemplate() error = %v", err)
+	}
+	if len(repo.operationLogs) != 1 {
+		t.Fatalf("operation log count after template create = %d, want 1", len(repo.operationLogs))
+	}
+	if got := repo.operationLogs[0]; got.OperationType != OperationUploadTemplate || got.TargetID != template.ID || got.ParameterSummary["fileRef"] != nil {
+		t.Fatalf("unexpected template operation log: %+v", got)
+	}
+
+	_, err = svc.CreateReportMaterial(ctx, reqCtx, CreateReportMaterialInput{
+		MaterialName: "material",
+		MaterialType: "image",
+		File: UploadedFile{
+			Filename:  "material.png",
+			SizeBytes: 16,
+			Content:   bytes.NewReader([]byte("material")),
+		},
+	})
+	if err != nil {
+		t.Fatalf("CreateReportMaterial() error = %v", err)
+	}
+	if len(repo.operationLogs) != 2 {
+		t.Fatalf("operation log count after material create = %d, want 2", len(repo.operationLogs))
+	}
+	if got := repo.operationLogs[1]; got.OperationType != OperationUploadMaterial || got.TargetType != "material" {
+		t.Fatalf("unexpected material operation log: %+v", got)
+	}
+}
+
 func validTemplateInput() CreateReportTemplateInput {
 	return templateInputWithFile("template.docx")
 }
@@ -248,6 +286,7 @@ type fakeRepository struct {
 	createMaterialErr    error
 	createdMaterial      ReportMaterial
 	updateStructureCalls int
+	operationLogs        []OperationLog
 }
 
 func (r *fakeRepository) ListReportTypes(context.Context) ([]ReportType, error) {
@@ -310,6 +349,11 @@ func (r *fakeRepository) FindReportMaterialByID(context.Context, string) (Report
 
 func (r *fakeRepository) DeleteReportMaterial(context.Context, string, time.Time) error {
 	return nil
+}
+
+func (r *fakeRepository) CreateOperationLog(_ context.Context, log OperationLog) (OperationLog, error) {
+	r.operationLogs = append(r.operationLogs, log)
+	return log, nil
 }
 
 type fakeFileClient struct {

@@ -115,6 +115,13 @@ type FileObject struct {
 	CreatedAt      time.Time
 }
 
+type FileContent struct {
+	Filename    string
+	ContentType string
+	SizeBytes   int64
+	Content     io.ReadCloser
+}
+
 type ReportTemplate struct {
 	ID           string
 	TemplateName string
@@ -249,6 +256,49 @@ type ReportJob struct {
 	CreatedAt    time.Time
 }
 
+type ReportFileStatus string
+
+const (
+	ReportFileStatusPending   ReportFileStatus = "pending"
+	ReportFileStatusRunning   ReportFileStatus = "running"
+	ReportFileStatusSucceeded ReportFileStatus = "succeeded"
+	ReportFileStatusFailed    ReportFileStatus = "failed"
+)
+
+const ReportFileFormatDOCX = "docx"
+
+type ReportFile struct {
+	ID        string
+	ReportID  string
+	JobID     string
+	Filename  string
+	Format    string
+	FileRef   string
+	FileSize  int64
+	Status    ReportFileStatus
+	CreatedBy string
+	CreatedAt time.Time
+}
+
+type ReportFileListFilter struct {
+	Page      int
+	PageSize  int
+	ReportID  string
+	CreatorID string
+}
+
+type ReportFileListResult struct {
+	Items []ReportFile
+	Page  PageMeta
+}
+
+type CreateReportFileInput struct {
+	ReportID     string
+	Format       string
+	TemplateID   string
+	StyleOptions json.RawMessage
+}
+
 type ReportJobAttempt struct {
 	ID            string
 	JobID         string
@@ -335,3 +385,127 @@ type ReportSectionVersion struct {
 	CreatedBy    string
 	CreatedAt    time.Time
 }
+
+type ReportSettingsModelConfig struct {
+	Provider  string
+	ProfileID string
+	// ProfileIDSet is used by PATCH inputs to distinguish omitted profileId from an explicit clear.
+	ProfileIDSet   bool
+	Model          string
+	TimeoutSeconds int
+}
+
+type ReportSettingsFileDefaults struct {
+	DefaultFormat         string
+	DefaultNumberingMode  string
+	DefaultStyleProfileID string
+	// DefaultStyleProfileIDSet distinguishes omitted style profile from an explicit clear.
+	DefaultStyleProfileIDSet bool
+	Extra                    map[string]any
+}
+
+type ReportSettings struct {
+	LLM              ReportSettingsModelConfig
+	DefaultTemplates map[string]string
+	File             ReportSettingsFileDefaults
+	UpdatedAt        time.Time
+}
+
+type UpdateReportSettingsInput struct {
+	LLM              *ReportSettingsModelConfig
+	DefaultTemplates *map[string]string
+	File             *ReportSettingsFileDefaults
+}
+
+type ModelProfileReference struct {
+	ID             string
+	Purpose        string
+	Provider       string
+	Model          string
+	Enabled        bool
+	TimeoutSeconds int
+}
+
+type ReportStatisticsOverview struct {
+	ReportCount     int
+	TemplateCount   int
+	MaterialCount   int
+	JobStatusCounts map[string]int
+	RecentDays      int
+}
+
+type ReportDailyStatistic struct {
+	Date           string
+	ReportType     string
+	CreatedCount   int
+	GeneratedCount int
+	FailedCount    int
+	ExportedCount  int
+}
+
+type OperationLog struct {
+	ID               string
+	OperatorID       string
+	OperatorName     string
+	OperationType    string
+	TargetType       string
+	TargetID         string
+	RequestID        string
+	RequestSource    string
+	ToolName         string
+	ParameterSummary map[string]any
+	OperationResult  string
+	ErrorMessage     string
+	Metadata         map[string]any
+	CreatedAt        time.Time
+}
+
+type OperationLogListFilter struct {
+	Page          int
+	PageSize      int
+	TargetType    string
+	TargetID      string
+	OperationType string
+	RequestID     string
+	RequestSource string
+	ToolName      string
+}
+
+type OperationLogListResult struct {
+	Items []OperationLog
+	Page  PageMeta
+}
+
+const (
+	OperationCreateReport         = "create_report"
+	OperationUpdateReport         = "update_report"
+	OperationDeleteReport         = "delete_report"
+	OperationOutlineGeneration    = "outline_generation"
+	OperationOutlineRegeneration  = "outline_regeneration"
+	OperationSaveOutline          = "save_outline"
+	OperationContentGeneration    = "content_generation"
+	OperationContentRegeneration  = "content_regeneration"
+	OperationSectionRegeneration  = "section_regeneration"
+	OperationUpdateSection        = "update_section"
+	OperationCreateSectionVersion = OperationSectionRegeneration
+	OperationUploadTemplate       = "upload_template"
+	OperationUpdateTemplate       = "update_template"
+	OperationDeleteTemplate       = "delete_template"
+	OperationUploadMaterial       = "upload_material"
+	OperationDeleteMaterial       = "delete_material"
+	OperationCreateReportJob      = "create_report_job"
+	OperationRetryReportJob       = "retry_report_job"
+	OperationUpdateReportSettings = "update_report_settings"
+	OperationReportJobRunning     = "report_job_running"
+	OperationReportJobSucceeded   = "report_job_succeeded"
+	OperationReportJobFailed      = "report_job_failed"
+	OperationReportFileCreation   = "report_file_creation"
+	OperationResultSucceeded      = "succeeded"
+	OperationResultFailed         = "failed"
+	DefaultReportSettingsProvider = "ai-gateway"
+	DefaultReportSettingsFormat   = "docx"
+	DefaultReportNumberingMode    = "global"
+	ReportNumberingModeByChapter  = "by_chapter"
+	DefaultReportStatisticsDays   = 30
+	MaximumReportStatisticsDays   = 366
+)

@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -341,9 +343,24 @@ func newTestPool(t *testing.T, ctx context.Context, databaseURL string) *pgxpool
 
 func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	t.Helper()
-	sqlBytes, err := os.ReadFile("../../migrations/0001_create_report_generation_tables.sql")
+	files, err := filepath.Glob("../../migrations/*.sql")
 	if err != nil {
-		t.Fatalf("read migration: %v", err)
+		t.Fatalf("find migrations: %v", err)
+	}
+	if len(files) == 0 {
+		t.Fatalf("no migrations found")
+	}
+	sort.Strings(files)
+	for _, file := range files {
+		applyMigrationFile(t, ctx, pool, file)
+	}
+}
+
+func applyMigrationFile(t *testing.T, ctx context.Context, pool *pgxpool.Pool, file string) {
+	t.Helper()
+	sqlBytes, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read migration %s: %v", file, err)
 	}
 	parts := strings.Split(string(sqlBytes), "-- +goose Down")
 	up := strings.TrimPrefix(parts[0], "-- +goose Up")
@@ -353,7 +370,7 @@ func applyMigration(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 			continue
 		}
 		if _, err := pool.Exec(ctx, stmt); err != nil {
-			t.Fatalf("apply migration statement %q: %v", stmt, err)
+			t.Fatalf("apply migration %s statement %q: %v", file, stmt, err)
 		}
 	}
 }

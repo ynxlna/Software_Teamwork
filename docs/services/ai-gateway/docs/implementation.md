@@ -67,7 +67,7 @@
 | Provider adapter 行为 | README 只描述接口形态 | 代码还包含 model exact-match、embedding count/index 校验、rerank document_id 校验和 usage aggregate | 不写清会导致下游绕过 profile 或误存敏感 payload | 新增 `provider-adapters.md`，本文链接到该细则。 |
 | Migration 编号 | 数据模型早期把 usage aggregate 规划为 `0005` | 当前 `0005` 是 invocation attempts，usage aggregate 是 `0006` | reviewer 按旧编号找不到表 | 本次回写 data-models 和 implementation。 |
 | Service token 格式 | README 要求 `X-Service-Token`，配置使用 token hashes | 代码读取 `AI_GATEWAY_SERVICE_TOKEN_HASHES`，不接受明文配置 | 安全部署需要先生成 hash | README 保留 hash 格式说明，补生成示例。 |
-| pgx version | 技术基线早期记录 pgx/v4 | AI Gateway 使用 `pgx/v5` | 版本统一策略不清 | 更新技术基线为混用现状。 |
+| pgx version | 技术基线目标为 `pgx/v5@v5.7.6` | AI Gateway 使用 `pgx/v5` | 无直接出入 | 保持随技术基线升级；不得降回 `pgx/v4`。 |
 
 ## 6. MVP / mock / memory backend / 占位
 

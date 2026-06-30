@@ -214,6 +214,92 @@ gateway -> normalized KnowledgeQueryResponse or ErrorResponse
 - `docs/architecture/service-boundaries.md`
 - `docs/architecture/frontend-backend-contract.md`
 
+## Scenario: QA Owner Authorization
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing QA session, message, response-run, event,
+  tool-call, or citation reads and mutations.
+- Applies to `services/qa/internal/http`, `services/qa/internal/service`,
+  `services/qa/internal/repository`, the Gateway OpenAPI QA paths, and generated
+  frontend Gateway types.
+
+### 2. Signatures
+
+- Direct session operations:
+  - `GET /api/v1/qa-sessions/{sessionId}`
+  - `PATCH /api/v1/qa-sessions/{sessionId}`
+  - `DELETE /api/v1/qa-sessions/{sessionId}`
+- Session-owned resources include `/qa-sessions/{sessionId}/messages`,
+  `/qa-sessions/{sessionId}/events`, `/response-runs/**`, `/messages/{messageId}/citations`,
+  and `/citations/{citationId}`.
+- QA derives the current owner only from trusted Gateway `X-User-Id` context.
+
+### 3. Contracts
+
+- A live session owned by another authenticated user returns `403 forbidden`
+  for direct detail, update, delete, and session-addressed message list/create
+  operations.
+- Missing and soft-deleted sessions return `404 not_found`.
+- ID-addressed child resources are filtered through their owning session and
+  return `404 not_found` when missing or owned by another user.
+- Empty collections are valid only after the parent message/run/session has
+  been authorized.
+- Administrator roles do not bypass QA ownership until a separate reviewed
+  cross-user administration contract exists.
+- OpenAPI response entries and `apps/web/src/api/generated/gateway.ts` must be
+  regenerated together when the public status-code set changes.
+
+### 4. Validation & Error Matrix
+
+| Condition | Response/error |
+| --- | --- |
+| Missing trusted user context | `401 unauthorized` |
+| Non-owner accesses a live session directly or lists/creates its messages | `403 forbidden` |
+| Session is missing or soft-deleted | `404 not_found` |
+| Message, run, event, tool call, or citation is missing/non-owned | `404 not_found` |
+| Owner cancels a running response run | `200` with cancelled run |
+| Owner cancels an existing terminal response run | `409 conflict` |
+| Non-owner cancels a response run | `404 not_found`, never `409 conflict` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: repository queries filter by `external_user_id`, direct session misses
+  perform a narrow access classification, and handlers preserve typed errors.
+- Base: an owned message or run with no citations/tool calls returns an empty
+  list only after parent authorization succeeds.
+- Bad: returning `200 []` for an unknown/non-owned parent, treating every
+  failed cancellation as `409`, or allowing an admin header to bypass owner checks.
+
+### 6. Tests Required
+
+- Handler tests assert direct non-owner session GET/PATCH/DELETE return the
+  standard `403 forbidden` envelope, including when admin roles are present.
+- Service tests assert session and message operations propagate forbidden
+  errors before writes or model/tool execution.
+- PostgreSQL integration tests assert direct session `403`, hidden child
+  resource `404`, owner terminal-run `409`, and no cross-user citation data.
+- Gateway contract checks and OpenAPI type generation must pass after response
+  status changes.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+non-owner PATCH session -> 404
+non-owner PATCH response run -> 409 conflict
+non-owner list citations -> 200 [] without checking the parent message
+```
+
+#### Correct
+
+```text
+non-owner PATCH session -> 403 forbidden
+non-owner PATCH response run -> 404 not_found
+owned message with no citations -> authorize message -> 200 []
+```
+
 ## Scenario: Internal Service Contract API
 
 ### 1. Scope / Trigger
@@ -845,6 +931,131 @@ POST /report-templates -> document stores uploaded bytes itself -> response retu
 
 ```text
 POST /report-templates -> document calls file /internal/v1/files -> stores file_ref internally -> response returns only template id and safe display metadata
+```
+
+## Scenario: Document Report Settings Statistics And Operation Logs
+
+### 1. Scope / Trigger
+
+- Trigger: adding or changing Document Service report settings, report
+  statistics, operation-log APIs, AI Gateway profile validation for report
+  settings, or operation-log write paths.
+- Applies to `services/document/internal/http`, `services/document/internal/service`,
+  `services/document/internal/repository`, `services/document/internal/platform/aigateway`,
+  `services/document/internal/worker`, `services/document/migrations`, and the
+  matching gateway contract in `docs/services/gateway/api/openapi.yaml`.
+
+### 2. Signatures
+
+Service-local Document routes mirror the gateway resource paths:
+
+- `GET /report-settings`
+- `PATCH /report-settings`
+- `GET /report-statistics/overview`
+- `GET /report-statistics/daily?days=<1..366>`
+- `GET /report-operation-logs?page=&pageSize=&targetType=&targetId=&operationType=&requestId=&requestSource=&toolName=`
+
+Database and integration signatures:
+
+- `report_settings` stores singleton settings with `llm_json`,
+  `default_templates_json`, `file_json`, and `updated_at`.
+- `report_operation_logs` uses existing `parameter_summary_json` and
+  `metadata_json` columns.
+- Document validates settings profiles through AI Gateway
+  `GET /internal/v1/model-profiles/{profileId}` with `X-Caller-Service:
+  document`, propagated request/user headers, and optional `X-Service-Token`.
+- Runtime env includes `DOCUMENT_AI_GATEWAY_URL`,
+  `DOCUMENT_AI_GATEWAY_PROFILE_ID`, optional
+  `DOCUMENT_AI_GATEWAY_SERVICE_TOKEN`, and optional fallback
+  `INTERNAL_SERVICE_TOKEN`.
+
+### 3. Contracts
+
+- Gateway-facing responses use `{ data, requestId }`; operation-log lists use
+  `{ data, page, requestId }`.
+- `GET /report-settings`, `PATCH /report-settings`,
+  `GET /report-statistics/overview`, `GET /report-statistics/daily`, and
+  `GET /report-operation-logs` are management/audit surfaces and must reject
+  non-admin callers in the Document service layer even when gateway already
+  authenticates the user.
+- `ReportSettings.llm.provider` is fixed to `ai-gateway`; provider base URLs
+  and API keys remain owned by AI Gateway and must not be stored in Document.
+- `ReportSettings.defaultTemplates` is a full `reportType ->
+  reportTemplateId` map, not a single default template id.
+- `PATCH /report-settings` may update only the supplied sections. Omitted
+  `llm.profileId` preserves the current profile/model; explicit empty
+  `profileId` clears the profile/model.
+- Omitted `file.defaultStyleProfileId` preserves the current style profile;
+  explicit empty `file.defaultStyleProfileId` clears it.
+- Statistics overview includes `reportCount`, `templateCount`,
+  `materialCount`, optional `jobStatusCounts`, and `recentDays`; daily
+  statistics is bounded by `days`.
+- Operation-log public filters are exactly the gateway-documented filters:
+  `targetType`, `targetId`, `operationType`, `requestId`, `requestSource`, and
+  `toolName`. Adding public filters requires a gateway OpenAPI update first.
+- Operation logs may store sanitized summaries only. They must not include
+  prompt text, raw document content, File Service IDs/file refs, object keys,
+  buckets, signed URLs, internal URLs, provider tokens, API keys, database URLs,
+  or full request/response bodies. Sanitization must inspect string values, not
+  only sensitive field names, and mutation paths must not write user-provided
+  free text such as retry reasons into operation-log summaries.
+
+### 4. Validation & Error Matrix
+
+| Condition | Response/error |
+| --- | --- |
+| Missing gateway user context | `401 unauthorized` |
+| Non-admin caller reads or patches settings, statistics, or operation logs | `403 forbidden` |
+| Unsupported `llm.provider` | `400 validation_error` |
+| Non-empty `llm.profileId` missing, disabled, or not a chat profile | `400 validation_error` |
+| `defaultTemplates` report type is missing/disabled | `400 validation_error` |
+| `defaultTemplates` template is missing, disabled, soft-deleted, or wrong report type | `400 validation_error` |
+| Unsupported `file.defaultFormat` or `file.defaultNumberingMode` | `400 validation_error` |
+| `days` outside `1..366` or invalid pagination | `400 validation_error` |
+| AI Gateway or PostgreSQL failure | `502 dependency_error` |
+
+### 5. Good/Base/Bad Cases
+
+- Good: settings update validates profile and template references before
+  saving, returns only `updatedAt`, and writes a sanitized
+  `update_report_settings` operation log.
+- Base: statistics queries use bounded date filters or indexed count/group
+  paths, and operation-log pagination runs a separate count so empty pages keep
+  the correct `total`.
+- Bad: storing a single `default_template_id`, accepting missing profile/template
+  references, returning `trend30d` instead of the gateway statistics schema, or
+  exposing prompts/object keys in `parameterSummary`.
+
+### 6. Tests Required
+
+- Handler tests for settings/statistics/log response envelopes, request id
+  propagation, query parsing, PATCH clear-vs-omit semantics, and route coverage
+  no longer returning `not_implemented`.
+- Service tests for admin authorization, profile validation, default-template
+  validation, file-default validation, bounded days, operation-log filtering,
+  and sensitive-field sanitization.
+- Repository or migration tests for `report_settings`, operation-log insert/list
+  with separate total count, daily statistics bounds, soft-delete exclusion, and
+  indexes for every documented operation-log filter.
+- Mutation-path tests confirming templates, materials, reports, outlines,
+  sections, jobs, retries, worker status transitions, and failure paths record
+  sanitized operation logs where Document owns the write.
+
+### 7. Wrong vs Correct
+
+#### Wrong
+
+```text
+PATCH /report-settings -> store default_template_id=tpl_1 and llm.profileId=missing
+GET /report-operation-logs -> return raw prompt, fileRef, and objectKey
+```
+
+#### Correct
+
+```text
+PATCH /report-settings -> validate defaultTemplates[reportType] and AI Gateway chat profile -> store JSON settings map
+Document mutation -> record operation log with IDs and low-sensitive metadata only
+GET /report-operation-logs -> filter by documented fields and return sanitized summaries
 ```
 
 ## Scenario: Gateway Redis Session Cache

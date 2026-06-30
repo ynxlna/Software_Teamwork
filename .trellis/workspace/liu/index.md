@@ -8,8 +8,8 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 3
-- **Last Active**: 2026-06-29
+- **Total Sessions**: 8
+- **Last Active**: 2026-06-30
 <!-- @@@/auto:current-status -->
 
 ---
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~107 | Active |
+| `journal-1.md` | ~273 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,11 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 8 | 2026-06-30 | File MinIO storage self-check | `add1229` | `L1nggTeam/feat/file-minio-storage` |
+| 7 | 2026-06-30 | File MinIO storage adapter | `a64c973` | `L1nggTeam/feat/file-minio-storage` |
+| 6 | 2026-06-30 | C-08 sanitizer and patch review fixes | `1a418bd` | `PrimeTeam/feat/c08-settings-stats-logs-redo` |
+| 5 | 2026-06-30 | C-08 PR review fixes | `049c835` | `PrimeTeam/feat/c08-settings-stats-logs-redo` |
+| 4 | 2026-06-30 | C-08 document settings statistics logs | `816c4ff`, `811463a` | `PrimeTeam/feat/c08-settings-stats-logs-redo` |
 | 3 | 2026-06-29 | Gateway active API contract verifier | `03c1192` | `Special/chore/gateway-active-api-check` |
 | 2 | 2026-06-29 | Document service baseline | `e0c1e2e`, `e850615` | `PrimeTeam/feat/document-service-baseline` |
 | 1 | 2026-06-28 | Report generation implementation preparation | `a63f731` | `PrimeTeam/docs/report-generation-docs` |

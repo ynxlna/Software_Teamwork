@@ -33,6 +33,7 @@ type Event struct {
 	ToolCallID   string
 	ToolName     string
 	FinishReason string
+	Usage        TokenUsage
 	Err          error
 }
 
@@ -121,7 +122,7 @@ func (r *Runner) RunWithObserver(ctx context.Context, input []Message, observer 
 			return Result{}, fmt.Errorf("%w: expected assistant role, got %q", ErrInvalidResponse, assistant.Role)
 		}
 		messages = append(messages, assistant)
-		emit(observer, Event{Type: EventModelCompleted, Iteration: iteration, FinishReason: completion.FinishReason})
+		emit(observer, Event{Type: EventModelCompleted, Iteration: iteration, FinishReason: completion.FinishReason, Usage: completion.Usage})
 
 		if len(assistant.ToolCalls) == 0 {
 			if strings.TrimSpace(assistant.Content) == "" {

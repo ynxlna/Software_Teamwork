@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -41,6 +42,7 @@ func (s *Service) CreateEmbeddings(ctx context.Context, req RequestContext, inpu
 	invocation := s.newInvocation(req, OperationEmbedding, profile, providerModel, startedAt)
 	invocation.InputCount = intPtr(len(input.Input))
 	invocation.EmbeddingDimensions = cloneIntPtr(dimensions)
+	encodingFormat := normalizedEncodingFormat(input.EncodingFormat)
 
 	response, metadata, callErr := s.invoker.CreateEmbeddings(ctx, ProviderEmbeddingRequest{
 		RequestID:         strings.TrimSpace(req.RequestID),
@@ -51,14 +53,14 @@ func (s *Service) CreateEmbeddings(ctx context.Context, req RequestContext, inpu
 		Model:             providerModel,
 		Input:             append([]string(nil), input.Input...),
 		Dimensions:        cloneIntPtr(dimensions),
-		EncodingFormat:    normalizedEncodingFormat(input.EncodingFormat),
+		EncodingFormat:    encodingFormat,
 		User:              strings.TrimSpace(input.User),
 		DefaultParameters: cloneRaw(profile.DefaultParameters),
 	})
 	if callErr != nil {
 		return EmbeddingResponse{}, s.finishInvocation(ctx, invocation, metadata, nil, callErr)
 	}
-	if err := validateEmbeddingResponse(response, len(input.Input)); err != nil {
+	if err := validateEmbeddingResponse(response, len(input.Input), encodingFormat); err != nil {
 		return EmbeddingResponse{}, s.finishInvocation(ctx, invocation, metadata, nil, err)
 	}
 	if err := s.finishInvocation(ctx, invocation, metadata, response.Usage, nil); err != nil {
@@ -120,6 +122,7 @@ func (s *Service) CreateReranking(ctx context.Context, req RequestContext, input
 	if err := validateRerankingResponse(response, input.Documents); err != nil {
 		return RerankingResponse{}, s.finishInvocation(ctx, invocation, metadata, nil, err)
 	}
+	response = limitRerankingResponse(response, *topN)
 	if err := s.finishInvocation(ctx, invocation, metadata, response.Usage, nil); err != nil {
 		return RerankingResponse{}, err
 	}
@@ -327,13 +330,13 @@ func validateRerankingInput(input RerankingInput) map[string]string {
 	return fields
 }
 
-func validateEmbeddingResponse(response EmbeddingResponse, expectedCount int) error {
+func validateEmbeddingResponse(response EmbeddingResponse, expectedCount int, encodingFormat string) error {
 	if response.Object != "list" || strings.TrimSpace(response.Model) == "" || expectedCount <= 0 || len(response.Data) != expectedCount {
 		return NewProviderError(CodeDependency, "provider returned an invalid response", nil, nil)
 	}
 	seen := make(map[int]struct{}, expectedCount)
 	for position, item := range response.Data {
-		if item.Object != "embedding" || !json.Valid(item.Embedding) || len(item.Embedding) == 0 {
+		if item.Object != "embedding" || !json.Valid(item.Embedding) || !validEmbeddingPayload(item.Embedding, encodingFormat) {
 			return NewProviderError(CodeDependency, "provider returned an invalid response", nil, nil)
 		}
 		if item.Index < 0 || item.Index >= expectedCount {
@@ -348,6 +351,35 @@ func validateEmbeddingResponse(response EmbeddingResponse, expectedCount int) er
 		seen[item.Index] = struct{}{}
 	}
 	return nil
+}
+
+func validEmbeddingPayload(payload json.RawMessage, encodingFormat string) bool {
+	switch normalizedEncodingFormat(encodingFormat) {
+	case "float":
+		var values []float64
+		if err := json.Unmarshal(payload, &values); err != nil {
+			return false
+		}
+		return len(values) > 0
+	case "base64":
+		var value string
+		if err := json.Unmarshal(payload, &value); err != nil {
+			return false
+		}
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return false
+		}
+		if _, err := base64.StdEncoding.DecodeString(value); err == nil {
+			return true
+		}
+		if _, err := base64.RawStdEncoding.DecodeString(value); err == nil {
+			return true
+		}
+		return false
+	default:
+		return false
+	}
 }
 
 func validateRerankingResponse(response RerankingResponse, documents []RerankingDocument) error {
@@ -368,6 +400,14 @@ func validateRerankingResponse(response RerankingResponse, documents []Reranking
 		seen[item.Index] = struct{}{}
 	}
 	return nil
+}
+
+func limitRerankingResponse(response RerankingResponse, topN int) RerankingResponse {
+	if topN <= 0 || len(response.Data) <= topN {
+		return response
+	}
+	response.Data = append([]RerankingResult(nil), response.Data[:topN]...)
+	return response
 }
 
 func normalizedEncodingFormat(value string) string {

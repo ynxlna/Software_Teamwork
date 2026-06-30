@@ -165,6 +165,12 @@ JSON 成功、分页和错误响应遵循 [前后端集成契约](../../architec
 | `50200` | `dependency_error` | `502` | 知识检索或重排序依赖失败。 |
 | `50300` | `dependency_error` | `502` | 文档处理或知识服务依赖失败。 |
 
+Owner 权限语义：
+
+- `GET/PATCH/DELETE /api/v1/qa-sessions/{sessionId}` 和会话消息列表/创建只允许当前用户访问。目标会话存在且属于其他用户时返回 `403 forbidden`；会话不存在或已软删除时返回 `404 not_found`。
+- `GET` message、response run、citation 子资源始终带当前用户 owner 过滤。不存在或不属于当前用户时返回 `404 not_found`，不通过单资源响应泄露其他用户数据；批量 citation lookup 只返回当前用户可见的记录，不披露被省略 ID 的存在性。
+- 当前未实现管理员跨用户访问能力；即使调用方带管理员角色，也不能绕过 QA owner 检查。
+
 ## 公开接口总览
 
 | Method | Gateway Path | Auth | Owner | 说明 |
@@ -393,6 +399,8 @@ JSON 成功、分页和错误响应遵循 [前后端集成契约](../../architec
 
 查询会话详情。默认返回最近消息摘要；完整消息列表由 `/messages` 子资源查询。
 
+当前用户访问其他用户的有效会话时返回 `403 forbidden`；会话不存在或已软删除时返回 `404 not_found`。
+
 响应 `200`：
 
 ```json
@@ -413,6 +421,8 @@ JSON 成功、分页和错误响应遵循 [前后端集成契约](../../architec
 
 更新会话标题或状态。只允许当前用户更新自己的会话。
 
+其他用户的有效会话返回 `403 forbidden`；不存在或已软删除的会话返回 `404 not_found`。
+
 请求：
 
 ```json
@@ -428,11 +438,15 @@ JSON 成功、分页和错误响应遵循 [前后端集成契约](../../architec
 
 删除或软删除会话。实现可将 `conversations.deleted_at` 置为当前时间，并隐藏该会话及其消息。
 
+其他用户的有效会话返回 `403 forbidden`；不存在或已软删除的会话返回 `404 not_found`。
+
 响应 `204`：无响应体。
 
 ### GET /api/v1/qa-sessions/{sessionId}/messages
 
 查询会话消息列表。
+
+其他用户的有效会话返回 `403 forbidden`；不存在或已软删除的会话返回 `404 not_found`。
 
 查询参数：
 

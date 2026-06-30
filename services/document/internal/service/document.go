@@ -113,6 +113,23 @@ func (s *Service) CreateReportTemplate(ctx context.Context, reqCtx RequestContex
 		_ = s.files.DeleteFile(context.WithoutCancel(ctx), reqCtx, file.ID)
 		return ReportTemplate{}, dependencyError("create report template", err)
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUploadTemplate,
+		TargetType:      "template",
+		TargetID:        created.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"templateName": created.TemplateName,
+			"reportType":   created.ReportType,
+			"filename":     created.Filename,
+			"fileSize":     created.FileSize,
+		},
+		CreatedAt: now,
+	})
 	return created, nil
 }
 
@@ -145,6 +162,22 @@ func (s *Service) UpdateReportTemplate(ctx context.Context, reqCtx RequestContex
 	if err != nil {
 		return ReportTemplate{}, mapRepositoryReadError(err, "report template not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUpdateTemplate,
+		TargetType:      "template",
+		TargetID:        template.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"templateNameChanged": input.TemplateName != nil,
+			"descriptionChanged":  input.Description != nil,
+			"enabledChanged":      input.Enabled != nil,
+		},
+		CreatedAt: s.now(),
+	})
 	return template, nil
 }
 
@@ -158,6 +191,17 @@ func (s *Service) DeleteReportTemplate(ctx context.Context, reqCtx RequestContex
 	if err := s.repo.DeleteReportTemplate(ctx, id, s.now()); err != nil {
 		return mapRepositoryReadError(err, "report template not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationDeleteTemplate,
+		TargetType:      "template",
+		TargetID:        id,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		CreatedAt:       s.now(),
+	})
 	return nil
 }
 
@@ -187,6 +231,20 @@ func (s *Service) UpdateReportTemplateStructure(ctx context.Context, reqCtx Requ
 	if err != nil {
 		return ReportTemplateStructure{}, mapRepositoryReadError(err, "report template not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUpdateTemplate,
+		TargetType:      "template",
+		TargetID:        input.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"structureUpdated": true,
+		},
+		CreatedAt: s.now(),
+	})
 	return normalizeStructure(updated), nil
 }
 
@@ -233,6 +291,25 @@ func (s *Service) CreateReportMaterial(ctx context.Context, reqCtx RequestContex
 		_ = s.files.DeleteFile(context.WithoutCancel(ctx), reqCtx, file.ID)
 		return ReportMaterial{}, dependencyError("create report material", err)
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUploadMaterial,
+		TargetType:      "material",
+		TargetID:        created.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"materialName": created.MaterialName,
+			"materialType": created.MaterialType,
+			"category":     created.Category,
+			"filename":     created.Filename,
+			"fileSize":     created.FileSize,
+			"tagCount":     len(created.Tags),
+		},
+		CreatedAt: now,
+	})
 	return created, nil
 }
 
@@ -257,6 +334,17 @@ func (s *Service) DeleteReportMaterial(ctx context.Context, reqCtx RequestContex
 	if err := s.repo.DeleteReportMaterial(ctx, id, s.now()); err != nil {
 		return mapRepositoryReadError(err, "report material not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationDeleteMaterial,
+		TargetType:      "material",
+		TargetID:        id,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		CreatedAt:       s.now(),
+	})
 	return nil
 }
 
@@ -395,7 +483,7 @@ func cleanList(values []string) []string {
 
 func mapFileError(err error) error {
 	var appErr *AppError
-	if errors.As(err, &appErr) && appErr.Code == CodeValidation {
+	if errors.As(err, &appErr) && (appErr.Code == CodeValidation || appErr.Code == CodeNotFound) {
 		return err
 	}
 	return dependencyError("file service failed", err)

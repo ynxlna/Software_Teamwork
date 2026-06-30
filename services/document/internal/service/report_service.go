@@ -199,6 +199,22 @@ func (s *ReportService) CreateReport(ctx context.Context, reqCtx RequestContext,
 	if err != nil {
 		return Report{}, mapRepositoryReadError(err, "create report failed")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationCreateReport,
+		TargetType:      "report",
+		TargetID:        created.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, source),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportType": created.ReportType,
+			"templateId": created.TemplateID,
+			"source":     created.Source,
+		},
+		CreatedAt: now,
+	})
 	return created, nil
 }
 
@@ -247,6 +263,25 @@ func (s *ReportService) UpdateReport(ctx context.Context, reqCtx RequestContext,
 	if err != nil {
 		return Report{}, mapRepositoryReadError(err, "report not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUpdateReport,
+		TargetType:      "report",
+		TargetID:        updated.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"nameChanged":           input.Name != nil,
+			"templateChanged":       input.TemplateID != nil,
+			"topicChanged":          input.Topic != nil,
+			"specialtyChanged":      input.Specialty != nil,
+			"businessObjectChanged": input.BusinessObject != nil,
+			"yearChanged":           input.Year != nil,
+		},
+		CreatedAt: s.now(),
+	})
 	return updated, nil
 }
 
@@ -261,6 +296,17 @@ func (s *ReportService) SoftDeleteReport(ctx context.Context, reqCtx RequestCont
 	if _, err := s.repo.SoftDeleteReport(ctx, reportID, s.now()); err != nil {
 		return mapRepositoryReadError(err, "report not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationDeleteReport,
+		TargetType:      "report",
+		TargetID:        reportID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		CreatedAt:       s.now(),
+	})
 	return nil
 }
 
@@ -320,6 +366,23 @@ func (s *ReportService) CreateOutline(ctx context.Context, reqCtx RequestContext
 	if err != nil {
 		return ReportOutline{}, mapRepositoryReadError(err, "create report outline failed")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationSaveOutline,
+		TargetType:      "outline",
+		TargetID:        created.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportId":     reportID,
+			"version":      created.Version,
+			"source":       created.Source,
+			"sectionCount": len(created.Sections),
+		},
+		CreatedAt: now,
+	})
 	return created, nil
 }
 
@@ -363,6 +426,22 @@ func (s *ReportService) UpdateOutline(ctx context.Context, reqCtx RequestContext
 	if err != nil {
 		return ReportOutline{}, mapRepositoryReadError(err, "report outline not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationSaveOutline,
+		TargetType:      "outline",
+		TargetID:        updated.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportId":     reportID,
+			"version":      updated.Version,
+			"sectionCount": len(updated.Sections),
+		},
+		CreatedAt: s.now(),
+	})
 	return updated, nil
 }
 
@@ -389,6 +468,22 @@ func (s *ReportService) DeleteOutlineSection(ctx context.Context, reqCtx Request
 	if err != nil {
 		return ReportOutline{}, mapRepositoryReadError(err, "report outline not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationSaveOutline,
+		TargetType:      "outline",
+		TargetID:        updated.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportId":        reportID,
+			"deletedSectionId": sectionID,
+			"sectionCount":     len(updated.Sections),
+		},
+		CreatedAt: s.now(),
+	})
 	return updated, nil
 }
 
@@ -450,6 +545,22 @@ func (s *ReportService) CreateSection(ctx context.Context, reqCtx RequestContext
 	if err != nil {
 		return ReportSection{}, mapRepositoryReadError(err, "create report section failed")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUpdateSection,
+		TargetType:      "section",
+		TargetID:        created.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportId":   reportID,
+			"title":      created.Title,
+			"createdNew": true,
+		},
+		CreatedAt: s.now(),
+	})
 	return created, nil
 }
 
@@ -488,6 +599,23 @@ func (s *ReportService) UpdateSection(ctx context.Context, reqCtx RequestContext
 	if err != nil {
 		return ReportSection{}, mapRepositoryReadError(err, "report section not found")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUpdateSection,
+		TargetType:      "section",
+		TargetID:        updated.ID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportId":       reportID,
+			"titleChanged":   input.Title != nil,
+			"contentChanged": input.Content != nil,
+			"tablesChanged":  input.Tables != nil,
+		},
+		CreatedAt: s.now(),
+	})
 	return updated, nil
 }
 
@@ -568,6 +696,20 @@ func (s *ReportService) SaveSections(ctx context.Context, reqCtx RequestContext,
 	if err != nil {
 		return nil, err
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationUpdateSection,
+		TargetType:      "report",
+		TargetID:        reportID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"sectionCount": len(saved),
+		},
+		CreatedAt: s.now(),
+	})
 	return saved, nil
 }
 
@@ -814,5 +956,21 @@ func (s *ReportService) CreateSectionVersion(ctx context.Context, reqCtx Request
 	if err != nil {
 		return ReportSectionVersion{}, mapRepositoryReadError(err, "create report section version failed")
 	}
+	recordOperationIfSupported(ctx, s.repo, OperationLog{
+		OperatorID:      reqCtx.UserID,
+		OperatorName:    reqCtx.UserID,
+		OperationType:   OperationCreateSectionVersion,
+		TargetType:      "section",
+		TargetID:        sectionID,
+		RequestID:       reqCtx.RequestID,
+		RequestSource:   requestSource(reqCtx, "api"),
+		OperationResult: OperationResultSucceeded,
+		ParameterSummary: map[string]any{
+			"reportId": reportID,
+			"version":  created.Version,
+			"source":   created.Source,
+		},
+		CreatedAt: s.now(),
+	})
 	return created, nil
 }

@@ -17,28 +17,30 @@ const (
 )
 
 type Config struct {
-	HTTPAddr           string
-	DatabaseURL        string
-	RedisAddr          string
-	FileServiceURL     string
-	AIGatewayURL       string
-	AIGatewayProfileID string
-	PandocPath         string
-	LibreOfficePath    string
-	ShutdownTimeout    time.Duration
+	HTTPAddr              string
+	DatabaseURL           string
+	RedisAddr             string
+	FileServiceURL        string
+	AIGatewayURL          string
+	AIGatewayProfileID    string
+	AIGatewayServiceToken string
+	PandocPath            string
+	LibreOfficePath       string
+	ShutdownTimeout       time.Duration
 }
 
 func Load() (Config, error) {
 	cfg := Config{
-		HTTPAddr:           envOr("DOCUMENT_HTTP_ADDR", DefaultHTTPAddr),
-		DatabaseURL:        strings.TrimSpace(os.Getenv("DOCUMENT_DATABASE_URL")),
-		RedisAddr:          strings.TrimSpace(os.Getenv("DOCUMENT_REDIS_ADDR")),
-		FileServiceURL:     strings.TrimSpace(os.Getenv("DOCUMENT_FILE_SERVICE_URL")),
-		AIGatewayURL:       strings.TrimSpace(os.Getenv("DOCUMENT_AI_GATEWAY_URL")),
-		AIGatewayProfileID: strings.TrimSpace(os.Getenv("DOCUMENT_AI_GATEWAY_PROFILE_ID")),
-		PandocPath:         envOr("DOCUMENT_PANDOC_PATH", DefaultPandocPath),
-		LibreOfficePath:    envOr("DOCUMENT_LIBREOFFICE_PATH", DefaultLibreOfficePath),
-		ShutdownTimeout:    DefaultShutdownTimeout,
+		HTTPAddr:              envOr("DOCUMENT_HTTP_ADDR", DefaultHTTPAddr),
+		DatabaseURL:           strings.TrimSpace(os.Getenv("DOCUMENT_DATABASE_URL")),
+		RedisAddr:             strings.TrimSpace(os.Getenv("DOCUMENT_REDIS_ADDR")),
+		FileServiceURL:        strings.TrimSpace(os.Getenv("DOCUMENT_FILE_SERVICE_URL")),
+		AIGatewayURL:          strings.TrimSpace(os.Getenv("DOCUMENT_AI_GATEWAY_URL")),
+		AIGatewayProfileID:    strings.TrimSpace(os.Getenv("DOCUMENT_AI_GATEWAY_PROFILE_ID")),
+		AIGatewayServiceToken: firstEnv("DOCUMENT_AI_GATEWAY_SERVICE_TOKEN", "INTERNAL_SERVICE_TOKEN"),
+		PandocPath:            envOr("DOCUMENT_PANDOC_PATH", DefaultPandocPath),
+		LibreOfficePath:       envOr("DOCUMENT_LIBREOFFICE_PATH", DefaultLibreOfficePath),
+		ShutdownTimeout:       DefaultShutdownTimeout,
 	}
 
 	if raw := strings.TrimSpace(os.Getenv("DOCUMENT_SHUTDOWN_TIMEOUT")); raw != "" {
@@ -104,4 +106,13 @@ func envOr(key string, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
 }

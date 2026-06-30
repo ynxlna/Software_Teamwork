@@ -8,10 +8,16 @@
 
 import type {
   CreateKnowledgeBaseRequest,
+  CreateModelProfileRequest,
   CreateParserConfigRequest,
   CreateQAConfigVersionRequest,
   CreateQALLMConfigVersionRequest,
+  DocumentChunk,
+  DocumentSummary,
   KnowledgeBaseSummary,
+  KnowledgeQueryRequest,
+  KnowledgeQuerySummary,
+  ModelProfile,
   ParserConfig,
   QAConfigVersion,
   QAIntentDistributionItem,
@@ -23,29 +29,21 @@ import type {
   QARetrievalTestRun,
   QARetrievalTestRunRequest,
   QATopQuery,
+  UpdateDocumentRequest,
   UpdateKnowledgeBaseRequest,
+  UpdateModelProfileRequest,
   UpdateParserConfigRequest,
 } from '@/lib/types'
 
-import { buildQuery, gatewayPageRequest, gatewayRequest } from './client'
+import {
+  buildQuery,
+  gatewayFileRequest,
+  gatewayPageRequest,
+  gatewayRequest,
+  requestVoid,
+} from './client'
 
 export { createUserSession as createUser, getCurrentUser } from './auth'
-
-export function listParserConfigs(enabled?: boolean): Promise<ParserConfig[]> {
-  return gatewayRequest<ParserConfig[]>(`/admin/parser-configs${buildQuery({ enabled })}`)
-}
-
-export function createParserConfig(input: CreateParserConfigRequest): Promise<ParserConfig> {
-  return gatewayRequest<ParserConfig>('/admin/parser-configs', { method: 'POST', body: input })
-}
-
-export function updateParserConfig(id: string, input: UpdateParserConfigRequest): Promise<ParserConfig> {
-  return gatewayRequest<ParserConfig>(`/admin/parser-configs/${encodeURIComponent(id)}`, { method: 'PATCH', body: input })
-}
-
-export function deleteParserConfig(id: string): Promise<void> {
-  return gatewayRequest<void>(`/admin/parser-configs/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
 
 // =========================================================================
 // LLM Configuration
@@ -187,7 +185,7 @@ export async function updateKnowledgeBase(
 
 /** DELETE /knowledge-bases/{knowledgeBaseId} */
 export async function deleteKnowledgeBase(id: string): Promise<void> {
-  await gatewayRequest<void>(`/knowledge-bases/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  await requestVoid(`/knowledge-bases/${encodeURIComponent(id)}`, { method: 'DELETE' })
 }
 
 // =========================================================================
@@ -203,6 +201,195 @@ export async function deleteKnowledgeBase(id: string): Promise<void> {
 // endpoints in the current gateway contract.
 // =========================================================================
 
-/** POST /users — Create a new user (registration). Returns user + session (envelope unwrapped). */
+// =========================================================================
+// Documents
+// =========================================================================
 
-/** GET /users/me — Get current authenticated user. */
+/** GET /knowledge-bases/{knowledgeBaseId}/documents?page=&pageSize=&status= */
+export interface ListDocumentsParams {
+  page?: number
+  pageSize?: number
+  status?: string
+}
+
+export async function listDocuments(
+  knowledgeBaseId: string,
+  params: ListDocumentsParams = {},
+): Promise<{
+  items: DocumentSummary[]
+  page: { page: number; pageSize: number; total: number }
+}> {
+  return gatewayPageRequest<DocumentSummary>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents${buildQuery({
+      page: params.page,
+      pageSize: params.pageSize,
+      status: params.status,
+    })}`,
+  )
+}
+
+/** POST /knowledge-bases/{knowledgeBaseId}/documents (multipart/form-data) */
+export async function uploadDocument(
+  knowledgeBaseId: string,
+  file: File,
+  tags?: string[],
+): Promise<DocumentSummary> {
+  const formData = new FormData()
+  formData.append('file', file)
+  if (tags && tags.length > 0) {
+    tags.forEach((tag) => formData.append('tags', tag))
+  }
+  return gatewayRequest<DocumentSummary>(
+    `/knowledge-bases/${encodeURIComponent(knowledgeBaseId)}/documents`,
+    { method: 'POST', body: formData },
+  )
+}
+
+/** GET /documents/{documentId} */
+export async function getDocument(documentId: string): Promise<DocumentSummary> {
+  return gatewayRequest<DocumentSummary>(`/documents/${encodeURIComponent(documentId)}`)
+}
+
+/** PATCH /documents/{documentId} */
+export async function updateDocument(
+  documentId: string,
+  params: UpdateDocumentRequest,
+): Promise<DocumentSummary> {
+  return gatewayRequest<DocumentSummary>(`/documents/${encodeURIComponent(documentId)}`, {
+    method: 'PATCH',
+    body: params,
+  })
+}
+
+/** DELETE /documents/{documentId} */
+export async function deleteDocument(documentId: string): Promise<void> {
+  await requestVoid(`/documents/${encodeURIComponent(documentId)}`, { method: 'DELETE' })
+}
+
+/** GET /documents/{documentId}/chunks?page=&pageSize= */
+export interface ListChunksParams {
+  page?: number
+  pageSize?: number
+}
+
+export async function listChunks(
+  documentId: string,
+  params: ListChunksParams = {},
+): Promise<{
+  items: DocumentChunk[]
+  page: { page: number; pageSize: number; total: number }
+}> {
+  return gatewayPageRequest<DocumentChunk>(
+    `/documents/${encodeURIComponent(documentId)}/chunks${buildQuery({
+      page: params.page,
+      pageSize: params.pageSize,
+    })}`,
+  )
+}
+
+/** GET /documents/{documentId}/content — returns the original file as a Blob */
+export function getDocumentContent(documentId: string): Promise<Blob> {
+  return gatewayFileRequest(`/documents/${encodeURIComponent(documentId)}/content`)
+}
+
+/** POST /knowledge-queries */
+export async function runKnowledgeQuery(
+  params: KnowledgeQueryRequest,
+): Promise<KnowledgeQuerySummary> {
+  return gatewayRequest<KnowledgeQuerySummary>('/knowledge-queries', {
+    method: 'POST',
+    body: params,
+  })
+}
+
+// =========================================================================
+// Model Profiles (admin-runtime-config, owner: ai-gateway)
+// =========================================================================
+
+/** GET /admin/model-profiles?purpose=&enabled= */
+export async function listModelProfiles(params?: {
+  purpose?: string
+  enabled?: boolean
+}): Promise<ModelProfile[]> {
+  return gatewayRequest<ModelProfile[]>(
+    `/admin/model-profiles${buildQuery({
+      purpose: params?.purpose,
+      enabled: params?.enabled,
+    })}`,
+  )
+}
+
+/** POST /admin/model-profiles */
+export async function createModelProfile(params: CreateModelProfileRequest): Promise<ModelProfile> {
+  return gatewayRequest<ModelProfile>('/admin/model-profiles', {
+    method: 'POST',
+    body: params,
+  })
+}
+
+/** GET /admin/model-profiles/{profileId} */
+export async function getModelProfile(profileId: string): Promise<ModelProfile> {
+  return gatewayRequest<ModelProfile>(`/admin/model-profiles/${encodeURIComponent(profileId)}`)
+}
+
+/** PATCH /admin/model-profiles/{profileId} */
+export async function updateModelProfile(
+  profileId: string,
+  params: UpdateModelProfileRequest,
+): Promise<ModelProfile> {
+  return gatewayRequest<ModelProfile>(`/admin/model-profiles/${encodeURIComponent(profileId)}`, {
+    method: 'PATCH',
+    body: params,
+  })
+}
+
+/** DELETE /admin/model-profiles/{profileId} */
+export async function deleteModelProfile(profileId: string): Promise<void> {
+  await requestVoid(`/admin/model-profiles/${encodeURIComponent(profileId)}`, { method: 'DELETE' })
+}
+
+// =========================================================================
+// Parser Configs (admin-runtime-config, owner: knowledge)
+// =========================================================================
+
+/** GET /admin/parser-configs?enabled= */
+export async function listParserConfigs(params?: { enabled?: boolean }): Promise<ParserConfig[]> {
+  return gatewayRequest<ParserConfig[]>(
+    `/admin/parser-configs${buildQuery({ enabled: params?.enabled })}`,
+  )
+}
+
+/** POST /admin/parser-configs */
+export async function createParserConfig(params: CreateParserConfigRequest): Promise<ParserConfig> {
+  return gatewayRequest<ParserConfig>('/admin/parser-configs', {
+    method: 'POST',
+    body: params,
+  })
+}
+
+/** GET /admin/parser-configs/{parserConfigId} */
+export async function getParserConfig(parserConfigId: string): Promise<ParserConfig> {
+  return gatewayRequest<ParserConfig>(`/admin/parser-configs/${encodeURIComponent(parserConfigId)}`)
+}
+
+/** PATCH /admin/parser-configs/{parserConfigId} */
+export async function updateParserConfig(
+  parserConfigId: string,
+  params: UpdateParserConfigRequest,
+): Promise<ParserConfig> {
+  return gatewayRequest<ParserConfig>(
+    `/admin/parser-configs/${encodeURIComponent(parserConfigId)}`,
+    { method: 'PATCH', body: params },
+  )
+}
+
+/** DELETE /admin/parser-configs/{parserConfigId} */
+export async function deleteParserConfig(parserConfigId: string): Promise<void> {
+  await requestVoid(`/admin/parser-configs/${encodeURIComponent(parserConfigId)}`, {
+    method: 'DELETE',
+  })
+}
+
+// =========================================================================
+// Auth (re-exported from ./auth)
+// =========================================================================

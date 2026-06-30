@@ -35,6 +35,7 @@ gateway service
    +--> file service
    +--> 智能问答
    +--> 知识库
+   +--> parser runtime
    +--> 文档生成
 
 基础设施:
@@ -50,7 +51,8 @@ postgres + redis + qdrant + minio
 | `auth` | 用户身份、登录认证、权限控制、令牌或会话管理。 |
 | `file` | 文件上传、文件元数据、对象存储协调，以及文件处理流程入口。 |
 | `qa` | 智能问答服务，作为 Agent Host 管理会话、ReAct 循环、MCP 工具调用、引用和回答持久化。 |
-| `knowledge` | 知识导入、切分、索引、元数据管理和检索协调。 |
+| `knowledge` | 知识导入状态、切分、索引、元数据管理和检索协调。 |
+| `parser` | 内部文档解析运行时，将 raw bytes 转成规范化 parsed content；首期目标为 Python/PaddleOCR，不通过 gateway 暴露。 |
 | `document` | 报告、材料、知识摘要等文档生成流程。 |
 
 基础设施职责：
@@ -76,6 +78,7 @@ Gateway 基础契约文档：
 - Auth 服务接口文档：[docs/services/auth/README.md](docs/services/auth/README.md)
 - File 服务接口文档：[docs/services/file/README.md](docs/services/file/README.md)
 - Knowledge 服务接口文档：[docs/services/knowledge/README.md](docs/services/knowledge/README.md)
+- Parser Runtime 服务文档：[docs/services/parser/README.md](docs/services/parser/README.md)
 - Gateway OpenAPI 契约：[docs/services/gateway/api/openapi.yaml](docs/services/gateway/api/openapi.yaml)
 - 服务边界矩阵：[docs/architecture/service-boundaries.md](docs/architecture/service-boundaries.md)
 - 前后端集成契约：[docs/architecture/frontend-backend-contract.md](docs/architecture/frontend-backend-contract.md)
@@ -97,6 +100,9 @@ Gateway 基础契约文档：
 │   │   └── go.mod
 │   ├── knowledge/
 │   │   └── go.mod
+│   ├── parser/
+│   │   ├── api/
+│   │   └── src/
 │   └── document/
 │       └── go.mod
 ├── deploy/

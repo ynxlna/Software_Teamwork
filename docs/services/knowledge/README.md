@@ -11,12 +11,23 @@ RESTful 路径、统一响应和错误 envelope 以 [前后端集成契约](../.
 | [API 契约](docs/api-contract.md) | 知识管理公开接口、权限、错误码和跨服务边界。 |
 | [数据模型](docs/data-models.md) | Knowledge Service 拥有的 PostgreSQL、Qdrant 和运行时逻辑模型。 |
 | [实现说明](docs/implementation.md) | 当前代码实现、契约对齐、缺口、临时后端和最近检查记录。 |
+| [Parser Runtime 服务文档](../parser/README.md) | 文档解析运行时和 PaddleOCR 边界；Knowledge 只通过内部 HTTP 调用。 |
+
+## 任务解耦契约
+
+A-11 ingestion worker、A-12 `knowledge-queries` 检索和 A-14 契约测试通过
+[`API 契约 2.6`](docs/api-contract.md#26-worker检索与契约测试解耦) 解耦。
+A-12/A-14 可以依赖 `knowledge_documents`、`document_chunks` 和 Qdrant 最小
+payload 的稳定契约，通过 seeded repository 或 fake vector/AI adapter 验证
+检索、错误 envelope 和 request id；不要求真实 A-11 worker 已经完成解析、embedding
+和 Qdrant 写入闭环。只有完整上传到检索的跨服务 smoke 需要等待 A-11 runtime。
 
 ## 技术基线
 
 Knowledge Service 的工程选型以 [技术选型基线](../../architecture/technology-decisions.md) 为准。本服务只补充知识域特有约束：
 
 - 文档入库、重处理和删除清理使用 `asynq` over Redis；PostgreSQL 仍是 job 状态、失败摘要和重试次数的事实来源。
+- 原始文档解析运行时由内部 Parser service 提供；Knowledge 不承载 PaddleOCR、PaddlePaddle、OpenCV、CUDA 或模型加载依赖。
 - Qdrant 只保存向量和最小检索 payload；知识库、文档处理状态、chunks 和权限相关状态仍归 PostgreSQL 与 owner service。
 - embedding、rerank 和后续 LLM 能力通过 AI Gateway 的 OpenAI-compatible profile 接入；Knowledge 不保存 provider API key 明文。
 
@@ -26,11 +37,14 @@ Knowledge Service 的工程选型以 [技术选型基线](../../architecture/tec
 | --- | --- |
 | 知识库元数据 | 创建、查询、更新和删除知识库，维护文档类型、切片策略和检索策略。 |
 | 文档处理状态 | 维护文档从 `uploaded` 到 `ready` 或 `failed` 的处理状态、错误摘要和统计字段。 |
-| 文档解析与切片 | 对已进入知识库的文档做解析、语义切片和切片详情保存。 |
+| 文档解析协调与切片 | 调用 Parser service 获取 parsed content，并在 Knowledge 内做语义切片和切片详情保存。 |
 | 向量索引 | 生成 embedding，维护 Qdrant collection、point 和检索 payload。 |
 | 检索查询 | 根据 query、知识库范围、Top K、阈值和标签过滤返回召回结果。 |
 
-`knowledge` 不负责用户登录、RBAC 源数据、底层对象存储实现、LLM 回答生成或 DOCX 报告导出。知识库文档公开资源、处理状态和原始文件流入口由 `knowledge` 拥有；底层原始文件对象可在服务边界内复用 `file` 的基础能力。
+`knowledge` 不负责用户登录、RBAC 源数据、底层对象存储实现、OCR/PaddleOCR
+运行时、LLM 回答生成或 DOCX 报告导出。知识库文档公开资源、处理状态和原始文件流入口由
+`knowledge` 拥有；底层原始文件对象可在服务边界内复用 `file` 的基础能力，解析运行时通过
+`parser` 内部服务调用。
 
 ## 接入模型
 
@@ -51,6 +65,8 @@ knowledge service
    +--> Qdrant vectors and retrieval payload
    +--> asynq over Redis for async ingestion/indexing workers
    +--> File service base file APIs for raw source bytes
+   +--> Parser service /internal/v1/parsed-documents for normalized parsed content
+   +--> AI Gateway /internal/v1/embeddings and /internal/v1/rerankings
 ```
 
 Gateway 调用 knowledge 服务时应传递：
@@ -133,6 +149,10 @@ POST /api/v1/knowledge-queries
 
 响应必须返回可溯源字段，例如 `knowledgeBaseId`、`documentId`、`chunkId`、`documentName`、`sectionPath`、`score` 和 `contentPreview`。不要向前端返回原始向量、完整 Qdrant payload、内部 object key、prompt 或下游服务 URL。
 
+检索实现必须从 Qdrant hit 中读取最小 payload 后回 PostgreSQL hydrate。测试中允许用
+seeded `document_chunks` 和 fake vector hit 替代真实 worker/Qdrant，只要请求、
+响应、过滤、权限和错误 envelope 与 gateway OpenAPI 一致。
+
 ## 与 File Service 的边界
 
 当前公开上传入口：
@@ -141,7 +161,7 @@ POST /api/v1/knowledge-queries
 POST /api/v1/knowledge-bases/{knowledgeBaseId}/documents
 ```
 
-该接口由 `knowledge` 拥有。Knowledge Service 负责接收 gateway 转发的 multipart、创建知识库文档资源、保存内部 file reference、维护处理状态、chunks、embedding、Qdrant 索引和检索。Knowledge 可在服务边界内调用 File Service 的 `/internal/v1/files/**` 基础接口保存和读取底层原始文件对象；File Service 不保存 `knowledgeBaseId`、文档处理状态、chunks 或索引状态。gateway 不能直接解析文件或操作 Qdrant。
+该接口由 `knowledge` 拥有。Knowledge Service 负责接收 gateway 转发的 multipart、创建知识库文档资源、保存内部 file reference、维护处理状态、chunks、embedding、Qdrant 索引和检索。Knowledge 可在服务边界内调用 File Service 的 `/internal/v1/files/**` 基础接口保存和读取底层原始文件对象，并调用 Parser Service 的 `/internal/v1/parsed-documents` 将 raw bytes 转成规范化 parsed content；File Service 不保存 `knowledgeBaseId`、文档处理状态、chunks 或索引状态，Parser Service 不保存业务状态、chunks、embedding 或 Qdrant point。gateway 不能直接解析文件或操作 Qdrant。
 
 ## 错误码约定
 
@@ -155,10 +175,10 @@ Knowledge 相关接口使用项目统一错误码：
 | `not_found` | `404` | 知识库、文档或切片不存在，或对当前用户隐藏。 |
 | `conflict` | `409` | 当前资源状态不允许修改、删除或重新处理。 |
 | `rate_limited` | `429` | 检索、上传或处理任务超过配额。 |
-| `dependency_error` | `502` | PostgreSQL、Qdrant、Redis、AI Gateway 或其他依赖失败。 |
+| `dependency_error` | `502` | PostgreSQL、Qdrant、Redis、File、Parser、AI Gateway 或其他依赖失败。 |
 | `internal_error` | `500` | 未预期服务端错误。 |
 
-错误响应不得包含 SQL、object key、MinIO 内部路径、原始向量、prompt、API key、token 或堆栈。
+错误响应不得包含 SQL、object key、MinIO 内部路径、Parser 内部文件路径、OCR debug output、原始向量、prompt、API key、token 或堆栈。
 
 ## 实现状态
 

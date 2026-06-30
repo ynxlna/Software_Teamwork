@@ -1,7 +1,7 @@
 # Knowledge Service 数据模型文档
 
-版本：v0.1
-日期：2026-06-29
+版本：v0.2
+日期：2026-06-30
 范围：`services/knowledge/` 负责的知识库、知识文档、处理任务、文档切片、向量索引和检索查询逻辑模型
 
 ## 1. 文档定位
@@ -28,6 +28,7 @@
 - PostgreSQL 是知识库元数据、文档状态、任务状态、切片正文和处理错误的事实来源。
 - Qdrant 只保存向量和检索所需的最小 payload，不作为文档状态、任务状态或正文完整性的事实来源。
 - 原始文件二进制、MinIO object key、文件下载权限和底层文件元数据归 File Service；Knowledge Service 只保存内部 `file_ref`，不把 file 服务内部 ID 暴露为公开文档字段。
+- 文档解析运行时归 Parser Service；Knowledge 只消费 Parser 返回的规范化 parsed content，并负责后续切片、embedding、Qdrant 写入和状态推进。
 - `knowledge-queries` 是检索请求资源。当前实现即时执行并返回结果，不持久化查询历史；如后续需要审计或调试留痕，应新增独立表。
 - 删除采用软删除优先：知识库和文档通过 `deleted_at` 从常规列表中隐藏，任务和切片清理由后续 cleanup job 兜底。
 
@@ -53,6 +54,10 @@ document_chunks 1 ── 1 Qdrant point
 knowledge_query
   └── reads Qdrant hits
   └── hydrates document_chunks and knowledge_documents from PostgreSQL
+
+parser service
+  └── accepts raw bytes from Knowledge
+  └── returns normalized parsed content
 ```
 
 关系约束：
@@ -109,7 +114,7 @@ knowledge_query
 
 ### 6.2 KnowledgeDocument
 
-知识文档是 Knowledge Service 拥有的可检索文档资源。它引用 File Service 中的原文件，并维护解析、切片、embedding 和错误状态。
+知识文档是 Knowledge Service 拥有的可检索文档资源。它引用 File Service 中的原文件，并维护解析协调、切片、embedding 和错误状态；具体 OCR/PaddleOCR 运行时在 Parser Service 内。
 
 | 逻辑字段 | HTTP 字段 | PostgreSQL 字段 | 类型 | 说明 |
 | --- | --- | --- | --- | --- |
@@ -244,6 +249,26 @@ knowledge_query
 | `ProcessingTimeoutSec` | `processingTimeoutSec` | integer | 处理超时秒数。 |
 | `SecretRefs` | `secretRefs` | object | 外部密钥引用名，不保存密钥明文。 |
 
+### 6.7 RetrievalContractFixture
+
+检索实现和契约测试依赖的是持久化数据契约，而不是 A-11 worker
+进程是否已经真实跑通。A-12 和 A-14 可以在测试中 seed 以下最小数据：
+
+| Fixture | 必填字段 | 说明 |
+| --- | --- | --- |
+| `knowledge_bases` | `id`、`created_by`、`deleted_at IS NULL` | 作为权限和范围过滤根。 |
+| `knowledge_documents` | `id`、`knowledge_base_id`、`name`、`status='ready'`、`tags`、`created_by`、`deleted_at IS NULL` | 只有 `ready` 且未删除文档可进入检索结果。 |
+| `document_chunks` | `id`、`knowledge_base_id`、`document_id`、`chunk_index`、`content`、`token_count`、`metadata`、`qdrant_point_id` | 作为检索结果 hydrate 的正文和展示事实来源。 |
+| vector hit | `pointId`、`score`、payload.`knowledge_base_id`、payload.`document_id`、payload.`chunk_id` | 可由 fake Qdrant adapter 直接返回；payload 只用于定位和过滤。 |
+
+fixture 规则：
+
+- `knowledge_documents.status != 'ready'`、`deleted_at IS NOT NULL`、缺少访问权限、低于阈值或 tag/metadata 不匹配的命中必须被过滤。
+- Qdrant hit 找不到对应 `document_chunks` 或 hydrate 后文档不可见时，跳过该 hit，不把内部不一致暴露给前端。
+- 无有效命中时返回 `results: []` 和 `trace.hitCount: 0`，不得返回 500。
+- fake embedding/rerank adapter 可以返回固定向量、固定 score 或固定重排序顺序，但公开响应和 trace 字段必须符合 gateway OpenAPI。
+- 真实 A-11 worker 只负责生产同样形态的数据；不能要求 A-12/A-14 在单元或契约测试中启动 Parser service、真实 embedding provider 或真实 Qdrant。
+
 ## 7. 枚举与状态机
 
 ### 7.1 DocumentStatus
@@ -332,6 +357,7 @@ Payload 规则：
 - 可包含 `tags` 和 `metadata` 支持过滤。
 - 不保存完整文档状态、任务状态或错误详情。
 - 不依赖 Qdrant payload 作为最终展示内容来源；展示正文从 PostgreSQL 的 `document_chunks.content` 读取。
+- 契约测试可以用等价的 fake vector hit 替代真实 Qdrant hit；只要 payload 字段和 score 语义一致，A-12/A-14 不需要等待 A-11 worker 完成真实索引写入。
 
 ## 9. PostgreSQL 当前表
 
@@ -361,6 +387,7 @@ document_chunks
 - `fileId`
 - MinIO bucket、object key、presigned URL
 - `parsedContent`
+- Parser 内部文件路径、OCR debug output、PaddleOCR 原始 provider body
 - `idempotencyKey`
 - provider secret 或 secret 明文
 

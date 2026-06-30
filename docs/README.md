@@ -32,6 +32,7 @@
 | [Knowledge 服务接口文档](services/knowledge/README.md) | 知识库、文档处理状态、切片、向量索引和检索接口契约。 |
 | [Knowledge 数据模型文档](services/knowledge/docs/data-models.md) | Knowledge 模块知识库、文档、处理任务、切片、Qdrant payload 和运行时配置逻辑模型。 |
 | [Knowledge 实现说明](services/knowledge/docs/implementation.md) | `services/knowledge/` 当前实现状态、契约对齐、缺口和最近检查记录。 |
+| [Parser Runtime 服务文档](services/parser/README.md) | 内部文档解析运行时、Python/PaddleOCR 边界和 `/internal/v1/parsed-documents` 契约入口。 |
 | [QA 服务接口文档](services/qa/README.md) | 智能问答 Agent Host、会话、消息、ReAct 循环、MCP 工具调用、SSE、引用、配置、检索测试和统计接口说明。 |
 | [QA 数据模型文档](services/qa/docs/data-models.md) | QA 模块逻辑数据模型、核心关系、写入流程、索引和安全约束。 |
 | [QA 实现说明](services/qa/docs/implementation.md) | `services/qa/` 当前实现状态、契约对齐、缺口和最近检查记录。 |
@@ -47,6 +48,7 @@
 | [Gateway OpenAPI 契约](services/gateway/api/openapi.yaml) | 当前稳定的 gateway 公开 API 机器可读契约。 |
 | [Gateway Active API Owner Map](services/gateway/docs/active-api-owner-map.md) | 从 Gateway OpenAPI 审计得到的 active API 清单、owner service、tag、operationId 和认证要求。 |
 | [AI Gateway OpenAPI 契约](services/ai-gateway/api/openapi.yaml) | AI Gateway 内部服务机器可读契约；前端不得直接调用。 |
+| [Parser Runtime OpenAPI 契约](../services/parser/api/openapi.yaml) | Parser 内部服务机器可读契约；只供 Knowledge ingestion 等后端服务调用。 |
 
 ## 运行与测试
 
@@ -73,6 +75,7 @@
 - Auth 相关用户与会话接口。
 - File 内部基础文件对象、元数据和原文件内容读取接口。
 - Knowledge-owned 知识库、文档上传、文档处理状态、原文件内容、切片详情和知识检索接口。
+- Parser 内部文档解析运行时接口草案。
 - Document-owned 报告模板、素材、报告记录、大纲、章节、生成任务、报告文件、配置、统计和日志接口。
 - QA-owned 会话、消息、非流式/流式回答、SSE 事件回放、引用、配置、检索体验测试和统计接口。
 - AI Gateway 内部模型配置、OpenAI-compatible chat/function calling/embedding 和 OpenAI-style rerank 接口草案。

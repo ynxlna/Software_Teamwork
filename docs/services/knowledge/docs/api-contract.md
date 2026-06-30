@@ -8,6 +8,7 @@
 
 - `knowledge`：知识库、文档上传公开资源、文档业务元数据、解析/切片/向量化任务、Qdrant 索引、检索协调和原始文档内容入口。
 - `file`：后端内部基础文件对象存储和内容读取能力，由 `knowledge` 在服务边界内复用。
+- `parser`：后端内部文档解析运行时，把 raw bytes 转成规范化 parsed content；首期目标为 Python/PaddleOCR，不拥有业务状态。
 - `auth`：用户、角色、权限和认证上下文。
 - `gateway`：外部 API 入口。
 - `ai-gateway`：统一提供 OpenAI-compatible 模型调用入口，供 embedding、rerank 和后续 LLM 能力使用。
@@ -16,13 +17,15 @@
 
 - `knowledge` 是 Qdrant 的唯一业务写入方。
 - `qa`、`document` 只能通过本契约的知识查询资源复用知识能力，不能直接写 Qdrant。
-- 原始文件和较大解析产物存储在 MinIO，业务元数据存储在 PostgreSQL。
+- 原始文件存储在 File/MinIO 边界；Parser 返回规范化 parsed content，不保存知识业务状态、object key、bucket、内部 URL 或持久化解析产物。
+- Knowledge 负责保存业务元数据、chunks、processing jobs 和 Qdrant 索引事实。
 - Redis 用于异步任务队列、短期任务状态辅助和缓存；PostgreSQL 保存可追溯业务状态，不把 Redis 作为长期业务真相。
 
 技术基线：
 
 - 后端通用技术栈、数据库、迁移、日志、配置、队列和测试规则以 [`docs/architecture/technology-decisions.md`](../../../architecture/technology-decisions.md) 为准。
 - Qdrant 当前使用面较窄，短期以轻量 HTTP client 接入；Knowledge 负责 collection/point 生命周期，但不把 Qdrant 作为业务状态事实来源。
+- 文档解析通过 Parser 内部 HTTP API 接入，契约见 [`services/parser/api/openapi.yaml`](../../../../services/parser/api/openapi.yaml)；Knowledge 不引入 PaddleOCR/PaddlePaddle/OpenCV/CUDA 运行时依赖。
 - embedding、rerank 和后续 LLM 能力通过 AI Gateway profile 调用；Knowledge 不保存 provider API key 明文。
 
 ## 2. 通用约定
@@ -132,6 +135,37 @@ succeeded
 failed
 cancelled
 ```
+
+### 2.6 Worker、检索与契约测试解耦
+
+以下规则用于解除 A-12、A-14 对 A-11 runtime 完成度的直接依赖。A-11
+仍负责真实解析、切片、embedding 和 Qdrant 写入；A-12 和 A-14
+只依赖本节定义的稳定数据契约。
+
+稳定交接面不是 asynq worker 进程本身，而是 Knowledge 拥有的
+PostgreSQL 行和 Qdrant 最小 payload：
+
+- `knowledge_documents.status=ready` 且 `deleted_at IS NULL` 的文档可作为检索候选。
+- `document_chunks` 必须保存 `id`、`knowledge_base_id`、`document_id`、
+  `chunk_index`、`content`、`token_count`、`section_path`、`chunk_type`、
+  `metadata`、`qdrant_point_id`、`embedding_provider` 和 `embedding_dimension`。
+- Qdrant payload 必须至少包含 `knowledge_base_id`、`document_id`、
+  `chunk_id` 和 `chunk_index`，可包含 `tags`、`chunk_type`、`section_path`
+  和过滤用 `metadata`。
+- 展示字段、权限判断、文档状态判断和删除状态判断必须回 PostgreSQL hydrate；
+  不得把 Qdrant payload 当作业务事实来源。
+
+A-12 的 `knowledge-queries` 实现可以在单元测试和契约测试中直接 seed
+上述文档、chunk 和 vector hit fixture，或使用 fake Qdrant/AI Gateway adapter。
+这类测试不要求 A-11 worker、真实 Parser service、真实 Qdrant 或真实 embedding profile
+已经可运行。无命中、低分、无权限、文档未 `ready` 或已删除时，必须按本契约返回
+稳定空结果或统一错误 envelope。
+
+A-14 的 active operation 契约测试、错误 envelope 测试和 request id 测试可以使用
+seeded repository、fake file client、fake parser client、fake queue、fake vector index 和 fake AI Gateway。
+只有跨服务 smoke 或“上传 -> worker -> Parser -> Qdrant -> 检索”的端到端验收需要等待
+A-11 runtime。端到端 smoke 可以登记为 integration follow-up，不应阻塞 A-14
+对公开契约、路由、错误和状态流转的测试收口。
 
 ## 3. 数据对象
 

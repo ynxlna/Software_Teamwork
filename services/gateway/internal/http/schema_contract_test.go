@@ -195,8 +195,8 @@ func TestGatewayOwnedResponsesReturnJSONContentType(t *testing.T) {
 		{"healthz", http.MethodGet, "/healthz", http.StatusOK},
 		{"readyz", http.MethodGet, "/readyz", http.StatusOK},
 		{"not_found", http.MethodGet, "/unknown-path", http.StatusNotFound},
-		// Gateway routes unknown methods as not_found (no 405 distinction).
-		{"unregistered_method", http.MethodDelete, "/healthz", http.StatusNotFound},
+		// Unregistered path: returns gateway 404 JSON envelope.
+		{"unregistered_path_with_delete", http.MethodDelete, "/unknown-path", http.StatusNotFound},
 	}
 
 	for _, tc := range cases {
@@ -253,10 +253,13 @@ func TestGatewayErrorEnvelopeShape(t *testing.T) {
 			wantError: "validation_error",
 		},
 		{
-			// Gateway routes unknown methods as not_found (no 405 distinction).
-			name:      "unregistered_method",
+			// Unregistered path: returns gateway 404 JSON envelope.
+			// Note: DELETE /healthz is NOT used here because Go 1.22+ ServeMux
+			// returns a plain-text 405 for method mismatch on a registered path,
+			// bypassing the gateway's JSON error handler.
+			name:      "unregistered_path_with_delete",
 			method:    http.MethodDelete,
-			path:      "/healthz",
+			path:      "/unknown-path",
 			wantCode:  http.StatusNotFound,
 			wantError: "not_found",
 		},

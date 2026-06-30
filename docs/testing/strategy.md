@@ -17,7 +17,7 @@
 - 数据库 migration 必须能从空库 apply。
 - env-gated integration tests 默认可能跳过；如果本次改动触碰 repository、SQL 或 migration，应尽量提供本地数据库执行记录。
 - 当前没有完整跨服务 E2E smoke；不要用单服务测试或前端 mock E2E 替代跨服务验收。
-- Parser runtime、Dockerfile 和 Parser Service CI 已落地；当前 CI 使用 fake OCR backend 覆盖 lint/test/compile，并校验 PaddleOCR extra lock，不等同于真实 PaddleOCR 模型 smoke。
+- Parser runtime、Dockerfile 和 Parser Service CI 已落地；当前 CI 使用 fake OCR backend 覆盖 lint/test/compile，并在 PaddleOCR 依赖、锁文件或 Dockerfile 变化时校验 extra lock，不等同于真实 PaddleOCR 模型 smoke。
 - open PR、未合入 issue 和草案不能写成当前 `develop` 已实现；测试记录也不能把未稳定依赖的检查写成 required。
 
 ## 当前 CI 覆盖
@@ -26,7 +26,7 @@
 | --- | --- | --- |
 | `go-services.yml` | `services/{ai-gateway,auth,document,file,gateway,knowledge,qa}` | 执行 `go test ./...`、`go build ./cmd/server`；QA 额外 build `./cmd/agent`；Knowledge 额外用 PostgreSQL 16 和 `KNOWLEDGE_TEST_DATABASE_URL` 执行 repository lifecycle integration test。 |
 | `go-migrations.yml` | `services/{ai-gateway,auth,document,file,knowledge,qa}` | 校验 migration 文件名并用 `goose@v3.27.1` 对 PostgreSQL 16 apply；Gateway 和 Parser 当前没有 SQL migration。 |
-| `parser-service.yml` | `services/parser/**` | 执行 `uv sync --frozen --group dev`、PaddleOCR extra lock dry-run、`uv run ruff check .`、`uv run pytest` 和 `uv run python -m compileall src tests`；测试使用 fake OCR backend，不下载真实 PaddleOCR 模型。 |
+| `parser-service.yml` | `services/parser/**` | 执行 `uv sync --frozen --group dev`、`uv run ruff check .`、`uv run pytest` 和 `uv run python -m compileall src tests`；当 `services/parser/pyproject.toml`、`uv.lock` 或 `Dockerfile` 变化时额外执行 PaddleOCR extra lock dry-run；测试使用 fake OCR backend，不下载真实 PaddleOCR 模型。 |
 | `frontend.yml` | `apps/web/**`、根前端依赖文件和 workflow | 执行 `bun install --frozen-lockfile`、`bun run --cwd apps/web check`、`build`、`test:unit`、安装 Chromium 后执行 `test:e2e`。 |
 | `gateway-contract.yml` | Gateway OpenAPI active API | 执行 verifier unit tests 和 `python3 scripts/verify_gateway_active_api.py`。 |
 | `check-api-types.yml` | 前端 Gateway 类型漂移 | 在 `apps/web` 执行 `bun run api:generate`，本地等价命令为 `bun run --cwd apps/web api:generate`，并要求 generated diff 干净。 |

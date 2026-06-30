@@ -679,3 +679,36 @@ Handled latest Codex review by accepting backend QA tool/reasoning payload shape
 ### Next Steps
 
 - None - task complete
+
+
+## Session 20: F-016 rebase onto develop 74652c3
+
+**Date**: 2026-06-30
+**Task**: F-016 rebase onto develop 74652c3
+**Branch**: `Frontend/feat/qa-capability-aligned-chat`
+
+### Summary
+
+Rebased onto upstream/develop@74652c3 after another develop update, refreshed Trellis records, and reran frontend checks.
+
+### Main Changes
+
+(Add details)
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `c600401` | (see git log) |
+
+### Testing
+
+- [OK] (Add test results)
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

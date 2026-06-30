@@ -1429,10 +1429,8 @@ export interface components {
             content: string;
             tokenCount: number;
             chunkType?: string | null;
-            qdrantPointId?: string | null;
             embeddingProvider?: string | null;
             embeddingDimension?: number | null;
-            embeddingPreview?: number[] | null;
             metadata?: components["schemas"]["JsonObject"];
             /** Format: date-time */
             createdAt: string;
@@ -1447,7 +1445,7 @@ export interface components {
             knowledgeBaseIds?: string[];
             /** @default 10 */
             topK: number;
-            /** @default 0 */
+            /** @default 0.35 */
             scoreThreshold: number;
             tags?: string[];
             metadataFilter?: {
@@ -1459,13 +1457,13 @@ export interface components {
         };
         KnowledgeQueryResult: {
             score: number;
-            pointId?: string;
             knowledgeBaseId: string;
             documentId: string;
             chunkId: string;
             documentName: string;
             sectionPath?: string | null;
             chunkIndex?: number | null;
+            chunkType?: string | null;
             contentPreview: string;
             tags?: string[];
         };

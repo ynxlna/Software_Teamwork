@@ -2,16 +2,6 @@
   "env": {
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1"
   },
-  "permissions": {
-    "allow": [
-      "Bash(git rebase *)",
-      "Bash(git merge *)",
-      "Bash(go build *)",
-      "Bash(go test *)",
-      "Bash(git add *)",
-      "Bash(git commit -m 'chore\\(qa\\): merge upstream develop and resolve conflicts' -m 'Merge latest upstream/develop \\(94bc1b3\\) into JerryTeam/feat/qa-citations. *)"
-    ]
-  },
   "hooks": {
     "SessionStart": [
       {

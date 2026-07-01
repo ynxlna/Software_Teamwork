@@ -1,1 +1,3 @@
-{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/index.md", "reason": "Review Knowledge Gateway integration against frontend module scope and backend integration contract."}
+{"file": ".trellis/spec/frontend/type-safety.md", "reason": "Check typed API wrappers, generated Gateway DTO use, envelope handling, and capability error behavior."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Run and report required frontend checks, tests, build, and review checklist items."}
